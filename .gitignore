@@ -67,3 +67,9 @@ release/
 debug/
 h264bitstream/h264bitstream
 moonlight-common-c/moonlight-common-c
+*.a
+config.log
+**/qml_qmlcache.qrc
+*.a
+config.log
+**/qml_qmlcache.qrc
