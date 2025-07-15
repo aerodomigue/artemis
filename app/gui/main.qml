@@ -81,7 +81,11 @@ ApplicationWindow {
 
     // This configures the maximum width of the singleton attached QML ToolTip. If left unconstrained,
     // it will never insert a line break and just extend on forever.
-    ToolTip.toolTip.contentWidth: Math.min(tooltipTextLayoutHelper.width, 400)
+    // Note: ToolTip must be attached to an Item, not ApplicationWindow
+    Item {
+        id: tooltipHelper
+        ToolTip.toolTip.contentWidth: Math.min(tooltipTextLayoutHelper.width, 400)
+    }
 
     function goBack() {
         if (clearOnBack) {

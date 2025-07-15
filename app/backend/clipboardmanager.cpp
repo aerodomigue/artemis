@@ -22,6 +22,11 @@ ClipboardManager::ClipboardManager(QObject *parent)
     , m_showToast(true)
     , m_hideContent(false)
     , m_maxClipboardSize(DEFAULT_MAX_SIZE)
+    , m_enabled(false)
+    , m_connected(false)
+    , m_textOnlyMode(true)
+    , m_maxContentSizeMB(1)
+    , m_showNotifications(true)
     , m_syncInProgress(false)
 {
     // Connect to clipboard changes (matches Android behavior)
@@ -37,6 +42,13 @@ void ClipboardManager::setConnection(NvComputer *computer, NvHTTP *http)
 {
     m_computer = computer;
     m_http = http;
+    
+    bool wasConnected = m_connected;
+    m_connected = (computer != nullptr && http != nullptr);
+    
+    if (wasConnected != m_connected) {
+        emit connectionChanged();
+    }
     
     qDebug() << "ClipboardManager: Connected to" << (computer ? computer->name : "null");
     
@@ -56,6 +68,13 @@ void ClipboardManager::disconnect()
     m_computer = nullptr;
     m_http = nullptr;
     m_syncInProgress = false;
+    
+    bool wasConnected = m_connected;
+    m_connected = false;
+    
+    if (wasConnected) {
+        emit connectionChanged();
+    }
     
     emit apolloSupportChanged(false);
     
@@ -379,5 +398,44 @@ QString ClipboardManager::getClipboardFromServer()
         emit clipboardSyncFailed("Failed to get clipboard from server");
         qWarning() << "ClipboardManager: Failed to get clipboard from server";
         return QString();
+    }
+}
+
+// Property setters
+void ClipboardManager::setEnabled(bool enabled)
+{
+    if (m_enabled != enabled) {
+        m_enabled = enabled;
+        emit enabledChanged();
+        qDebug() << "ClipboardManager: Enabled changed to" << enabled;
+    }
+}
+
+void ClipboardManager::setTextOnlyMode(bool textOnly)
+{
+    if (m_textOnlyMode != textOnly) {
+        m_textOnlyMode = textOnly;
+        emit textOnlyModeChanged();
+        qDebug() << "ClipboardManager: Text-only mode changed to" << textOnly;
+    }
+}
+
+void ClipboardManager::setMaxContentSizeMB(int sizeMB)
+{
+    if (m_maxContentSizeMB != sizeMB) {
+        m_maxContentSizeMB = sizeMB;
+        m_maxClipboardSize = sizeMB * 1024 * 1024; // Convert to bytes
+        emit maxContentSizeMBChanged();
+        qDebug() << "ClipboardManager: Max content size changed to" << sizeMB << "MB";
+    }
+}
+
+void ClipboardManager::setShowNotifications(bool show)
+{
+    if (m_showNotifications != show) {
+        m_showNotifications = show;
+        m_showToast = show; // Sync with internal setting
+        emit showNotificationsChanged();
+        qDebug() << "ClipboardManager: Show notifications changed to" << show;
     }
 }

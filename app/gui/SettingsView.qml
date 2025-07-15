@@ -7,6 +7,8 @@ import StreamingPreferences 1.0
 import ComputerManager 1.0
 import SdlGamepadKeyNavigation 1.0
 import SystemProperties 1.0
+import ClipboardManager 1.0
+import ServerCommandManager 1.0
 
 Flickable {
     id: settingsPage
@@ -17,7 +19,7 @@ Flickable {
     boundsBehavior: Flickable.OvershootBounds
 
     contentWidth: settingsColumn1.width > settingsColumn2.width ? settingsColumn1.width : settingsColumn2.width
-    contentHeight: settingsColumn1.height > settingsColumn2.height ? settingsColumn1.height : settingsColumn2.height
+    contentHeight: (settingsColumn1.height > settingsColumn2.height ? settingsColumn1.height : settingsColumn2.height) + 50
 
     ScrollBar.vertical: ScrollBar {
         anchors {
@@ -1286,6 +1288,7 @@ Flickable {
     Column {
         padding: 10
         rightPadding: 20
+        bottomPadding: 30
         anchors.left: settingsColumn1.right
         id: settingsColumn2
         width: settingsPage.width / 2
@@ -1750,6 +1753,34 @@ Flickable {
                     ToolTip.text: qsTr("Display real-time stream performance information while streaming.") + "\n\n" +
                                   qsTr("You can toggle it at any time while streaming using Ctrl+Alt+Shift+S or Select+L1+R1+X.") + "\n\n" +
                                   qsTr("The performance overlay is not supported on Steam Link or Raspberry Pi.")
+                }
+            }
+        }
+
+        GroupBox {
+            id: artemisSettingsGroupBox
+            width: (parent.width - (parent.leftPadding + parent.rightPadding))
+            padding: 12
+            title: "<font color=\"skyblue\">" + qsTr("Artemis Features") + "</font>"
+            font.pointSize: 12
+
+            Column {
+                anchors.fill: parent
+                spacing: 10
+
+                ClipboardSettings {
+                    id: clipboardSettings
+                    width: parent.width
+                }
+
+                // Note about Server Commands
+                Label {
+                    width: parent.width
+                    text: qsTr("Server Commands are available during streaming sessions via the game menu when connected to Apollo servers.")
+                    font.pointSize: 9
+                    wrapMode: Text.Wrap
+                    color: "#aaaaaa"
+                    topPadding: 10
                 }
             }
         }

@@ -9,8 +9,16 @@ class NvComputer;
 class NvHTTP;
 
 // Declare opaque pointers for Qt's meta-object system
+// (Only declare if not already declared by clipboardmanager.h)
+#ifndef NVCOMPUTER_OPAQUE_DECLARED
+#define NVCOMPUTER_OPAQUE_DECLARED
 Q_DECLARE_OPAQUE_POINTER(NvComputer*)
+#endif
+
+#ifndef NVHTTP_OPAQUE_DECLARED  
+#define NVHTTP_OPAQUE_DECLARED
 Q_DECLARE_OPAQUE_POINTER(NvHTTP*)
+#endif
 
 /**
  * @brief Manages server commands functionality with Apollo servers
@@ -22,6 +30,8 @@ Q_DECLARE_OPAQUE_POINTER(NvHTTP*)
 class ServerCommandManager : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(bool hasPermission READ hasPermission NOTIFY permissionChanged)
+    Q_PROPERTY(bool isExecuting READ isExecuting NOTIFY executionStateChanged)
     QML_ELEMENT
 
 public:
@@ -36,6 +46,10 @@ public:
     explicit ServerCommandManager(QObject *parent = nullptr);
     ~ServerCommandManager();
 
+    // Property getters
+    bool hasPermission() const { return m_hasPermission; }
+    bool isExecuting() const { return m_isExecuting; }
+
     // Connection management
     Q_INVOKABLE void setConnection(NvComputer *computer, NvHTTP *http);
     Q_INVOKABLE void disconnect();
@@ -44,6 +58,7 @@ public:
     Q_INVOKABLE bool hasServerCommandPermission() const;
     Q_INVOKABLE void refreshCommands();
     Q_INVOKABLE void executeCommand(const QString &commandId);
+    Q_INVOKABLE void executeCustomCommand(const QString &command);
 
     // Command list access
     Q_INVOKABLE QStringList getAvailableCommands() const;
@@ -56,8 +71,9 @@ public:
 signals:
     void commandsRefreshed();
     void commandExecuted(const QString &commandId, bool success, const QString &result);
-    void commandExecutionFailed(const QString &commandId, const QString &error);
-    void permissionChanged(bool hasPermission);
+    void commandFailed(const QString &commandId, const QString &error);
+    void permissionChanged();
+    void executionStateChanged();
     void noCommandsAvailable(); // Matches Android dialog
 
 private slots:
@@ -80,6 +96,7 @@ private:
     NvHTTP *m_http;
     
     bool m_hasPermission;
+    bool m_isExecuting;
     QStringList m_availableCommands;
     QHash<QString, QString> m_commandNames;
     QHash<QString, QString> m_commandDescriptions;

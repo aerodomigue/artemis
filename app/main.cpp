@@ -47,6 +47,8 @@
 #include "streaming/session.h"
 #include "settings/streamingpreferences.h"
 #include "gui/sdlgamepadkeynavigation.h"
+#include "backend/clipboardmanager.h"
+#include "backend/servercommandmanager.h"
 
 #if defined(Q_OS_WIN32)
 #define IS_UNSPECIFIED_HANDLE(x) ((x) == INVALID_HANDLE_VALUE || (x) == NULL)
@@ -726,6 +728,16 @@ int main(int argc, char *argv[])
                                                    "StreamingPreferences",
                                                    [](QQmlEngine* qmlEngine, QJSEngine*) -> QObject* {
                                                        return StreamingPreferences::get(qmlEngine);
+                                                   });
+    qmlRegisterSingletonType<ClipboardManager>("ClipboardManager", 1, 0,
+                                               "ClipboardManager",
+                                               [](QQmlEngine*, QJSEngine*) -> QObject* {
+                                                   return new ClipboardManager();
+                                               });
+    qmlRegisterSingletonType<ServerCommandManager>("ServerCommandManager", 1, 0,
+                                                   "ServerCommandManager",
+                                                   [](QQmlEngine*, QJSEngine*) -> QObject* {
+                                                       return new ServerCommandManager();
                                                    });
 
     // Create the identity manager on the main thread

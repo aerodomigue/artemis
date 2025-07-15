@@ -5,6 +5,7 @@
 #include <QJsonArray>
 #include <QNetworkRequest>
 #include <QDebug>
+#include <QTimer>
 
 // Define builtin commands that Artemis supports
 const QList<ServerCommandManager::ServerCommand> ServerCommandManager::BUILTIN_COMMANDS = {
@@ -51,6 +52,7 @@ ServerCommandManager::ServerCommandManager(QObject *parent)
     , m_computer(nullptr)
     , m_http(nullptr)
     , m_hasPermission(false)
+    , m_isExecuting(false)
     , m_refreshInProgress(false)
 {
     qDebug() << "ServerCommandManager: Initialized";
@@ -66,6 +68,8 @@ void ServerCommandManager::setConnection(NvComputer *computer, NvHTTP *http)
     m_computer = computer;
     m_http = http;
     
+    bool oldPermission = m_hasPermission;
+    
     // Check if this is an Apollo server and refresh commands
     if (computer && http) {
         refreshCommands();
@@ -75,6 +79,10 @@ void ServerCommandManager::setConnection(NvComputer *computer, NvHTTP *http)
         m_commandNames.clear();
         m_commandDescriptions.clear();
         emit commandsRefreshed();
+    }
+    
+    if (oldPermission != m_hasPermission) {
+        emit permissionChanged();
     }
 }
 
@@ -101,6 +109,7 @@ void ServerCommandManager::refreshCommands()
     }
     
     m_refreshInProgress = true;
+    bool oldPermission = m_hasPermission;
     
     // For now, just populate with builtin commands if it's an Apollo server
     if (isApolloServer()) {
@@ -123,25 +132,76 @@ void ServerCommandManager::refreshCommands()
     
     m_refreshInProgress = false;
     emit commandsRefreshed();
+    
+    if (oldPermission != m_hasPermission) {
+        emit permissionChanged();
+    }
 }
 
 void ServerCommandManager::executeCommand(const QString &commandId)
 {
     if (!m_computer || !m_http || !m_hasPermission) {
-        emit commandExecuted(commandId, false, "Server commands not available");
+        emit commandFailed(commandId, "Server commands not available");
         return;
     }
     
     if (!m_availableCommands.contains(commandId)) {
-        emit commandExecuted(commandId, false, "Command not found");
+        emit commandFailed(commandId, "Command not found");
         return;
     }
+
+    if (m_isExecuting) {
+        emit commandFailed(commandId, "Another command is already executing");
+        return;
+    }
+    
+    m_isExecuting = true;
+    m_currentExecutingCommand = commandId;
+    emit executionStateChanged();
     
     qDebug() << "ServerCommandManager: Executing command:" << commandId;
     
     // TODO: Implement actual command execution via HTTP
-    // For now, just simulate success
-    emit commandExecuted(commandId, true, "Command executed successfully");
+    // For now, just simulate success with a delay
+    QTimer::singleShot(1000, this, [this, commandId]() {
+        m_isExecuting = false;
+        m_currentExecutingCommand.clear();
+        emit executionStateChanged();
+        emit commandExecuted(commandId, true, "Command executed successfully");
+    });
+}
+
+void ServerCommandManager::executeCustomCommand(const QString &command)
+{
+    if (command.isEmpty()) {
+        emit commandFailed("custom", "Empty command");
+        return;
+    }
+
+    if (!m_computer || !m_http || !m_hasPermission) {
+        emit commandFailed("custom", "Server commands not available");
+        return;
+    }
+
+    if (m_isExecuting) {
+        emit commandFailed("custom", "Another command is already executing");
+        return;
+    }
+    
+    m_isExecuting = true;
+    m_currentExecutingCommand = "custom";
+    emit executionStateChanged();
+    
+    qDebug() << "ServerCommandManager: Executing custom command:" << command;
+    
+    // TODO: Implement actual custom command execution via HTTP
+    // For now, just simulate success with a delay
+    QTimer::singleShot(1500, this, [this, command]() {
+        m_isExecuting = false;
+        m_currentExecutingCommand.clear();
+        emit executionStateChanged();
+        emit commandExecuted("custom", true, QString("Custom command '%1' executed successfully").arg(command));
+    });
 }
 
 QStringList ServerCommandManager::getAvailableCommands() const
