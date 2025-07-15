@@ -9,6 +9,10 @@
 class NvComputer;
 class NvHTTP;
 
+// Declare opaque pointers for Qt's meta-object system
+Q_DECLARE_OPAQUE_POINTER(NvComputer*)
+Q_DECLARE_OPAQUE_POINTER(NvHTTP*)
+
 /**
  * @brief Manages clipboard synchronization between client and server
  * 
@@ -36,6 +40,9 @@ public:
     Q_INVOKABLE void enableSmartSync(bool enabled);
     Q_INVOKABLE bool isSmartSyncEnabled() const;
 
+    // Apollo server detection (clipboard sync only works with Apollo servers)
+    Q_INVOKABLE bool isClipboardSyncSupported() const;
+
     // Auto-sync triggers (matches Android behavior)
     Q_INVOKABLE void onStreamStarted();
     Q_INVOKABLE void onStreamResumed();
@@ -56,10 +63,11 @@ public:
 
 signals:
     void clipboardSyncStarted();
-    void clipboardSyncCompleted(bool success, const QString &message);
+    void clipboardSyncCompleted();
     void clipboardSyncFailed(const QString &error);
     void clipboardContentChanged();
     void showToast(const QString &message);
+    void apolloSupportChanged(bool supported);
 
 private slots:
     void onClipboardChanged();

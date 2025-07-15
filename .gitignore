@@ -59,3 +59,9 @@ config.tests/*/Makefile
 
 # Visual Studio
 **/.vs/
+*.a
+*.o
+config.log
+Makefile*
+release/
+debug/
