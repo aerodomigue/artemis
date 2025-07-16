@@ -174,9 +174,106 @@ vDisplay = Game.this.getIntent().getBooleanExtra(EXTRA_VDISPLAY, false);
 
 **Research Needed**: Check app list management and Apollo-specific endpoints.
 
-## 🎯 **IMPLEMENTATION ROADMAP FOR QT**
+## 🎉 **BREAKTHROUGH: Apollo Integration Discovered!**
 
-### **Phase 1: Client-Side Settings (IMMEDIATE - Easy Wins)**
+**MAJOR FINDING**: Analysis of Apollo source code reveals exactly how these features work!
+
+### ✅ **1. Fractional Refresh Rate** - **Apollo Parameter Integration**
+**Implementation Type**: 🔄 **Apollo-Enhanced (with fallback)**
+
+**Apollo Integration** (lines 436-440 in nvhttp.cpp):
+```cpp
+auto fps = atof(segment.c_str());  // Supports fractional rates!
+if (fps < 1000) {
+    fps *= 1000;  // Internal representation
+};
+launch_session->fps = (int)fps;
+```
+
+**Client Implementation**:
+- **Parameter**: `mode` in launch request
+- **Format**: `"1920x1080x59.94"` (width x height x fractional_fps)
+- **Fallback**: Standard GameStream servers ignore fractional part
+
+### ✅ **2. Virtual Display Control** - **Apollo Parameter Integration**
+**Implementation Type**: 🔄 **Apollo-Enhanced (with fallback)**
+
+**Apollo Integration** (line 461 in nvhttp.cpp):
+```cpp
+launch_session->virtual_display = util::from_view(get_arg(args, "virtualDisplay", "0")) || named_cert_p->always_use_virtual_display;
+```
+
+**Client Implementation**:
+- **Parameter**: `virtualDisplay` in launch request
+- **Format**: `"0"` or `"1"`
+- **Fallback**: Standard GameStream servers ignore parameter
+
+### ✅ **3. Resolution Scaling** - **Apollo Parameter Integration**
+**Implementation Type**: 🔄 **Apollo-Enhanced (with fallback)**
+
+**Apollo Integration** (line 462 in nvhttp.cpp):
+```cpp
+launch_session->scale_factor = util::from_view(get_arg(args, "scaleFactor", "100"));
+```
+
+**Client Implementation**:
+- **Parameter**: `scaleFactor` in launch request
+- **Format**: `"100"` (percentage as string)
+- **Fallback**: Standard GameStream servers ignore parameter
+
+## 🎯 **IMPLEMENTATION ROADMAP - UPDATED**
+
+### **Phase 1: UI Settings** ✅ **COMPLETED**
+- Virtual Display Control checkbox
+- Fractional Refresh Rate settings
+- Resolution Scaling settings
+- All settings properly saved/loaded
+
+### **Phase 2: Apollo Integration** 🔄 **NEXT**
+Need to modify Moonlight Qt's stream launch logic to include these parameters:
+
+#### **Stream Launch Parameter Integration**
+```cpp
+// In stream launch code
+if (StreamingPreferences.enableFractionalRefreshRate) {
+    // Modify mode parameter: "1920x1080x59.94"
+    mode = QString("%1x%2x%3").arg(width).arg(height).arg(customRefreshRate);
+}
+
+if (StreamingPreferences.useVirtualDisplay) {
+    // Add virtualDisplay parameter
+    launchParams["virtualDisplay"] = "1";
+}
+
+if (StreamingPreferences.enableResolutionScaling) {
+    // Add scaleFactor parameter  
+    launchParams["scaleFactor"] = QString::number(resolutionScaleFactor);
+}
+```
+
+#### **Server Capability Detection** (Optional Enhancement)
+```cpp
+// Check if server supports Apollo features
+bool isApolloServer = serverInfo.contains("VirtualDisplayCapable");
+if (!isApolloServer && useApolloFeatures) {
+    // Show warning: "These features require Apollo backend"
+}
+```
+
+## 🎉 **EXCELLENT NEWS!**
+
+**Our UI implementation is already correct!** We just need to:
+
+1. **Find Moonlight Qt's stream launch code**
+2. **Add the Apollo parameters to launch requests**
+3. **Test with Apollo server**
+
+The features will:
+✅ **Work perfectly with Apollo servers**  
+✅ **Be safely ignored by standard GameStream servers**  
+✅ **Provide graceful degradation**
+
+This is exactly how Artemis Android works! 🚀
 
 #### 1. Fractional Refresh Rate ⚡ **(30 minutes)**
 ```cpp

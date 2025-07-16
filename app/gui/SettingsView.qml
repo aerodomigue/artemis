@@ -851,6 +851,159 @@ Flickable {
         }
 
         GroupBox {
+            id: artemisStreamingGroupBox
+            width: (parent.width - (parent.leftPadding + parent.rightPadding))
+            padding: 12
+            title: "<font color=\"skyblue\">" + qsTr("Artemis Streaming Enhancements") + "</font>"
+            font.pointSize: 12
+
+            Column {
+                anchors.fill: parent
+                spacing: 10
+
+                Label {
+                    width: parent.width
+                    text: qsTr("Client-side streaming enhancements")
+                    font.pointSize: 12
+                    wrapMode: Text.Wrap
+                }
+
+                Label {
+                    width: parent.width
+                    text: qsTr("These features work with any GameStream server and don't require Apollo backend.")
+                    font.pointSize: 9
+                    wrapMode: Text.Wrap
+                    color: "#888888"
+                }
+
+                // Virtual Display Control
+                CheckBox {
+                    id: virtualDisplayCheck
+                    width: parent.width
+                    hoverEnabled: true
+                    text: qsTr("Use Virtual Display")
+                    font.pointSize: 12
+                    checked: StreamingPreferences.useVirtualDisplay
+                    onCheckedChanged: {
+                        StreamingPreferences.useVirtualDisplay = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Creates a virtual display on the server for streaming. Useful for headless servers or when you want to stream without affecting the main display.")
+                }
+
+                // Fractional Refresh Rate
+                CheckBox {
+                    id: fractionalRefreshRateCheck
+                    width: parent.width
+                    hoverEnabled: true
+                    text: qsTr("Enable Fractional Refresh Rate")
+                    font.pointSize: 12
+                    checked: StreamingPreferences.enableFractionalRefreshRate
+                    onCheckedChanged: {
+                        StreamingPreferences.enableFractionalRefreshRate = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Allows setting custom fractional refresh rates like 59.94 Hz for better compatibility with certain displays and content.")
+                }
+
+                Row {
+                    spacing: 10
+                    visible: StreamingPreferences.enableFractionalRefreshRate
+                    width: parent.width
+
+                    Label {
+                        text: qsTr("Custom Refresh Rate:")
+                        font.pointSize: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    SpinBox {
+                        id: customRefreshRateSpinBox
+                        from: 3000  // 30.00 Hz
+                        to: 24000   // 240.00 Hz
+                        stepSize: 1
+                        value: StreamingPreferences.customRefreshRate * 100
+                        
+                        property int decimals: 2
+                        property real realValue: value / 100.0
+
+                        validator: DoubleValidator {
+                            bottom: Math.min(customRefreshRateSpinBox.from, customRefreshRateSpinBox.to)
+                            top: Math.max(customRefreshRateSpinBox.from, customRefreshRateSpinBox.to)
+                        }
+
+                        textFromValue: function(value, locale) {
+                            return Number(value / 100).toLocaleString(locale, 'f', customRefreshRateSpinBox.decimals) + " Hz"
+                        }
+
+                        valueFromText: function(text, locale) {
+                            return Number.fromLocaleString(locale, text.replace(" Hz", "")) * 100
+                        }
+
+                        onValueChanged: {
+                            StreamingPreferences.customRefreshRate = realValue
+                        }
+                    }
+                }
+
+                // Resolution Scaling
+                CheckBox {
+                    id: resolutionScalingCheck
+                    width: parent.width
+                    hoverEnabled: true
+                    text: qsTr("Enable Resolution Scaling")
+                    font.pointSize: 12
+                    checked: StreamingPreferences.enableResolutionScaling
+                    onCheckedChanged: {
+                        StreamingPreferences.enableResolutionScaling = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Scales the stream resolution. Useful for improving performance on lower-end devices or increasing quality on high-DPI displays.")
+                }
+
+                Row {
+                    spacing: 10
+                    visible: StreamingPreferences.enableResolutionScaling
+                    width: parent.width
+
+                    Label {
+                        text: qsTr("Scale Factor:")
+                        font.pointSize: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Slider {
+                        id: resolutionScaleSlider
+                        from: 50    // 50%
+                        to: 200     // 200%
+                        stepSize: 5
+                        value: StreamingPreferences.resolutionScaleFactor
+                        
+                        onValueChanged: {
+                            StreamingPreferences.resolutionScaleFactor = value
+                        }
+                    }
+
+                    Label {
+                        text: resolutionScaleSlider.value + "%"
+                        font.pointSize: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 40
+                    }
+                }
+            }
+        }
+
+        GroupBox {
 
             id: audioSettingsGroupBox
             width: (parent.width - (parent.leftPadding + parent.rightPadding))

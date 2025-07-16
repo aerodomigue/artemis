@@ -642,6 +642,19 @@ bool Session::initialize()
     m_StreamConfig.width = m_Preferences->width;
     m_StreamConfig.height = m_Preferences->height;
 
+    // Artemis Apollo integration: Apply resolution scaling if enabled
+    if (m_Preferences->enableResolutionScaling && m_Preferences->resolutionScaleFactor != 100) {
+        // Apply scaling factor to resolution
+        m_StreamConfig.width = (m_StreamConfig.width * m_Preferences->resolutionScaleFactor) / 100;
+        m_StreamConfig.height = (m_StreamConfig.height * m_Preferences->resolutionScaleFactor) / 100;
+        
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Applied resolution scaling factor %d%%: %dx%d -> %dx%d",
+                    m_Preferences->resolutionScaleFactor,
+                    m_Preferences->width, m_Preferences->height,
+                    m_StreamConfig.width, m_StreamConfig.height);
+    }
+
     int x, y, width, height;
     getWindowDimensions(x, y, width, height);
 
@@ -671,6 +684,19 @@ bool Session::initialize()
 
     m_StreamConfig.fps = m_Preferences->fps;
     m_StreamConfig.bitrate = m_Preferences->bitrateKbps;
+
+    // Artemis Apollo integration: Apply fractional refresh rate if enabled
+    if (m_Preferences->enableFractionalRefreshRate) {
+        // Convert fractional refresh rate to integer (multiply by 1000 for precision)
+        // This matches Apollo's internal representation: fps * 1000
+        int fractionalFps = (int)(m_Preferences->customRefreshRate * 1000);
+        m_StreamConfig.fps = fractionalFps;
+        
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Applied fractional refresh rate: %.2f Hz (internal: %d)",
+                    m_Preferences->customRefreshRate,
+                    fractionalFps);
+    }
 
 #ifndef STEAM_LINK
     // Opt-in to all encryption features if we detect that the platform
