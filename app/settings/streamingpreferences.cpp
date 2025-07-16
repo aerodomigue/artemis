@@ -52,6 +52,13 @@
 #define SER_KEEPAWAKE "keepawake"
 #define SER_LANGUAGE "language"
 
+// Artemis client-side streaming enhancements
+#define SER_VIRTUALDISPLAY "virtualdisplay"
+#define SER_FRACTIONALREFRESHRATE "fractionalrefreshrate"
+#define SER_CUSTOMREFRESHRATE "customrefreshrate"
+#define SER_RESOLUTIONSCALING "resolutionscaling"
+#define SER_RESOLUTIONSCALEFACTOR "resolutionscalefactor"
+
 #define CURRENT_DEFAULT_VER 2
 
 static StreamingPreferences* s_GlobalPrefs;
@@ -165,6 +172,13 @@ void StreamingPreferences::reload()
                                                                                                                  : UIDisplayMode::UI_MAXIMIZED)).toInt());
     language = static_cast<Language>(settings.value(SER_LANGUAGE,
                                                     static_cast<int>(Language::LANG_AUTO)).toInt());
+
+    // Artemis client-side streaming enhancements
+    useVirtualDisplay = settings.value(SER_VIRTUALDISPLAY, false).toBool();
+    enableFractionalRefreshRate = settings.value(SER_FRACTIONALREFRESHRATE, false).toBool();
+    customRefreshRate = settings.value(SER_CUSTOMREFRESHRATE, 59.94).toDouble();
+    enableResolutionScaling = settings.value(SER_RESOLUTIONSCALING, false).toBool();
+    resolutionScaleFactor = settings.value(SER_RESOLUTIONSCALEFACTOR, 100).toInt();
 
 
     // Perform default settings updates as required based on last default version
@@ -355,6 +369,13 @@ void StreamingPreferences::save()
     settings.setValue(SER_SWAPFACEBUTTONS, swapFaceButtons);
     settings.setValue(SER_CAPTURESYSKEYS, captureSysKeysMode);
     settings.setValue(SER_KEEPAWAKE, keepAwake);
+    
+    // Artemis client-side streaming enhancements
+    settings.setValue(SER_VIRTUALDISPLAY, useVirtualDisplay);
+    settings.setValue(SER_FRACTIONALREFRESHRATE, enableFractionalRefreshRate);
+    settings.setValue(SER_CUSTOMREFRESHRATE, customRefreshRate);
+    settings.setValue(SER_RESOLUTIONSCALING, enableResolutionScaling);
+    settings.setValue(SER_RESOLUTIONSCALEFACTOR, resolutionScaleFactor);
 }
 
 int StreamingPreferences::getDefaultBitrate(int width, int height, int fps, bool yuv444)
