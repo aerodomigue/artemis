@@ -2,6 +2,9 @@
 #include "settings/streamingpreferences.h"
 #include "streaming/streamutils.h"
 #include "backend/richpresencemanager.h"
+#include "backend/quickmenumanager.h"
+#include "backend/servercommandmanager.h"
+#include "backend/clipboardmanager.h"
 
 #include <Limelight.h>
 #include "SDL_compat.h"
@@ -507,6 +510,13 @@ Session::getDecoderAvailability(SDL_Window* window,
     return hw ? DecoderAvailability::Hardware : DecoderAvailability::Software;
 }
 
+void Session::toggleQuickMenu()
+{
+    if (m_QuickMenuManager) {
+        m_QuickMenuManager->toggle();
+    }
+}
+
 bool Session::populateDecoderProperties(SDL_Window* window)
 {
     IVideoDecoder* decoder;
@@ -582,8 +592,11 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
       m_PortTestResults(0),
       m_OpusDecoder(nullptr),
       m_AudioRenderer(nullptr),
-      m_AudioSampleCount(0),
-      m_DropAudioEndTime(0)
+    m_AudioSampleCount(0),
+    m_DropAudioEndTime(0),
+    m_QuickMenuManager(new QuickMenuManager()),
+    m_ServerCommandManager(new ServerCommandManager()),
+    m_ClipboardManager(new ClipboardManager())
 {
 }
 
@@ -977,6 +990,32 @@ bool Session::initialize()
                 }
             }
         }
+    }
+
+    // Initialize ServerCommandManager and ClipboardManager after everything is configured
+    if (m_ServerCommandManager && m_QuickMenuManager && m_ClipboardManager) {
+        // Set up the ServerCommandManager with the computer and HTTP client
+        NvHTTP* httpClient = new NvHTTP(m_Computer);
+        m_ServerCommandManager->setConnection(m_Computer, httpClient);
+        
+        // Set up the ClipboardManager with the same HTTP client
+        m_ClipboardManager->setConnection(m_Computer, httpClient);
+        
+        // Connect the ServerCommandManager to the QuickMenuManager
+        m_QuickMenuManager->setServerCommandManager(m_ServerCommandManager);
+        
+        // Connect the ClipboardManager to the QuickMenuManager
+        m_QuickMenuManager->setClipboardManager(m_ClipboardManager);
+        
+        // Connect signals for permission updates
+        connect(m_ServerCommandManager, &ServerCommandManager::permissionChanged,
+                m_QuickMenuManager, &QuickMenuManager::serverCommandsChanged);
+        
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "ServerCommandManager and ClipboardManager initialized and connected to QuickMenuManager");
+    } else {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Failed to initialize ServerCommandManager, ClipboardManager or QuickMenuManager is null");
     }
 
     return true;
@@ -1955,6 +1994,20 @@ void Session::execInternal()
 #endif
 
     m_InputHandler->setWindow(m_Window);
+
+    // Set window geometry for QuickMenuManager
+    if (m_QuickMenuManager) {
+        // Get actual window position after SDL window creation
+        int actualX, actualY;
+        SDL_GetWindowPosition(m_Window, &actualX, &actualY);
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Setting QuickMenuManager geometry: %d,%d %dx%d (actual pos: %d,%d)", 
+                    x, y, width, height, actualX, actualY);
+        m_QuickMenuManager->setWindowGeometry(actualX, actualY, width, height);
+    } else {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "QuickMenuManager is null when trying to set geometry");
+    }
 
     QSvgRenderer svgIconRenderer(QString(":/res/moonlight.svg"));
     QImage svgImage(ICON_SIZE, ICON_SIZE, QImage::Format_RGBA8888);

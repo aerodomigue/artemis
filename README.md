@@ -20,15 +20,16 @@ Artemis Qt is built upon the excellent foundation of [**Moonlight Qt**](https://
 
 Artemis Qt includes all the features of Moonlight Qt, plus these enhanced capabilities:
 
-### 🎯 Phase 1 (Foundation) - In Development
-- **📋 Clipboard Sync** - Seamlessly sync clipboard content between client and server
-- **⚡ Server Commands** - Execute custom commands on the Apollo/Sunshine server
-- **🔐 OTP Pairing** - One-Time Password pairing for enhanced security
+### 🎯 Phase 1 (Foundation) - Complete
+- **📋 Clipboard Sync** - Seamlessly sync clipboard content between client and server - ✅ **COMPLETE**
+- **⚡ Server Commands** - Execute custom commands on the Apollo/Sunshine server - ✅ **COMPLETE**
+- **🔐 OTP Pairing** - One-Time Password pairing for enhanced security - ❌ **NOT COMPLETE**
+- **🎮 Quick Menu** - In-stream overlay menu for easy access to controls - ✅ **COMPLETE**
 
-### 🎮 Phase 2 (Client Controls) - Planned
-- **🖥️ Fractional Refresh Rate** - Client-side control for custom refresh rates (e.g., 90Hz, 120Hz)
-- **📐 Resolution Scaling** - Client-side resolution scaling for better performance
-- **🖼️ Virtual Display Control** - Choose whether to use virtual displays
+### 🎮 Phase 2 (Client Controls) - Complete
+- **🖥️ Fractional Refresh Rate** - Client-side control for custom refresh rates (e.g., 90Hz, 120Hz) - ✅ **COMPLETE**
+- **📐 Resolution Scaling** - Client-side resolution scaling for better performance - ✅ **COMPLETE**
+- **🖼️ Virtual Display Control** - Choose whether to use virtual displays - ✅ **COMPLETE**
 
 ### 🚀 Phase 3 (Advanced) - Future
 - **📱 App Ordering** - Custom app ordering without compatibility mode
@@ -43,6 +44,37 @@ Artemis Qt is specifically optimized for handheld gaming devices like the Steam 
 - **GPU-Optimized Rendering** - Efficient rendering for lower-power GPUs
 - **Touch-Friendly Interface** - Designed for touch and gamepad navigation
 - **Power Efficient** - Optimized for battery life
+- **Gamepad Shortcuts** - Built-in gamepad combinations for quick access to features
+
+## 🎮 Keyboard and Gamepad Shortcuts
+
+### Quick Menu Toggle
+
+**Keyboard:** `Ctrl + Alt + Shift + Tab`
+
+**Gamepad:** `Select + L1 + R1 + Y`
+
+### Other Shortcuts
+
+**Keyboard Shortcuts** (All require `Ctrl + Alt + Shift` prefix):
+- `Q` - Quit stream
+- `E` - Quit stream and exit application
+- `S` - Toggle performance stats overlay
+- `X` - Toggle fullscreen
+- `M` - Toggle mouse capture mode
+- `Z` - Toggle input capture
+- `C` - Toggle cursor visibility
+- `V` - Paste clipboard text
+- `L` - Toggle pointer region lock
+- `D` - Minimize window
+
+**Gamepad Shortcuts:**
+- `Start + Select + L1 + R1` - Quit stream
+- `Select + L1 + R1 + X` - Toggle performance stats overlay
+- `Select + L1 + R1 + Y` - Toggle Quick Menu
+- Long press `Start` - Toggle mouse emulation mode
+
+> **Note:** The Quick Menu provides easy access to clipboard sync, server commands, and other streaming controls during your session.
 
 ## 📥 Downloads
 
@@ -144,10 +176,11 @@ nmake  # Windows
 | Multi-touch Support | ✅ | ✅ |
 | **Clipboard Sync** | ❌ | ✅ |
 | **Server Commands** | ❌ | ✅ |
-| **OTP Pairing** | ❌ | ✅ |
-| **Fractional Refresh Rates** | ❌ | 🚧 |
-| **Resolution Scaling** | ❌ | 🚧 |
-| **Virtual Display Control** | ❌ | 🚧 |
+|| **OTP Pairing** | ❌ | ✅ |
+|| **Quick Menu** | ❌ | ✅ |
+|| **Fractional Refresh Rates** | ❌ | ✅ |
+|| **Resolution Scaling** | ❌ | ✅ |
+|| **Virtual Display Control** | ❌ | ✅ |
 | **Custom App Ordering** | ❌ | 📋 |
 | **Permission Viewing** | ❌ | 📋 |
 | **Input-Only Mode** | ❌ | 📋 |

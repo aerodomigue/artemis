@@ -21,5 +21,7 @@
         <file>gui/CliPair.qml</file>
         <file>gui/ClipboardSettings.qml</file>
         <file>gui/ServerCommands.qml</file>
+        <file>gui/QuickMenu.qml</file>
+        <file>gui/Toast.qml</file>
     </qresource>
 </RCC>

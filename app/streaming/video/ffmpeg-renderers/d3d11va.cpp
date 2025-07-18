@@ -968,6 +968,13 @@ void D3D11VARenderer::notifyOverlayUpdated(Overlay::OverlayType type)
         renderRect.x = 0;
         renderRect.y = m_DisplayHeight - newSurface->h;
     }
+    else if (type == Overlay::OverlayServerCommands) {
+        // Center
+        renderRect.x = (m_DisplayWidth - newSurface->w) / 2;
+        renderRect.y = (m_DisplayHeight - newSurface->h) / 2;
+    } else {
+        SDL_assert(false);
+    }
 
     renderRect.w = newSurface->w;
     renderRect.h = newSurface->h;

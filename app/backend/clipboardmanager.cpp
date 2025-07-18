@@ -152,31 +152,10 @@ bool ClipboardManager::isClipboardSyncSupported() const
         return false;
     }
 
-    // Clipboard sync only works with Apollo servers (not GeForce Experience)
-    // Apollo servers can be detected by checking for specific server info fields
-    try {
-        QString serverInfo = m_http->getServerInfo(NvHTTP::NVLL_ERROR, true);
-        
-        // Apollo servers typically have different server info structure
-        // Check for Apollo-specific fields or version patterns
-        QString serverVersion = m_http->getXmlString(serverInfo, "appversion");
-        QString serverName = m_http->getXmlString(serverInfo, "hostname");
-        
-        // Apollo/Sunshine servers typically don't have GFE version info
-        QString gfeVersion = m_http->getXmlString(serverInfo, "GfeVersion");
-        
-        // If no GFE version but has app version, likely Apollo/Sunshine
-        bool isApollo = gfeVersion.isEmpty() && !serverVersion.isEmpty();
-        
-        qDebug() << "ClipboardManager: Apollo detection - GFE:" << gfeVersion 
-                 << "AppVer:" << serverVersion << "IsApollo:" << isApollo;
-        
-        return isApollo;
-    }
-    catch (const std::exception& e) {
-        qWarning() << "ClipboardManager: Failed to detect Apollo server:" << e.what();
-        return false;
-    }
+    // Based on Artemis Android implementation, we don't need complex Apollo detection.
+    // Just return true and let the HTTP calls succeed or fail naturally.
+    // The clipboard sync endpoints work with any server that supports them.
+    return true;
 }
 
 void ClipboardManager::onStreamStarted()

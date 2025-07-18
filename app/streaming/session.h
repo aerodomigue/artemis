@@ -11,6 +11,10 @@
 #include "audio/renderers/renderer.h"
 #include "video/overlaymanager.h"
 
+class QuickMenuManager;
+class ServerCommandManager;
+class ClipboardManager;
+
 class SupportedVideoFormatList : public QList<int>
 {
 public:
@@ -103,7 +107,20 @@ public:
 
     // NB: This may not get destroyed for a long time! Don't put any cleanup here.
     // Use Session::exec() or DeferredSessionCleanupTask instead.
-    virtual ~Session() {};
+    virtual ~Session() {
+        if (m_QuickMenuManager) {
+            delete m_QuickMenuManager;
+            m_QuickMenuManager = nullptr;
+        }
+        if (m_ServerCommandManager) {
+            delete m_ServerCommandManager;
+            m_ServerCommandManager = nullptr;
+        }
+        if (m_ClipboardManager) {
+            delete m_ClipboardManager;
+            m_ClipboardManager = nullptr;
+        }
+    };
 
     Q_INVOKABLE void exec(QWindow* qtWindow);
 
@@ -169,6 +186,8 @@ private:
                              int& width, int& height);
 
     void toggleFullscreen();
+
+    void toggleQuickMenu();
 
     void notifyMouseEmulationMode(bool enabled);
 
@@ -284,6 +303,9 @@ private:
     Uint32 m_DropAudioEndTime;
 
     Overlay::OverlayManager m_OverlayManager;
+    QuickMenuManager* m_QuickMenuManager;
+    ServerCommandManager* m_ServerCommandManager;
+    ClipboardManager* m_ClipboardManager;
 
     static CONNECTION_LISTENER_CALLBACKS k_ConnCallbacks;
     static Session* s_ActiveSession;

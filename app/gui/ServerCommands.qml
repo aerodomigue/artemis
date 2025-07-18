@@ -49,7 +49,7 @@ GroupBox {
                 enabled: ServerCommandManager.hasPermission && !ServerCommandManager.isExecuting
 
                 onClicked: {
-                    confirmDialog.commandId = "restart"
+                    confirmDialog.commandId = "restart_server"
                     confirmDialog.commandName = qsTr("Restart Server")
                     confirmDialog.commandDescription = qsTr("This will restart the streaming server. You will be disconnected.")
                     confirmDialog.open()
@@ -65,7 +65,7 @@ GroupBox {
                 enabled: ServerCommandManager.hasPermission && !ServerCommandManager.isExecuting
 
                 onClicked: {
-                    confirmDialog.commandId = "shutdown"
+                    confirmDialog.commandId = "shutdown_server"
                     confirmDialog.commandName = qsTr("Shutdown Server")
                     confirmDialog.commandDescription = qsTr("This will shut down the streaming server. You will be disconnected.")
                     confirmDialog.open()
@@ -81,9 +81,9 @@ GroupBox {
                 enabled: ServerCommandManager.hasPermission && !ServerCommandManager.isExecuting
 
                 onClicked: {
-                    confirmDialog.commandId = "suspend"
-                    confirmDialog.commandName = qsTr("Suspend Server")
-                    confirmDialog.commandDescription = qsTr("This will suspend the streaming server. You will be disconnected.")
+                    confirmDialog.commandId = "suspend_computer"
+                    confirmDialog.commandName = qsTr("Suspend Computer")
+                    confirmDialog.commandDescription = qsTr("This will suspend the host computer. You will be disconnected.")
                     confirmDialog.open()
                 }
             }

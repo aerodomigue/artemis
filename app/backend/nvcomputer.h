@@ -113,6 +113,7 @@ public:
     QSslCertificate serverCert;
     QVector<NvApp> appList;
     bool isNvidiaServerSoftware;
+    QStringList serverCommands;
     // Remember to update isEqualSerialized() when adding fields here!
 
     // Synchronization

@@ -22,5 +22,7 @@
         <file alias="gui/CliPair.qml">gui/CliPair.qml</file>
         <file alias="gui/ClipboardSettings.qml">gui/ClipboardSettings.qml</file>
         <file alias="gui/ServerCommands.qml">gui/ServerCommands.qml</file>
+        <file alias="gui/QuickMenu.qml">gui/QuickMenu.qml</file>
+        <file alias="gui/Toast.qml">gui/Toast.qml</file>
     </qresource>
 </RCC>

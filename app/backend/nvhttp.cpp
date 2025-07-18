@@ -448,6 +448,28 @@ NvHTTP::getXmlString(QString xml,
     return nullptr;
 }
 
+QStringList
+NvHTTP::getXmlArray(QString xml, QString tagName)
+{
+    QStringList result;
+    QXmlStreamReader xmlReader(xml);
+
+    while (!xmlReader.atEnd())
+    {
+        if (xmlReader.readNext() != QXmlStreamReader::StartElement)
+        {
+            continue;
+        }
+
+        if (xmlReader.name() == tagName)
+        {
+            result.append(xmlReader.readElementText());
+        }
+    }
+
+    return result;
+}
+
 void NvHTTP::handleSslErrors(QNetworkReply* reply, const QList<QSslError>& errors)
 {
     bool ignoreErrors = true;
@@ -674,3 +696,6 @@ NvHTTP::sendClipboardContent(const QString& content)
         return false;
     }
 }
+
+// Server command methods are now handled through LiSendExecServerCmd in the moonlight-common-c library
+// instead of direct HTTP requests. This provides better compatibility with the Apollo protocol.

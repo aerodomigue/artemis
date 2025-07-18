@@ -175,8 +175,8 @@ void SLVideoDecoder::notifyOverlayUpdated(Overlay::OverlayType type)
     // stats like the FFmpeg-based decoders, we'll just support the status update
     // overlay and nothing else.
     if (type != Overlay::OverlayStatusUpdate) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "Unsupported overlay type: %d", type);
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Unsupported overlay type: %d", type);
         return;
     }
 
