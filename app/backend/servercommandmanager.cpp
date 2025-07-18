@@ -11,6 +11,14 @@
 #include <QTimer>
 #include <Limelight.h>
 
+// Define static member
+const QList<ServerCommandManager::ServerCommand> ServerCommandManager::BUILTIN_COMMANDS = {
+    {"restart", "Restart Computer", "Restart the host computer", {}},
+    {"shutdown", "Shutdown Computer", "Shutdown the host computer", {}},
+    {"sleep", "Sleep Computer", "Put the host computer to sleep", {}},
+    {"hibernate", "Hibernate Computer", "Hibernate the host computer", {}},
+    {"lock", "Lock Computer", "Lock the host computer", {}}
+};
 
 ServerCommandManager::ServerCommandManager(QObject *parent)
     : QObject(parent)
