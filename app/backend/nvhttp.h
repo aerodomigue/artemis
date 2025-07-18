@@ -130,6 +130,11 @@ public:
                  QString tagName);
 
     static
+    QStringList
+    getXmlArray(QString xml,
+                QString tagName);
+
+    static
     QByteArray
     getXmlStringFromHex(QString xml,
                         QString tagName);
@@ -184,6 +189,8 @@ public:
 
     bool
     sendClipboardContent(const QString& content);
+
+    // Server command methods are now handled through LiSendExecServerCmd in the moonlight-common-c library
 
     static
     QVector<NvDisplayMode>

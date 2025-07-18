@@ -229,6 +229,9 @@ VAAPIRenderer::initialize(PDECODER_PARAMETERS params)
 
     m_Window = params->window;
     m_VideoFormat = params->videoFormat;
+    
+    // Get display dimensions for overlay positioning
+    SDL_GetWindowSize(m_Window, &m_DisplayWidth, &m_DisplayHeight);
 
     m_HwContext = av_hwdevice_ctx_alloc(AV_HWDEVICE_TYPE_VAAPI);
     if (!m_HwContext) {
@@ -725,6 +728,13 @@ void VAAPIRenderer::notifyOverlayUpdated(Overlay::OverlayType type)
             // Top left
             overlayRect.x = 0;
             overlayRect.y = 0;
+        }
+        else if (type == Overlay::OverlayServerCommands) {
+            // Center
+            overlayRect.x = (m_DisplayWidth - newSurface->w) / 2;
+            overlayRect.y = (m_DisplayHeight - newSurface->h) / 2;
+        } else {
+            SDL_assert(false);
         }
 
         overlayRect.w = newSurface->w;

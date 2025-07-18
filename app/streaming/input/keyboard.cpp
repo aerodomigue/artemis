@@ -153,6 +153,17 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
         SDL_PushEvent(&quitExitEvent);
         break;
 
+    // KeyComboToggleServerCommands removed - now handled through QuickMenu
+
+    case KeyComboToggleQuickMenu:
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Detected quick menu toggle combo");
+        
+        // Access the QuickMenuManager through the Session
+        if (Session::get()) {
+            Session::get()->toggleQuickMenu();
+        }
+        break;
+
     default:
         Q_UNREACHABLE();
     }

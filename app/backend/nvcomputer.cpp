@@ -211,6 +211,9 @@ NvComputer::NvComputer(NvHTTP& http, QString serverInfo)
     this->state = NvComputer::CS_ONLINE;
     this->pendingQuit = false;
     this->isSupportedServerVersion = CompatFetcher::isGfeVersionSupported(this->gfeVersion);
+    
+    // Parse server commands (Apollo/Sunshine servers only)
+    this->serverCommands = NvHTTP::getXmlArray(serverInfo, "ServerCommand");
 }
 
 bool NvComputer::wake() const

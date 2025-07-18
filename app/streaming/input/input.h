@@ -165,6 +165,7 @@ private:
         KeyComboPasteText,
         KeyComboTogglePointerRegionLock,
         KeyComboQuitAndExit,
+        KeyComboToggleQuickMenu,
         KeyComboMax
     };
 
