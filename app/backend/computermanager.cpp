@@ -2,6 +2,8 @@
 #include "boxartmanager.h"
 #include "nvhttp.h"
 #include "nvpairingmanager.h"
+#include "otppairingmanager.h"
+#include "identitymanager.h"
 
 #include <Limelight.h>
 #include <QtEndian>
@@ -9,8 +11,15 @@
 #include <QThread>
 #include <QThreadPool>
 #include <QCoreApplication>
+#include <QCryptographicHash>
+#include <QRandomGenerator>
+#include <QRegularExpression>
 
 #include <random>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/bio.h>
+#include <openssl/x509.h>
 
 #define SER_HOSTS "hosts"
 #define SER_HOSTS_BACKUP "hostsbackup"
@@ -620,6 +629,475 @@ void ComputerManager::pairHost(NvComputer* computer, QString pin)
     // Punt to a worker thread to avoid stalling the
     // UI while waiting for pairing to complete
     PendingPairingTask* pairing = new PendingPairingTask(this, computer, pin);
+    QThreadPool::globalInstance()->start(pairing);
+}
+
+class PendingOTPPairingTask : public QObject, public QRunnable
+{
+    Q_OBJECT
+
+public:
+    PendingOTPPairingTask(ComputerManager* computerManager, NvComputer* computer, QString pin, QString passphrase)
+        : m_ComputerManager(computerManager),
+          m_Computer(computer),
+          m_Pin(pin),
+          m_Passphrase(passphrase)
+    {
+        connect(this, &PendingOTPPairingTask::pairingCompleted,
+                computerManager, &ComputerManager::pairingCompleted);
+    }
+
+signals:
+    void pairingCompleted(NvComputer* computer, QString error);
+
+private:
+    // Helper functions for crypto operations
+    QByteArray encryptAES(const QByteArray& plaintext, const QByteArray& key) {
+        EVP_CIPHER_CTX* cipher = EVP_CIPHER_CTX_new();
+        if (!cipher) {
+            qCritical() << "Failed to create AES cipher context";
+            return QByteArray();
+        }
+        
+        QByteArray ciphertext(plaintext.size(), 0);
+        int ciphertextLen;
+        
+        EVP_EncryptInit(cipher, EVP_aes_128_ecb(), reinterpret_cast<const unsigned char*>(key.data()), NULL);
+        EVP_CIPHER_CTX_set_padding(cipher, 0);
+        
+        EVP_EncryptUpdate(cipher,
+                          reinterpret_cast<unsigned char*>(ciphertext.data()),
+                          &ciphertextLen,
+                          reinterpret_cast<const unsigned char*>(plaintext.data()),
+                          plaintext.length());
+        
+        if (ciphertextLen != ciphertext.length()) {
+            qCritical() << "AES encryption length mismatch";
+            EVP_CIPHER_CTX_free(cipher);
+            return QByteArray();
+        }
+        
+        EVP_CIPHER_CTX_free(cipher);
+        return ciphertext;
+    }
+    
+    QByteArray decryptAES(const QByteArray& ciphertext, const QByteArray& key) {
+        EVP_CIPHER_CTX* cipher = EVP_CIPHER_CTX_new();
+        if (!cipher) {
+            qCritical() << "Failed to create AES cipher context";
+            return QByteArray();
+        }
+        
+        QByteArray plaintext(ciphertext.size(), 0);
+        int plaintextLen;
+        
+        EVP_DecryptInit(cipher, EVP_aes_128_ecb(), reinterpret_cast<const unsigned char*>(key.data()), NULL);
+        EVP_CIPHER_CTX_set_padding(cipher, 0);
+        
+        EVP_DecryptUpdate(cipher,
+                          reinterpret_cast<unsigned char*>(plaintext.data()),
+                          &plaintextLen,
+                          reinterpret_cast<const unsigned char*>(ciphertext.data()),
+                          ciphertext.length());
+        
+        if (plaintextLen != plaintext.length()) {
+qCritical() << "AES decryption length mismatch";
+            EVP_CIPHER_CTX_free(cipher);
+            return QByteArray();
+        }
+        
+        EVP_CIPHER_CTX_free(cipher);
+        return plaintext;
+    }
+    
+    QByteArray signMessage(const QByteArray& message) {
+        // Load private key from PEM format
+        QByteArray privateKeyData = IdentityManager::get()->getPrivateKey();
+        
+        BIO* bio = BIO_new_mem_buf(privateKeyData.data(), -1);
+        if (!bio) {
+qCritical() << "Failed to create BIO for private key";
+            return QByteArray();
+        }
+        
+        EVP_PKEY* privateKey = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
+        BIO_free(bio);
+        
+        if (!privateKey) {
+qCritical() << "Failed to load private key from PEM";
+            return QByteArray();
+        }
+        
+        EVP_MD_CTX* ctx = EVP_MD_CTX_create();
+        if (!ctx) {
+            qCritical() << "Failed to create signing context";
+            EVP_PKEY_free(privateKey);
+            return QByteArray();
+        }
+        
+        if (EVP_DigestSignInit(ctx, NULL, EVP_sha256(), NULL, privateKey) != 1) {
+qCritical() << "Failed to initialize signing";
+            EVP_MD_CTX_destroy(ctx);
+            EVP_PKEY_free(privateKey);
+            return QByteArray();
+        }
+        
+        if (EVP_DigestSignUpdate(ctx, message.data(), message.length()) != 1) {
+qCritical() << "Failed to update signing";
+            EVP_MD_CTX_destroy(ctx);
+            EVP_PKEY_free(privateKey);
+            return QByteArray();
+        }
+        
+        size_t signatureLength = 0;
+        if (EVP_DigestSignFinal(ctx, NULL, &signatureLength) != 1) {
+            qCritical() << "Failed to get signature length";
+            EVP_MD_CTX_destroy(ctx);
+            EVP_PKEY_free(privateKey);
+            return QByteArray();
+        }
+        
+        QByteArray signature((int)signatureLength, 0);
+        if (EVP_DigestSignFinal(ctx, reinterpret_cast<unsigned char*>(signature.data()), &signatureLength) != 1) {
+qCritical() << "Failed to sign message";
+            EVP_MD_CTX_destroy(ctx);
+            EVP_PKEY_free(privateKey);
+            return QByteArray();
+        }
+        
+        EVP_MD_CTX_destroy(ctx);
+        EVP_PKEY_free(privateKey);
+        
+        signature.resize((int)signatureLength);
+        return signature;
+    }
+    
+    // Perform the complete pairing handshake after OTP authentication, matching Android client behavior
+    bool performFullPairingHandshake(NvHTTP& http, const QString& saltStr, const QString& otpHash, const QString& pin)
+    {
+        qDebug() << "PendingOTPPairingTask: Starting full pairing handshake";
+        
+        try {
+            // Generate AES key from salt + PIN like Android does
+            QByteArray saltBytes = QByteArray::fromHex(saltStr.toUtf8());
+            QByteArray pinBytes = pin.toUtf8();
+            QByteArray saltedPin = saltBytes + pinBytes;
+            
+            QCryptographicHash keyHasher(QCryptographicHash::Sha256);
+            keyHasher.addData(saltedPin);
+            QByteArray aesKey = keyHasher.result().left(16); // Take first 16 bytes for AES-128
+            
+qDebug() << "PendingOTPPairingTask: Generated AES key from salt+PIN";
+            
+            // Step 1: Generate random challenge and encrypt it with AES key
+            QByteArray randomChallenge(16, 0);
+            for (int i = 0; i < 16; i++) {
+                randomChallenge[i] = QRandomGenerator::global()->bounded(256);
+            }
+            
+            // Encrypt the challenge with AES-128-ECB (matches Android's encryptAes)
+            QByteArray encryptedChallenge = encryptAES(randomChallenge, aesKey);
+            
+            qDebug() << "PendingOTPPairingTask: Sending encrypted client challenge";
+            QString challengeParams = QString("clientchallenge=%1").arg(QString(encryptedChallenge.toHex().toUpper()));
+            QString challengeResp = http.openConnectionToString(
+                http.m_BaseUrlHttp,
+                "pair",
+                challengeParams + "&updateState=1",
+                5000
+            );
+            
+            if (!challengeResp.contains("<paired>1</paired>")) {
+                qDebug() << "PendingOTPPairingTask: Client challenge failed";
+                return false;
+            }
+            
+            // Extract encrypted challenge response from server
+            QRegularExpression challengeResponseRegex(R"(<challengeresponse>([A-Fa-f0-9]+)</challengeresponse>)");
+            QRegularExpressionMatch challengeResponseMatch = challengeResponseRegex.match(challengeResp);
+            if (!challengeResponseMatch.hasMatch()) {
+                qDebug() << "PendingOTPPairingTask: No challenge response found";
+                return false;
+            }
+            QString encChallengeResponseHex = challengeResponseMatch.captured(1);
+            QByteArray encChallengeResponse = QByteArray::fromHex(encChallengeResponseHex.toUtf8());
+            
+            // Decrypt the challenge response and verify it (matches Android client behavior)
+            QByteArray challengeResponseData = decryptAES(encChallengeResponse, aesKey);
+            if (challengeResponseData.isEmpty()) {
+                qDebug() << "PendingOTPPairingTask: Failed to decrypt challenge response";
+                return false;
+            }
+            
+            // Step 2: Send server challenge response
+            // Generate a 16-byte random client secret like Android does
+            QByteArray clientSecret(16, 0);
+            for (int i = 0; i < 16; i++) {
+                clientSecret[i] = QRandomGenerator::global()->bounded(256);
+            }
+            
+            // Create challenge response hash following the Android implementation
+            // Extract server response parts (hash + challenge from server)
+            QByteArray serverResponse(challengeResponseData.data(), 32); // First 32 bytes are server hash
+            QByteArray serverChallenge = challengeResponseData.mid(32, 16); // Next 16 bytes are server challenge
+            
+            // Get our client certificate signature for the challenge response
+            QByteArray clientCert = IdentityManager::get()->getCertificate();
+            QSslCertificate cert(clientCert);
+            QByteArray clientCertDer = cert.toDer();
+            const unsigned char* p = (const unsigned char*)clientCertDer.constData();
+            X509* x509 = d2i_X509(NULL, &p, clientCertDer.length());
+            if (!x509) {
+                qWarning() << "PendingOTPPairingTask: Failed to parse client certificate";
+                return false;
+            }
+
+            const ASN1_BIT_STRING* signature_asn1;
+            const X509_ALGOR* sig_alg;
+            X509_get0_signature(&signature_asn1, &sig_alg, x509);
+
+            QByteArray certSignature;
+            if (signature_asn1) {
+                certSignature = QByteArray((const char*)ASN1_STRING_get0_data(signature_asn1), ASN1_STRING_length(signature_asn1));
+            }
+            X509_free(x509);
+            
+            // Build challenge response: serverChallenge + certSignature + clientSecret
+            QByteArray challengeResponse;
+            challengeResponse.append(serverChallenge);
+            challengeResponse.append(certSignature);
+            challengeResponse.append(clientSecret);
+            
+            QByteArray challengeRespHash = QCryptographicHash::hash(challengeResponse, QCryptographicHash::Sha256);
+            challengeRespHash.resize(32); // Pad to 32 bytes like NvPairingManager
+            
+            // Encrypt the challenge response hash with AES
+            QByteArray encryptedChallengeResp = encryptAES(challengeRespHash, aesKey);
+            
+            QString serverRespParams = QString("serverchallengeresp=%1").arg(QString(encryptedChallengeResp.toHex().toUpper()));
+            QString serverResp = http.openConnectionToString(
+                http.m_BaseUrlHttp,
+                "pair",
+                serverRespParams + "&updateState=1",
+                5000
+            );
+            
+            if (!serverResp.contains("<paired>1</paired>")) {
+                qDebug() << "PendingOTPPairingTask: Server challenge response failed";
+                return false;
+            }
+            
+            // Step 3: Send client pairing secret with proper RSA signature
+            qDebug() << "PendingOTPPairingTask: Sending client pairing secret";
+            
+            // Sign the client secret using proper RSA-SHA256 signature
+            QByteArray signature = signMessage(clientSecret);
+            if (signature.isEmpty()) {
+                qDebug() << "PendingOTPPairingTask: Failed to sign client secret";
+                return false;
+            }
+            
+            // Create the client pairing secret exactly like NvPairingManager: clientSecret + signature
+            QByteArray clientPairingSecret = clientSecret + signature;
+            
+            QString pairingSecretParams = QString("clientpairingsecret=%1").arg(QString(clientPairingSecret.toHex().toUpper()));
+            QString secretResp = http.openConnectionToString(
+                http.m_BaseUrlHttp,
+                "pair",
+                pairingSecretParams + "&updateState=1",
+                5000
+            );
+            
+            if (!secretResp.contains("<paired>1</paired>")) {
+                qDebug() << "PendingOTPPairingTask: Client pairing secret failed";
+                return false;
+            }
+            
+            // Step 4: Final pairing challenge - use HTTPS like Android client does
+            qDebug() << "PendingOTPPairingTask: Performing final pairing challenge";
+            QString finalChallengeParams = QString("phrase=pairchallenge");
+            QString finalResp = http.openConnectionToString(
+                http.m_BaseUrlHttps,
+                "pair",
+                finalChallengeParams + "&updateState=1",
+                5000
+            );
+            
+            if (finalResp.contains("<paired>1</paired>")) {
+                qDebug() << "PendingOTPPairingTask: Full pairing handshake completed successfully";
+                return true;
+            } else {
+                qDebug() << "PendingOTPPairingTask: Final pairing challenge failed:" << finalResp;
+                return false;
+            }
+            
+        } catch (const GfeHttpResponseException& e) {
+            qDebug() << "PendingOTPPairingTask: Pairing handshake HTTP error:" << e.getStatusMessage();
+            return false;
+        } catch (const QtNetworkReplyException& e) {
+            qDebug() << "PendingOTPPairingTask: Pairing handshake network error:" << e.getErrorText();
+            return false;
+        } catch (const std::exception& e) {
+            qDebug() << "PendingOTPPairingTask: Pairing handshake error:" << e.what();
+            return false;
+        }
+    }
+    
+    void run()
+    {
+        qDebug() << "PendingOTPPairingTask: Starting OTP pairing task for" << m_Computer->name;
+        
+        try {
+            // Create NvHTTP instance for this computer
+            NvHTTP http(m_Computer);
+            
+            qDebug() << "PendingOTPPairingTask: Starting Apollo OTP pairing";
+            qDebug() << "PendingOTPPairingTask: PIN from user:" << m_Pin;
+            qDebug() << "PendingOTPPairingTask: Passphrase from user:" << m_Passphrase;
+            
+            // Generate a 16-byte salt
+            QByteArray saltBytes(16, 0);
+            for (int i = 0; i < 16; i++) {
+                saltBytes[i] = QRandomGenerator::global()->bounded(256);
+            }
+            QString saltStr = saltBytes.toHex();
+            
+            // Generate the OTP hash
+            QString plainText = m_Pin + saltStr + m_Passphrase;
+            QCryptographicHash hash(QCryptographicHash::Sha256);
+            hash.addData(plainText.toUtf8());
+            QString otpHash = hash.result().toHex().toUpper();
+            
+            qDebug() << "PendingOTPPairingTask: Generated OTP hash:" << otpHash;
+            qDebug() << "PendingOTPPairingTask: Using salt:" << saltStr;
+            
+            // Build the pairing parameters - use consistent device name
+            QString deviceName = QSysInfo::machineHostName();
+            if (deviceName.isEmpty()) {
+                deviceName = "Artemis";
+            }
+            QString pairingParams = QString("devicename=%1&updateState=1&phrase=getservercert&salt=%2&clientcert=%3&otpauth=%4")
+                .arg(deviceName)
+                .arg(saltStr)
+                .arg(QString(IdentityManager::get()->getCertificate().toHex()))
+                .arg(otpHash);
+            
+            qDebug() << "PendingOTPPairingTask: Sending OTP pairing request";
+            
+            QString pairingRequest = http.openConnectionToString(
+                http.m_BaseUrlHttp,
+                "pair",
+                pairingParams,
+                5000
+            );
+            
+            qDebug() << "PendingOTPPairingTask: Received response:" << pairingRequest;
+            
+            // Parse the response
+            if (pairingRequest.isEmpty()) {
+                qDebug() << "PendingOTPPairingTask: OTP pairing failed - no response";
+                emit pairingCompleted(m_Computer, "No response from Apollo server. Please check the server is running and OTP is active.");
+                return;
+            }
+            
+            // Check for specific error cases
+            if (pairingRequest.contains("status_message=\"OTP auth not available.\"")) {
+                qDebug() << "PendingOTPPairingTask: OTP pairing failed - OTP not available";
+                emit pairingCompleted(m_Computer, "OTP is not available or has expired. Please generate a new OTP on the Apollo server.");
+                return;
+            }
+            
+            // Check if pairing was successful
+            if (pairingRequest.contains("<root status_code=\"200\">") && pairingRequest.contains("<paired>1</paired>")) {
+                qDebug() << "PendingOTPPairingTask: OTP pairing successful, extracting server certificate";
+                
+                // Extract the server certificate from the response
+                QRegularExpression certRegex(R"(<plaincert>([A-Fa-f0-9]+)</plaincert>)");
+                QRegularExpressionMatch certMatch = certRegex.match(pairingRequest);
+                
+                if (certMatch.hasMatch()) {
+                    QString serverCertHex = certMatch.captured(1);
+                    QByteArray serverCertBytes = QByteArray::fromHex(serverCertHex.toUtf8());
+                    QSslCertificate serverCert(serverCertBytes);
+                    
+                    if (!serverCert.isNull()) {
+                        // Set the server certificate for HTTPS requests
+                        m_Computer->serverCert = serverCert;
+                        http.setServerCert(serverCert);
+                        
+                        qDebug() << "PendingOTPPairingTask: Server certificate obtained, preparing for full handshake";
+                        
+                        qDebug() << "PendingOTPPairingTask: Server certificate obtained, performing full pairing handshake";
+                        
+                        // Complete the full pairing process like Android client does
+                        if (performFullPairingHandshake(http, saltStr, otpHash, m_Pin)) {
+                            // Only mark as paired after full handshake completes
+                            m_Computer->pairState = NvComputer::PS_PAIRED;
+                            
+                            qDebug() << "PendingOTPPairingTask: Full pairing handshake successful, saving host";
+                            
+                            // Persist the newly paired computer
+                            m_ComputerManager->saveHost(m_Computer);
+                            
+                            qDebug() << "PendingOTPPairingTask: Computer saved, notifying UI";
+                            
+                            // Notify the UI that the computer state has changed
+                            m_ComputerManager->handleComputerStateChanged(m_Computer);
+                            
+                            qDebug() << "PendingOTPPairingTask: Emitting pairingCompleted signal with success";
+                            
+                            emit pairingCompleted(m_Computer, QString());
+                            return;
+                        } else {
+                            qDebug() << "PendingOTPPairingTask: Full pairing handshake failed";
+                            emit pairingCompleted(m_Computer, "Apollo pairing handshake failed");
+                            return;
+                        }
+                    } else {
+                        qDebug() << "PendingOTPPairingTask: Invalid server certificate received";
+                        emit pairingCompleted(m_Computer, "Invalid server certificate received from Apollo server");
+                        return;
+                    }
+                } else {
+                    qDebug() << "PendingOTPPairingTask: No server certificate found in response";
+                    emit pairingCompleted(m_Computer, "Server certificate not found in Apollo response");
+                    return;
+                }
+            } else {
+                qDebug() << "PendingOTPPairingTask: OTP pairing failed with response:" << pairingRequest;
+                emit pairingCompleted(m_Computer, "Apollo OTP pairing failed: " + pairingRequest);
+                return;
+            }
+            
+        } catch (const GfeHttpResponseException& e) {
+            QString errorMsg = QString("Apollo OTP pairing failed: %1 (Code: %2)")
+                                .arg(e.getStatusMessage())
+                                .arg(e.getStatusCode());
+            qDebug() << "PendingOTPPairingTask: HTTP error:" << errorMsg;
+            emit pairingCompleted(m_Computer, errorMsg);
+        } catch (const QtNetworkReplyException& e) {
+            QString errorMsg = QString("Apollo OTP pairing network error: %1")
+                                .arg(e.getErrorText());
+            qDebug() << "PendingOTPPairingTask: Network error:" << errorMsg;
+            emit pairingCompleted(m_Computer, errorMsg);
+        } catch (const std::exception& e) {
+            QString errorMsg = QString("Apollo OTP pairing error: %1").arg(e.what());
+            qDebug() << "PendingOTPPairingTask: General error:" << errorMsg;
+            emit pairingCompleted(m_Computer, errorMsg);
+        }
+    }
+
+    ComputerManager* m_ComputerManager;
+    NvComputer* m_Computer;
+    QString m_Pin;
+    QString m_Passphrase;
+};
+
+void ComputerManager::pairHostWithOTP(NvComputer* computer, QString pin, QString passphrase)
+{
+    // Punt to a worker thread to avoid stalling the
+    // UI while waiting for OTP pairing to complete
+    PendingOTPPairingTask* pairing = new PendingOTPPairingTask(this, computer, pin, passphrase);
     QThreadPool::globalInstance()->start(pairing);
 }
 

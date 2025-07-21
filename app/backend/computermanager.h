@@ -215,6 +215,7 @@ class ComputerManager : public QObject
     friend class DeferredHostDeletionTask;
     friend class PendingAddTask;
     friend class PendingPairingTask;
+    friend class PendingOTPPairingTask;
     friend class DelayedFlushThread;
 
 public:
@@ -233,6 +234,8 @@ public:
     QString generatePinString();
 
     void pairHost(NvComputer* computer, QString pin);
+
+    void pairHostWithOTP(NvComputer* computer, QString pin, QString passphrase);
 
     void quitRunningApp(NvComputer* computer);
 

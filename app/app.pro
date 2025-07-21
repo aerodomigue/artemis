@@ -214,6 +214,7 @@ SOURCES += \
     backend/clipboardmanager.cpp \
     backend/servercommandmanager.cpp \
     backend/quickmenumanager.cpp \
+    backend/otppairingmanager.cpp \
     wm.cpp
 
 HEADERS += \
@@ -253,7 +254,8 @@ HEADERS += \
     backend/systemproperties.h \
     backend/clipboardmanager.h \
     backend/servercommandmanager.h \
-    backend/quickmenumanager.h
+    backend/quickmenumanager.h \
+    backend/otppairingmanager.h
 
 # Platform-specific renderers and decoders
 ffmpeg {
