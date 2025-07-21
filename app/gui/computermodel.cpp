@@ -220,9 +220,29 @@ void ComputerModel::pairComputer(int computerIndex, QString pin)
     m_ComputerManager->pairHost(m_Computers[computerIndex], pin);
 }
 
+void ComputerModel::pairComputerWithOTP(int computerIndex, QString pin, QString passphrase)
+{
+    Q_ASSERT(computerIndex < m_Computers.count());
+
+    m_ComputerManager->pairHostWithOTP(m_Computers[computerIndex], pin, passphrase);
+}
+
+bool ComputerModel::isOTPSupported(int computerIndex)
+{
+    Q_ASSERT(computerIndex < m_Computers.count());
+
+    NvComputer* computer = m_Computers[computerIndex];
+    QReadLocker lock(&computer->lock);
+    
+    // OTP pairing is only available with Apollo/Sunshine servers (not Nvidia GeForce Experience)
+    return !computer->isNvidiaServerSoftware;
+}
+
 void ComputerModel::handlePairingCompleted(NvComputer*, QString error)
 {
+    qDebug() << "ComputerModel::handlePairingCompleted called with error:" << error;
     emit pairingCompleted(error.isEmpty() ? QVariant() : error);
+    qDebug() << "ComputerModel: Emitted pairingCompleted signal";
 }
 
 void ComputerModel::handleComputerStateChanged(NvComputer* computer)

@@ -15,6 +15,8 @@
 #include <QImageReader>
 #include <QtEndian>
 #include <QNetworkProxy>
+#include <QSysInfo>
+#include <QRandomGenerator>
 
 #define FAST_FAIL_TIMEOUT_MS 2000
 #define REQUEST_TIMEOUT_MS 5000
@@ -128,6 +130,13 @@ QString
 NvHTTP::getServerInfo(NvLogLevel logLevel, bool fastFail)
 {
     QString serverInfo;
+    
+    // Add devicename parameter to match Android client behavior
+    QString deviceName = QSysInfo::machineHostName();
+    if (deviceName.isEmpty()) {
+        deviceName = "Artemis";
+    }
+    QString deviceNameParam = "devicename=" + deviceName;
 
     // Check if we have a pinned cert and HTTPS port for this host yet
     if (!m_ServerCert.isNull() && httpsPort() != 0)
@@ -138,7 +147,7 @@ NvHTTP::getServerInfo(NvLogLevel logLevel, bool fastFail)
             // pairing status (and a few other attributes).
             serverInfo = openConnectionToString(m_BaseUrlHttps,
                                                 "serverinfo",
-                                                nullptr,
+                                                deviceNameParam,
                                                 fastFail ? FAST_FAIL_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
                                                 logLevel);
             // Throws if the request failed
@@ -151,7 +160,7 @@ NvHTTP::getServerInfo(NvLogLevel logLevel, bool fastFail)
                 // Certificate validation error, fallback to HTTP
                 serverInfo = openConnectionToString(m_BaseUrlHttp,
                                                     "serverinfo",
-                                                    nullptr,
+                                                    deviceNameParam,
                                                     fastFail ? FAST_FAIL_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
                                                     logLevel);
                 verifyResponseStatus(serverInfo);
@@ -168,7 +177,7 @@ NvHTTP::getServerInfo(NvLogLevel logLevel, bool fastFail)
         // Only use HTTP prior to pairing or fetching HTTPS port
         serverInfo = openConnectionToString(m_BaseUrlHttp,
                                             "serverinfo",
-                                            nullptr,
+                                            deviceNameParam,
                                             fastFail ? FAST_FAIL_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
                                             logLevel);
         verifyResponseStatus(serverInfo);
@@ -530,11 +539,26 @@ NvHTTP::openConnection(QUrl baseUrl,
     QUrl url(baseUrl);
     url.setPath("/" + command);
 
-    // Use a common UID for Moonlight clients to allow them to quit
-    // games for each other (otherwise GFE gets screwed up and it requires
-    // manual intervention to solve).
-    url.setQuery("uniqueid=0123456789ABCDEF&uuid=" +
-                 QUuid::createUuid().toRfc4122().toHex() +
+    // Use a machine-specific UID to match Apollo server expectations
+    // Generate a uniqueid based on hostname + timestamp for uniqueness
+    static QString machineUniqueId;
+    if (machineUniqueId.isEmpty()) {
+        QString hostname = QSysInfo::machineHostName();
+        if (hostname.isEmpty()) hostname = "artemis";
+        // Take first 8 chars of hostname and pad with random hex
+        QString hostPart = hostname.left(8).toUpper();
+        while (hostPart.length() < 8) {
+            hostPart += QString("%1").arg(QRandomGenerator::global()->bounded(16), 1, 16).toUpper();
+        }
+        // Add 8 random hex chars
+        QString randomPart;
+        for (int i = 0; i < 8; i++) {
+            randomPart += QString("%1").arg(QRandomGenerator::global()->bounded(16), 1, 16).toUpper();
+        }
+        machineUniqueId = hostPart + randomPart;
+    }
+    url.setQuery("uniqueid=" + machineUniqueId + "&uuid=" +
+                 QUuid::createUuid().toString(QUuid::WithoutBraces) +
                  ((arguments != nullptr) ? ("&" + arguments) : ""));
 
     QNetworkRequest request(url);

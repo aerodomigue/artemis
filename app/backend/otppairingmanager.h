@@ -3,10 +3,15 @@
 #include <QObject>
 #include <QQmlEngine>
 #include <QCryptographicHash>
+#include <QTimer>
+#include <QSslCertificate>
 
 class NvComputer;
 class NvHTTP;
 class NvPairingManager;
+
+// Forward declarations for Qt MOC system
+Q_DECLARE_OPAQUE_POINTER(NvComputer*)
 
 /**
  * @brief Manages OTP (One-Time Password) pairing with Apollo servers
@@ -21,6 +26,14 @@ class OTPPairingManager : public QObject
     QML_ELEMENT
 
 public:
+    enum PairState
+    {
+        PAIRED,
+        PIN_WRONG,
+        FAILED,
+        ALREADY_IN_PROGRESS
+    };
+
     explicit OTPPairingManager(QObject *parent = nullptr);
     ~OTPPairingManager();
 
@@ -32,9 +45,6 @@ public:
     Q_INVOKABLE bool isPairingInProgress() const;
     Q_INVOKABLE bool isOTPSupported(NvComputer *computer) const;
 
-    // Settings
-    Q_INVOKABLE void setPairingManager(NvPairingManager *pairingManager);
-
 signals:
     void pairingStarted();
     void pairingCompleted(bool success, const QString &message);
@@ -42,8 +52,7 @@ signals:
     void pairingProgress(const QString &status);
 
 private slots:
-    void onStandardPairingCompleted(bool success, const QString &message);
-    void onStandardPairingFailed(const QString &error);
+    void onPairingTimeout();
 
 private:
     // OTP hash generation (matches Android implementation)
@@ -52,12 +61,22 @@ private:
     // Pairing flow helpers
     void performOTPPairing(NvComputer *computer, const QString &pin, const QString &passphrase);
     bool validatePinFormat(const QString &pin);
+    
+    // Network request helpers
+    void sendOTPPairingRequest(NvComputer *computer, const QString &otpHash, const QString &salt, const QString &passphrase);
+    
+    // Apollo OTP pairing implementation
+    PairState performApolloOTPPairing(NvPairingManager &pairingManager, NvComputer *serverInfo, const QString &pin, const QString &passphrase);
+    
+    // AES encryption/decryption helpers (similar to NvPairingManager)
+    QByteArray encryptAES(const QByteArray &plaintext, const QByteArray &key);
+    QByteArray decryptAES(const QByteArray &ciphertext, const QByteArray &key);
 
 private:
     static constexpr int OTP_PIN_LENGTH = 4; // Matches Android constant
     
-    NvPairingManager *m_pairingManager;
     NvComputer *m_currentComputer;
+    QTimer *m_timeoutTimer;
     
     bool m_pairingInProgress;
     QString m_currentPin;
