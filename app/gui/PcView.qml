@@ -215,6 +215,28 @@ CenteredGridView {
                 }
                 NavigableMenuItem {
                     parentMenu: pcContextMenu
+                    text: qsTr("Pair")
+                    onTriggered: {
+                        // Use standard pairing for GeForce Experience
+                        var pin = computerModel.generatePinString()
+                        computerModel.pairComputer(index, pin)
+                        pairDialog.pin = pin
+                        pairDialog.open()
+                    }
+                    visible: model.online && !model.paired
+                }
+                NavigableMenuItem {
+                    parentMenu: pcContextMenu
+                    text: qsTr("Pair using OTP")
+                    onTriggered: {
+                        // Show OTP pairing dialog
+                        otpPairDialog.computerIndex = index
+                        otpPairDialog.open()
+                    }
+                    visible: model.online && !model.paired
+                }
+                NavigableMenuItem {
+                    parentMenu: pcContextMenu
                     text: qsTr("Test Network")
                     onTriggered: {
                         computerModel.testConnectionForComputer(index)
@@ -265,13 +287,12 @@ CenteredGridView {
                     stackView.push(appView)
                 }
                 else {
-                    // Check if this is an Apollo/Sunshine server that supports OTP pairing
-                    if (computerModel.isOTPSupported(index)) {
-                        // Show OTP pairing dialog
+                    // If we know this is an Apollo server, use OTP. Otherwise, use PIN.
+                    if (model.apolloVersion) {
                         otpPairDialog.computerIndex = index
                         otpPairDialog.open()
                     } else {
-                        // Use standard pairing for GeForce Experience
+                        // Default to standard PIN pairing on click
                         var pin = computerModel.generatePinString()
 
                         // Kick off pairing in the background

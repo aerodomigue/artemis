@@ -141,36 +141,17 @@ NvHTTP::getServerInfo(NvLogLevel logLevel, bool fastFail)
     // Check if we have a pinned cert and HTTPS port for this host yet
     if (!m_ServerCert.isNull() && httpsPort() != 0)
     {
-        try
-        {
-            // Always try HTTPS first, since it properly reports
-            // pairing status (and a few other attributes).
-            serverInfo = openConnectionToString(m_BaseUrlHttps,
-                                                "serverinfo",
-                                                deviceNameParam,
-                                                fastFail ? FAST_FAIL_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
-                                                logLevel);
-            // Throws if the request failed
-            verifyResponseStatus(serverInfo);
+        // If we have a server cert, we must use HTTPS.
+        serverInfo = openConnectionToString(m_BaseUrlHttps,
+                                            "serverinfo",
+                                            deviceNameParam,
+                                            fastFail ? FAST_FAIL_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
+                                            logLevel);
+        // Only log response if not suppressing output (polling requests use NVLL_NONE)
+        if (logLevel != NvLogLevel::NVLL_NONE) {
+            qInfo() << "getServerInfo HTTPS response:" << serverInfo;
         }
-        catch (const GfeHttpResponseException& e)
-        {
-            if (e.getStatusCode() == 401)
-            {
-                // Certificate validation error, fallback to HTTP
-                serverInfo = openConnectionToString(m_BaseUrlHttp,
-                                                    "serverinfo",
-                                                    deviceNameParam,
-                                                    fastFail ? FAST_FAIL_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
-                                                    logLevel);
-                verifyResponseStatus(serverInfo);
-            }
-            else
-            {
-                // Rethrow real errors
-                throw e;
-            }
-        }
+        verifyResponseStatus(serverInfo);
     }
     else
     {
@@ -180,7 +161,10 @@ NvHTTP::getServerInfo(NvLogLevel logLevel, bool fastFail)
                                             deviceNameParam,
                                             fastFail ? FAST_FAIL_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
                                             logLevel);
-        verifyResponseStatus(serverInfo);
+        // Only log response if not suppressing output (polling requests use NVLL_NONE)
+        if (logLevel != NvLogLevel::NVLL_NONE) {
+            qInfo() << "getServerInfo response:" << serverInfo;
+        }
 
         // Populate the HTTPS port
         uint16_t httpsPort = getXmlString(serverInfo, "HttpsPort").toUShort();
@@ -532,6 +516,12 @@ NvHTTP::openConnection(QUrl baseUrl,
                        int timeoutMs,
                        NvLogLevel logLevel)
 {
+    // Suppress debug output for polling requests to reduce log noise
+    bool suppressDebugOutput = (logLevel == NvLogLevel::NVLL_NONE);
+    if (!suppressDebugOutput) {
+        qDebug() << "NvHTTP::openConnection - URL:" << baseUrl.toString() << "Command:" << command << "Arguments:" << arguments;
+    }
+
     // Port must be set
     Q_ASSERT(baseUrl.port(0) != 0);
 

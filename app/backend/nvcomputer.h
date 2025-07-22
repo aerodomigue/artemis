@@ -115,6 +115,7 @@ public:
     bool isNvidiaServerSoftware;
     QStringList serverCommands;
     // Remember to update isEqualSerialized() when adding fields here!
+    QString apolloVersion;
 
     // Synchronization
     mutable CopySafeReadWriteLock lock;

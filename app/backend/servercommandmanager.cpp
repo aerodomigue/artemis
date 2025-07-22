@@ -492,6 +492,40 @@ bool ServerCommandManager::isStreamingSessionActive() const
     return true;
 }
 
+void ServerCommandManager::onComputerPairingCompleted()
+{
+    qDebug() << "ServerCommandManager::onComputerPairingCompleted: Computer pairing completed, refreshing commands";
+    
+    // Wait a short moment to ensure the computer state is fully updated after pairing
+    QTimer::singleShot(1000, this, [this]() {
+        if (m_computer && m_http) {
+            qDebug() << "ServerCommandManager::onComputerPairingCompleted: Delayed refresh after pairing";
+            refreshCommands();
+        }
+    });
+}
+
+void ServerCommandManager::onComputerStateChanged()
+{
+    if (!m_computer) {
+        qDebug() << "ServerCommandManager::onComputerStateChanged: No computer object";
+        return;
+    }
+    
+    qDebug() << "ServerCommandManager::onComputerStateChanged: Computer state changed, pair state:" << m_computer->pairState;
+    
+    // If the computer is now paired and we don't have server commands yet, refresh them
+    if (m_computer->pairState == NvComputer::PS_PAIRED && m_availableCommands.isEmpty() && !m_refreshInProgress) {
+        qDebug() << "ServerCommandManager::onComputerStateChanged: Computer is now paired, refreshing server commands";
+        QTimer::singleShot(500, this, [this]() {
+            if (m_computer && m_http && m_computer->pairState == NvComputer::PS_PAIRED) {
+                qDebug() << "ServerCommandManager::onComputerStateChanged: Delayed refresh after state change";
+                refreshCommands();
+            }
+        });
+    }
+}
+
 bool ServerCommandManager::sendHttpServerCommand(const QString &commandId)
 {
     if (!m_http || !m_computer) {
@@ -576,3 +610,11 @@ bool ServerCommandManager::sendHttpServerCommand(const QString &commandId)
     
     return false;
 }
+
+void ServerCommandManager::noCommandsAvailable()
+{
+    // This matches the Android dialog shown when no server commands are available
+    qDebug() << "ServerCommandManager::noCommandsAvailable: No server commands available";
+    // UI components can connect to this slot to display appropriate messaging
+}
+

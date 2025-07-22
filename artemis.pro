@@ -1648,9 +1648,7 @@ HEADERS += AntiHooking/antihookingprotection.h \
            app/Moonlight.app/Contents/Frameworks/SDL2.framework/Versions/Current/Headers/SDL_vulkan.h \
            app/Moonlight.app/Contents/Frameworks/SDL2_ttf.framework/Versions/A/Headers/SDL_ttf.h \
            app/Moonlight.app/Contents/Frameworks/SDL2_ttf.framework/Versions/Current/Headers/SDL_ttf.h
-SOURCES += test_otp_fixes.cpp \
-           test_otp_hash.cpp \
-           /test_otp_fixes.cpp \
+SOURCES += test_otp_hash.cpp \
            AntiHooking/antihookingprotection.cpp \
            app/main.cpp \
            app/masterhook.c \

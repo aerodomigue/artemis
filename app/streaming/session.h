@@ -11,6 +11,10 @@
 #include "audio/renderers/renderer.h"
 #include "video/overlaymanager.h"
 
+#include "backend/quickmenumanager.h"
+#include "backend/servercommandmanager.h"
+#include "backend/clipboardmanager.h"
+
 class QuickMenuManager;
 class ServerCommandManager;
 class ClipboardManager;

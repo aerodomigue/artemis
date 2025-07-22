@@ -22,6 +22,9 @@ Rectangle {
     // Toast notification system
     property string toastMessage: ""
     property bool showToast: false
+
+    // Server command data model
+    ListModel {        id: serverCommandsModel    }
     
     // Animation for smooth show/hide
     Behavior on opacity {
@@ -65,80 +68,55 @@ Rectangle {
             
             model: currentMenu === "main" ? mainMenuModel : serverCommandsModel
             
-            delegate: Rectangle {
+            delegate: Button {
                 width: menuListView.width
                 height: 60
-                color: index === menuListView.currentIndex ? "#444" : "transparent"
-                border.color: index === menuListView.currentIndex ? "#00cccc" : "transparent"
-                border.width: 2
-                radius: 5
-                
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    onEntered: menuListView.currentIndex = index
-                    onClicked: {
-                        executeAction(model.action)
-                        closeMenuDelayed()
-                    }
+                flat: true
+
+                background: Rectangle {
+                    color: parent.down ? "#333" : (parent.hovered ? "#444" : "transparent")
+                    border.color: parent.hovered ? "#00cccc" : "transparent"
+                    border.width: 2
+                    radius: 5
                 }
-                
-                RowLayout {
+
+                onClicked: {
+                    executeAction(model.action)
+                }
+
+                contentItem: RowLayout {
+                    anchors.fill: parent
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.margins: 15
                     spacing: 15
-                    
-                    // Fixed-width icon container for consistent alignment
-                    Rectangle {
+
+                    Text {
+                        text: model.icon
+                        font.pointSize: 20
+                        color: "white"
+                        Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
                         Layout.preferredWidth: 40
-                        Layout.preferredHeight: 40
-                        Layout.alignment: Qt.AlignVCenter
-                        color: "transparent"
-                        
-                        Text {
-                            text: model.icon
-                            font.pointSize: 20
-                            color: "white"
-                            anchors.centerIn: parent
-                        }
                     }
-                    
+
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.alignment: Qt.AlignVCenter
                         spacing: 2
-                        
+
                         Text {
                             text: model.text
                             font.pointSize: 14
                             font.bold: true
                             color: "white"
-                            Layout.alignment: Qt.AlignLeft | Qt.AlignTop
                         }
-                        
+
                         Text {
                             text: model.description
                             font.pointSize: 10
                             color: "#cccccc"
-                            Layout.alignment: Qt.AlignLeft | Qt.AlignTop
                         }
-                    }
-                    
-                    // Status indicator (for visual feedback)
-                    Rectangle {
-                        Layout.preferredWidth: 8
-                        Layout.preferredHeight: 8
-                        Layout.alignment: Qt.AlignVCenter
-                        radius: 4
-                        color: {
-                            if (model.action === "server_restart" || model.action === "server_shutdown" || model.action === "server_suspend") {
-                                return quickMenuManager.hasServerCommands ? "#00ff00" : "#ff6666"
-                            }
-                            return "transparent"
-                        }
-                        visible: model.action === "server_restart" || model.action === "server_shutdown" || model.action === "server_suspend"
                     }
                 }
             }
@@ -203,6 +181,35 @@ Rectangle {
             closeMenu()
         }
     }
+
+    // ServerCommandManager connection
+    Connections {
+        target: quickMenuManager.serverCommandManager
+        function onCommandsRefreshed() {
+            console.log("Server commands refreshed, updating model...");
+            serverCommandsModel.clear();
+            var commandIds = quickMenuManager.serverCommandManager.getAvailableCommands();
+            for (var i = 0; i < commandIds.length; i++) {
+                var commandId = commandIds[i];
+                var icon = "⚙️"; // Default
+                if (commandId.toLowerCase() === "shutdown") {
+                    icon = "⏻";
+                } else if (commandId.toLowerCase() === "restart") {
+                    icon = "🔄";
+                }
+                serverCommandsModel.append({
+                    icon: icon,
+                    text: quickMenuManager.serverCommandManager.getCommandName(commandId),
+                    action: commandId, // Use command ID as the action
+                    description: quickMenuManager.serverCommandManager.getCommandDescription(commandId)
+                });
+            }
+            console.log("Server commands model updated with", serverCommandsModel.count, "commands");
+        }
+        function onCommandExecuted(commandId, success, result) {
+            showActionFeedback(success ? "Command '" + commandId + "' executed successfully" : "Command '" + commandId + "' failed: " + result);
+        }
+    }
     
     // Main menu model
     ListModel {
@@ -263,46 +270,17 @@ Rectangle {
         }
     }
     
-    // Server commands menu model
-    ListModel {
-        id: serverCommandsModel
-        ListElement {
-            text: qsTr("Restart Server")
-            icon: "🔄"
-            action: "server_restart"
-            description: qsTr("Restart the streaming server")
-        }
-        ListElement {
-            text: qsTr("Shutdown Server")
-            icon: "⏹"
-            action: "server_shutdown"
-            description: qsTr("Shutdown the streaming server")
-        }
-        ListElement {
-            text: qsTr("Suspend Server")
-            icon: "⏸"
-            action: "server_suspend"
-            description: qsTr("Suspend the streaming server")
-        }
+    function closeMenuDelayed() {
+        closeTimer.restart();
     }
-    
+
     // Functions
-function closeMenu() {
+    function closeMenu() {
         // Only call backend hide - don't set QML invisible
             if (typeof quickMenuManager !== 'undefined') {
                 showActionFeedback("Closing menu...")  // Feedback when closing
             quickMenuManager.hide();
         }
-    }
-    
-    function closeMenuDelayed() {
-        // Don't close immediately for navigation actions
-        if (currentMenu === "server_commands") {
-            return
-        }
-        
-        // Close after a short delay to allow toast to be visible
-        closeTimer.start()
     }
     
     function executeCurrentItem() {
@@ -317,8 +295,23 @@ function closeMenu() {
         
         // Handle navigation actions
         if (action === "server_commands") {
-            currentMenu = "server_commands"
-            return
+            if (quickMenuManager.serverCommandManager && quickMenuManager.serverCommandManager.hasPermission) {
+                currentMenu = "server_commands";
+            } else {
+                showActionFeedback("Server commands not available or no permission");
+                closeMenuDelayed();
+            }
+            return;
+        } else { // It might be a server command
+            for (var i = 0; i < serverCommandsModel.count; i++) {
+                if (serverCommandsModel.get(i).action === action) {
+                    if (quickMenuManager.serverCommandManager) {
+                        quickMenuManager.serverCommandManager.executeCommand(action);
+                        closeMenuDelayed();
+                    }
+                    return;
+                }
+            }
         }
         
         // Show action feedback
@@ -330,7 +323,7 @@ function closeMenu() {
         }
         
         // Close menu after action (except for navigation)
-        closeMenu()
+        closeMenuDelayed();
     }
     
     function showActionFeedback(action) {
@@ -343,13 +336,13 @@ function closeMenu() {
                 message = "Quitting session..."
                 break
             case "server_restart":
-                message = quickMenuManager.hasServerCommands ? "Restarting server..." : "Server commands not available"
+                message = ServerCommandManager.hasServerCommands ? "Restarting server..." : "Server commands not available"
                 break
             case "server_shutdown":
-                message = quickMenuManager.hasServerCommands ? "Shutting down server..." : "Server commands not available"
+                message = ServerCommandManager.hasServerCommands ? "Shutting down server..." : "Server commands not available"
                 break
             case "server_suspend":
-                message = quickMenuManager.hasServerCommands ? "Suspending server..." : "Server commands not available"
+                message = ServerCommandManager.hasServerCommands ? "Suspending server..." : "Server commands not available"
                 break
             case "clipboard_upload":
                 message = "Uploading clipboard to server..."
@@ -380,13 +373,15 @@ function closeMenu() {
         }
     }
     
-    function startToastTimer() {
-        toastTimer.restart()
-    }
-    
     // Make menu focusable and reset state
     Component.onCompleted: {
         focus = true
         currentMenu = "main"  // Always start with main menu
+
+        if (quickMenuManager.serverCommandManager) {
+            console.log("QuickMenu: Refreshing server commands on open");
+            quickMenuManager.serverCommandManager.refreshCommands();
+        }
     }
 }
+

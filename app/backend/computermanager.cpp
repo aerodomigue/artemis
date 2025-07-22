@@ -606,6 +606,12 @@ private:
                emit pairingCompleted(m_Computer, tr("Another pairing attempt is already in progress."));
                break;
            case NvPairingManager::PairState::PAIRED:
+               // Lock the computer manager to update the computer's state atomically
+               {
+                   QWriteLocker lock(&m_ComputerManager->m_Lock);
+                   m_Computer->pairState = NvComputer::PS_PAIRED;
+               }
+
                // Persist the newly pinned server certificate for this host
                m_ComputerManager->saveHost(m_Computer);
 
@@ -1031,9 +1037,16 @@ qDebug() << "PendingOTPPairingTask: Generated AES key from salt+PIN";
                         
                         // Complete the full pairing process like Android client does
                         if (performFullPairingHandshake(http, saltStr, otpHash, m_Pin)) {
-                            // Only mark as paired after full handshake completes
+                            // Lock the computer manager to update the computer's state atomically
+                            QWriteLocker lock(&m_ComputerManager->m_Lock);
+
+                            // Update the computer object with the new cert and paired state
+                            m_Computer->serverCert = serverCert;
                             m_Computer->pairState = NvComputer::PS_PAIRED;
-                            
+
+                            // Unlock before notifying and saving
+                            lock.unlock();
+
                             qDebug() << "PendingOTPPairingTask: Full pairing handshake successful, saving host";
                             
                             // Persist the newly paired computer

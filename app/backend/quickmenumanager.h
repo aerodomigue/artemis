@@ -8,7 +8,7 @@
 
 class NvComputer;
 class NvHTTP;
-class ServerCommandManager;
+#include "backend/servercommandmanager.h"
 class ClipboardManager;
 
 /**
@@ -28,6 +28,7 @@ class QuickMenuManager : public QObject
     Q_PROPERTY(bool isMouseCaptured READ isMouseCaptured NOTIFY mouseCaptureChanged)
     Q_PROPERTY(bool isKeyboardCaptured READ isKeyboardCaptured NOTIFY keyboardCaptureChanged)
     Q_PROPERTY(bool isStatsVisible READ isStatsVisible NOTIFY statsVisibilityChanged)
+    Q_PROPERTY(ServerCommandManager* serverCommandManager READ serverCommandManager CONSTANT)
     QML_ELEMENT
 
 public:
@@ -68,6 +69,8 @@ public:
     // Window management
     void setWindow(QWindow *window);
     void setWindowGeometry(int x, int y, int width, int height);
+
+    ServerCommandManager* serverCommandManager() const { return m_serverCommandManager; }
 
 signals:
     void visibilityChanged();

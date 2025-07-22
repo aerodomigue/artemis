@@ -4,8 +4,9 @@
 #include <QQmlEngine>
 #include <QAbstractListModel>
 #include <QJsonObject>
+#include <QTimer>
+#include "nvcomputer.h"
 
-class NvComputer;
 class NvHTTP;
 
 // Declare opaque pointers for Qt's meta-object system
@@ -69,11 +70,15 @@ public:
     Q_INVOKABLE bool isApolloServer() const;
 
 signals:
-    void commandsRefreshed();
-    void commandExecuted(const QString &commandId, bool success, const QString &result);
-    void commandFailed(const QString &commandId, const QString &error);
     void permissionChanged();
+    void commandsRefreshed();
+    void commandExecuted(const QString& commandId, bool success, const QString& result);
+    void commandFailed(const QString& commandId, const QString& error);
     void executionStateChanged();
+
+public slots:
+    void onComputerPairingCompleted();
+    void onComputerStateChanged();
     void noCommandsAvailable(); // Matches Android dialog
 
 private slots:

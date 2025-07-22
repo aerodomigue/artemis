@@ -117,6 +117,8 @@ bool NvComputer::isEqualSerialized(const NvComputer &that) const
            this->manualAddress == that.manualAddress &&
            this->serverCert == that.serverCert &&
            this->isNvidiaServerSoftware == that.isNvidiaServerSoftware &&
+           this->apolloVersion == that.apolloVersion &&
+           this->serverCommands == that.serverCommands &&
            this->appList == that.appList;
 }
 
@@ -203,6 +205,12 @@ NvComputer::NvComputer(NvHTTP& http, QString serverInfo)
 
     this->pairState = NvHTTP::getXmlString(serverInfo, "PairStatus") == "1" ?
                 PS_PAIRED : PS_NOT_PAIRED;
+
+    // Check for Apollo server support
+    this->apolloVersion = NvHTTP::getXmlString(serverInfo, "ApolloVersion");
+    if (!this->apolloVersion.isEmpty()) {
+        qDebug() << "Apollo server detected, version:" << this->apolloVersion;
+    }
     this->currentGameId = NvHTTP::getCurrentGame(serverInfo);
     this->appVersion = NvHTTP::getXmlString(serverInfo, "appversion");
     this->gfeVersion = NvHTTP::getXmlString(serverInfo, "GfeVersion");
@@ -485,12 +493,12 @@ QVector<NvAddress> NvComputer::uniqueAddresses() const
     QReadLocker readLocker(&lock);
     QVector<NvAddress> uniqueAddressList;
 
-    // Start with addresses correctly ordered
-    uniqueAddressList.append(activeAddress);
+    // Start with addresses correctly ordered to prioritize local connections
     uniqueAddressList.append(localAddress);
     uniqueAddressList.append(remoteAddress);
-    uniqueAddressList.append(ipv6Address);
     uniqueAddressList.append(manualAddress);
+    uniqueAddressList.append(ipv6Address);
+    uniqueAddressList.append(activeAddress);
 
     // Prune duplicates (always giving precedence to the first)
     for (int i = 0; i < uniqueAddressList.count(); i++) {
@@ -567,8 +575,10 @@ bool NvComputer::update(const NvComputer& that)
     ASSIGN_IF_CHANGED(isNvidiaServerSoftware);
     ASSIGN_IF_CHANGED(maxLumaPixelsHEVC);
     ASSIGN_IF_CHANGED(gpuModel);
+    ASSIGN_IF_CHANGED(apolloVersion);
     ASSIGN_IF_CHANGED_AND_NONNULL(serverCert);
     ASSIGN_IF_CHANGED_AND_NONEMPTY(displayModes);
+    ASSIGN_IF_CHANGED(serverCommands);
 
     if (!that.appList.isEmpty()) {
         // updateAppList() handles merging client-side attributes
