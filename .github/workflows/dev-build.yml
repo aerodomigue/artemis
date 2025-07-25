@@ -266,7 +266,8 @@ jobs:
           libpulse-dev libudev-dev libx11-dev libxcursor-dev \
           libxext-dev libxi-dev libxinerama-dev libxrandr-dev \
           libxss-dev libxt-dev libxv-dev libxxf86vm-dev \
-          libxcb-dri3-dev libx11-xcb-dev file wget desktop-file-utils
+          libxcb-dri3-dev libx11-xcb-dev file wget desktop-file-utils \
+          libxcb-cursor-dev
     
     - name: Clean any existing build
       run: |

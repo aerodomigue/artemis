@@ -304,7 +304,7 @@ bool ServerCommandManager::parseServerCommandsXml(const QByteArray &xmlData)
         xml.readNext();
         
         if (xml.isStartElement()) {
-            if (xml.name() == "ServerCommand") {
+            if (xml.name().toString() == "ServerCommand") {
                 // Parse Apollo/Android style server command
                 QString commandText = xml.readElementText();
                 if (!commandText.isEmpty()) {
@@ -313,7 +313,7 @@ bool ServerCommandManager::parseServerCommandsXml(const QByteArray &xmlData)
                     commandDescriptions.append("Server command: " + commandText);
                     qDebug() << "ServerCommandManager::parseServerCommandsXml: Found server command:" << commandText;
                 }
-            } else if (xml.name() == "Command") {
+            } else if (xml.name().toString() == "Command") {
                 // Parse alternative command format
                 QString commandId;
                 QString commandName;
