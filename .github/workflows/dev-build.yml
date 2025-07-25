@@ -224,9 +224,317 @@ jobs:
         path: artemis-linux-${{ steps.version.outputs.version }}.tar.gz
         retention-days: 30
 
+  build-appimage-dev:
+    name: AppImage Development Build
+    runs-on: ubuntu-20.04  # Use older Ubuntu for better compatibility
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+        fetch-depth: 0
+    
+    - name: Get version info
+      id: version
+      run: |
+        branch="${{ github.ref_name }}"
+        commit="${{ github.sha }}"
+        commit_short="${commit:0:7}"
+        timestamp=$(date +"%Y%m%d-%H%M")
+        version="dev-${branch}-${commit_short}-${timestamp}"
+        echo "version=${version}" >> $GITHUB_OUTPUT
+    
+    - name: Setup Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'linux'
+        target: 'desktop'
+        modules: 'qtmultimedia'
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libegl1-mesa-dev libgl1-mesa-dev libopus-dev libsdl2-dev \
+          libsdl2-ttf-dev libssl-dev libavcodec-dev libavformat-dev \
+          libswscale-dev libva-dev libvdpau-dev libxkbcommon-dev \
+          wayland-protocols libdrm-dev nasm libgbm-dev \
+          libfreetype6-dev libasound2-dev libdbus-1-dev \
+          libgles2-mesa-dev libglu1-mesa-dev libibus-1.0-dev \
+          libpulse-dev libudev-dev libx11-dev libxcursor-dev \
+          libxext-dev libxi-dev libxinerama-dev libxrandr-dev \
+          libxss-dev libxt-dev libxv-dev libxxf86vm-dev \
+          libxcb-dri3-dev libx11-xcb-dev file wget
+    
+    - name: Build
+      run: |
+        export PATH="$Qt6_DIR/bin:$PATH"
+        qmake6 moonlight-qt.pro CONFIG+=release
+        make -j$(nproc)
+    
+    - name: Create AppImage
+      run: |
+        # Download linuxdeploy and Qt plugin
+        wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+        wget https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+        chmod +x linuxdeploy*.AppImage
+        
+        # Create AppDir structure
+        mkdir -p AppDir/usr/bin
+        cp app/moonlight AppDir/usr/bin/artemis-dev
+        
+        # Create desktop file
+        cat > AppDir/artemis-dev.desktop << EOF
+        [Desktop Entry]
+        Type=Application
+        Name=Artemis Desktop (Dev)
+        Comment=Artemis Desktop Development Build
+        Exec=artemis-dev
+        Icon=artemis-dev
+        Categories=Game;Network;
+        EOF
+        
+        # Create a simple icon (you might want to replace this with actual icon)
+        mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+        # For now, create a placeholder - in production you'd copy your actual icon
+        touch AppDir/usr/share/icons/hicolor/256x256/apps/artemis-dev.png
+        
+        # Create build info
+        cat > AppDir/build_info.txt << EOF
+        Artemis Desktop Development Build (AppImage)
+        Version: ${{ steps.version.outputs.version }}
+        Branch: ${{ github.ref_name }}
+        Commit: ${{ github.sha }}
+        Built: $(date)
+        EOF
+        
+        # Build AppImage
+        export OUTPUT="artemis-dev-${{ steps.version.outputs.version }}-x86_64.AppImage"
+        ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage
+        
+        # Rename to include version
+        mv Artemis_Desktop_Dev*.AppImage "$OUTPUT" || mv artemis-dev*.AppImage "$OUTPUT" || ls -la *.AppImage
+    
+    - name: Upload AppImage Development Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: artemis-appimage-dev-${{ steps.version.outputs.version }}
+        path: artemis-dev-${{ steps.version.outputs.version }}-x86_64.AppImage
+        retention-days: 30
+
+  build-flatpak-dev:
+    name: Flatpak Development Build
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+        fetch-depth: 0
+    
+    - name: Get version info
+      id: version
+      run: |
+        branch="${{ github.ref_name }}"
+        commit="${{ github.sha }}"
+        commit_short="${commit:0:7}"
+        timestamp=$(date +"%Y%m%d-%H%M")
+        version="dev-${branch}-${commit_short}-${timestamp}"
+        echo "version=${version}" >> $GITHUB_OUTPUT
+    
+    - name: Install Flatpak and dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y flatpak flatpak-builder
+        sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+        sudo flatpak install -y flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08 org.kde.Platform//6.6 org.kde.Sdk//6.6
+    
+    - name: Create Flatpak manifest
+      run: |
+        cat > com.artemisdesktop.ArtemisDesktopDev.yml << EOF
+        app-id: com.artemisdesktop.ArtemisDesktopDev
+        runtime: org.kde.Platform
+        runtime-version: '6.6'
+        sdk: org.kde.Sdk
+        command: artemis-dev
+        finish-args:
+          - --share=ipc
+          - --socket=x11
+          - --socket=wayland
+          - --socket=pulseaudio
+          - --share=network
+          - --device=all
+          - --filesystem=home
+        modules:
+          - name: artemis-desktop-dev
+            buildsystem: qmake
+            config-opts:
+              - CONFIG+=release
+            sources:
+              - type: dir
+                path: .
+            post-install:
+              - mv /app/bin/moonlight /app/bin/artemis-dev
+              - install -Dm644 /dev/stdin /app/share/applications/com.artemisdesktop.ArtemisDesktopDev.desktop << EOD
+                [Desktop Entry]
+                Type=Application
+                Name=Artemis Desktop (Dev)
+                Comment=Artemis Desktop Development Build
+                Exec=artemis-dev
+                Icon=com.artemisdesktop.ArtemisDesktopDev
+                Categories=Game;Network;
+                EOD
+        EOF
+    
+    - name: Build Flatpak
+      run: |
+        flatpak-builder --force-clean --repo=repo build-dir com.artemisdesktop.ArtemisDesktopDev.yml
+        flatpak build-bundle repo artemis-desktop-dev-${{ steps.version.outputs.version }}.flatpak com.artemisdesktop.ArtemisDesktopDev
+    
+    - name: Upload Flatpak Development Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: artemis-flatpak-dev-${{ steps.version.outputs.version }}
+        path: artemis-desktop-dev-${{ steps.version.outputs.version }}.flatpak
+        retention-days: 30
+
+  build-steamdeck-dev:
+    name: Steam Deck Development Build
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+        fetch-depth: 0
+    
+    - name: Get version info
+      id: version
+      run: |
+        branch="${{ github.ref_name }}"
+        commit="${{ github.sha }}"
+        commit_short="${commit:0:7}"
+        timestamp=$(date +"%Y%m%d-%H%M")
+        version="dev-${branch}-${commit_short}-${timestamp}"
+        echo "version=${version}" >> $GITHUB_OUTPUT
+    
+    - name: Setup Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'linux'
+        target: 'desktop'
+        modules: 'qtmultimedia'
+    
+    - name: Install Steam Deck specific dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libegl1-mesa-dev libgl1-mesa-dev libopus-dev libsdl2-dev \
+          libsdl2-ttf-dev libssl-dev libavcodec-dev libavformat-dev \
+          libswscale-dev libva-dev libvdpau-dev libxkbcommon-dev \
+          wayland-protocols libdrm-dev nasm libgbm-dev \
+          libfreetype6-dev libasound2-dev libdbus-1-dev \
+          libgles2-mesa-dev libglu1-mesa-dev libibus-1.0-dev \
+          libpulse-dev libudev-dev libx11-dev libxcursor-dev \
+          libxext-dev libxi-dev libxinerama-dev libxrandr-dev \
+          libxss-dev libxt-dev libxv-dev libxxf86vm-dev \
+          libxcb-dri3-dev libx11-xcb-dev
+    
+    - name: Build for Steam Deck
+      run: |
+        export PATH="$Qt6_DIR/bin:$PATH"
+        export QMAKE="$Qt6_DIR/bin/qmake6"
+        # Build with Steam Deck optimizations
+        qmake6 moonlight-qt.pro CONFIG+=release CONFIG+=steamdeck
+        make -j$(nproc)
+    
+    - name: Package Steam Deck Development Build
+      run: |
+        mkdir -p steamdeck-package
+        cp app/moonlight steamdeck-package/artemis-dev
+        
+        # Create Steam Deck specific files
+        cat > steamdeck-package/artemis-dev.desktop << EOF
+        [Desktop Entry]
+        Type=Application
+        Name=Artemis Desktop (Dev)
+        Comment=Artemis Desktop Development Build - Optimized for Steam Deck
+        Exec=artemis-dev
+        Icon=artemis-dev
+        Categories=Game;Network;
+        EOF
+        
+        # Create installation script for Steam Deck
+        cat > steamdeck-package/install-steamdeck.sh << 'EOF'
+        #!/bin/bash
+        echo "Installing Artemis Desktop Development Build for Steam Deck..."
+        
+        # Create directories
+        mkdir -p ~/.local/share/applications
+        mkdir -p ~/.local/bin
+        
+        # Copy files
+        cp artemis-dev ~/.local/bin/
+        chmod +x ~/.local/bin/artemis-dev
+        cp artemis-dev.desktop ~/.local/share/applications/
+        
+        echo "Installation complete!"
+        echo "You can now find Artemis Desktop (Dev) in your applications menu."
+        EOF
+        
+        chmod +x steamdeck-package/install-steamdeck.sh
+        
+        # Create build info
+        cat > steamdeck-package/build_info.txt << EOF
+        Artemis Desktop Development Build (Steam Deck)
+        Version: ${{ steps.version.outputs.version }}
+        Branch: ${{ github.ref_name }}
+        Commit: ${{ github.sha }}
+        Built: $(date)
+        
+        Installation:
+        1. Extract this archive
+        2. Run: ./install-steamdeck.sh
+        3. Find Artemis Desktop (Dev) in your applications
+        EOF
+        
+        # Create README for Steam Deck users
+        cat > steamdeck-package/README-SteamDeck.md << EOF
+        # Artemis Desktop for Steam Deck (Development Build)
+        
+        ## Installation
+        1. Extract this archive to a folder
+        2. Open a terminal in that folder
+        3. Run: \`./install-steamdeck.sh\`
+        4. The app will be available in your applications menu
+        
+        ## Steam Deck Specific Notes
+        - This build is optimized for Steam Deck's controls and display
+        - Use the touchscreen or external mouse/keyboard for initial setup
+        - Game mode streaming works best with the built-in controls
+        
+        ## Troubleshooting
+        - If you have issues, try running from terminal: \`~/.local/bin/artemis-dev\`
+        - Check the build_info.txt for version details
+        EOF
+        
+        tar -czf artemis-steamdeck-dev-${{ steps.version.outputs.version }}.tar.gz -C steamdeck-package .
+    
+    - name: Upload Steam Deck Development Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: artemis-steamdeck-dev-${{ steps.version.outputs.version }}
+        path: artemis-steamdeck-dev-${{ steps.version.outputs.version }}.tar.gz
+        retention-days: 30
+
   create-dev-release:
     name: Create Development Release
-    needs: [build-windows-dev, build-macos-dev, build-linux-dev]
+    needs: [build-windows-dev, build-macos-dev, build-linux-dev, build-appimage-dev, build-flatpak-dev, build-steamdeck-dev]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/develop'  # Only create releases for develop branch
     
@@ -360,11 +668,14 @@ jobs:
           ## 📥 Downloads
           Choose the appropriate build for your platform:
           
-          | Platform | File | 
-          |----------|------|
-          | 🪟 Windows | `artemis-windows-${{ steps.version.outputs.version }}.zip` |
-          | 🍎 macOS | `artemis-macos-${{ steps.version.outputs.version }}.tar.gz` |
-          | 🐧 Linux | `artemis-linux-${{ steps.version.outputs.version }}.tar.gz` |
+          | Platform | File | Notes |
+          |----------|------|-------|
+          | 🪟 Windows | `artemis-windows-${{ steps.version.outputs.version }}.zip` | Standard Windows build |
+          | 🍎 macOS | `artemis-macos-${{ steps.version.outputs.version }}.tar.gz` | macOS app bundle |
+          | 🐧 Linux | `artemis-linux-${{ steps.version.outputs.version }}.tar.gz` | Generic Linux binary |
+          | 📦 AppImage | `artemis-dev-${{ steps.version.outputs.version }}-x86_64.AppImage` | Portable Linux app |
+          | 📱 Flatpak | `artemis-desktop-dev-${{ steps.version.outputs.version }}.flatpak` | Sandboxed Linux app |
+          | 🎮 Steam Deck | `artemis-steamdeck-dev-${{ steps.version.outputs.version }}.tar.gz` | Optimized for Steam Deck |
           
           ## 🔄 Installation
           1. Download the appropriate file for your platform
@@ -377,6 +688,9 @@ jobs:
           artifacts/artemis-windows-dev-${{ steps.version.outputs.version }}/*
           artifacts/artemis-macos-dev-${{ steps.version.outputs.version }}/*
           artifacts/artemis-linux-dev-${{ steps.version.outputs.version }}/*
+          artifacts/artemis-appimage-dev-${{ steps.version.outputs.version }}/*
+          artifacts/artemis-flatpak-dev-${{ steps.version.outputs.version }}/*
+          artifacts/artemis-steamdeck-dev-${{ steps.version.outputs.version }}/*
         prerelease: true
         draft: false
       env:

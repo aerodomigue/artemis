@@ -31,7 +31,12 @@ Artemis Qt includes all the features of Moonlight Qt, plus these enhanced capabi
 - **📐 Resolution Scaling** - Client-side resolution scaling for better performance - ✅ **COMPLETE**
 - **🖼️ Virtual Display Control** - Choose whether to use virtual displays - ✅ **COMPLETE**
 
-### 🚀 Phase 3 (Advanced) - Future
+### 🆕 Phase 3 (UUID & Modern Features) - Complete
+- **🆔 UUID-Based App Launching** - Modern app identification system for Apollo/Sunshine servers - ✅ **COMPLETE**
+- **🔄 Automatic Fallback** - Seamlessly falls back to legacy app IDs when UUIDs unavailable - ✅ **COMPLETE**
+- **🚀 Development Builds** - Automated development builds with changelogs for all platforms - ✅ **COMPLETE**
+
+### 🚀 Phase 4 (Advanced) - Future
 - **📱 App Ordering** - Custom app ordering without compatibility mode
 - **🔍 Permission Viewing** - View and manage server-side permissions
 - **🎯 Input-Only Mode** - Stream input without video for remote control scenarios
@@ -54,9 +59,12 @@ Artemis Qt is specifically optimized for handheld gaming devices like the Steam 
 
 **Gamepad:** `Select + L1 + R1 + Y`
 
+> **💡 Pro Tip:** The Quick Menu provides instant access to clipboard sync, server commands, streaming controls, and more - all without leaving your game!
+
 ### Other Shortcuts
 
 **Keyboard Shortcuts** (All require `Ctrl + Alt + Shift` prefix):
+- `Tab` - **Toggle Quick Menu** (NEW!)
 - `Q` - Quit stream
 - `E` - Quit stream and exit application
 - `S` - Toggle performance stats overlay
@@ -69,21 +77,34 @@ Artemis Qt is specifically optimized for handheld gaming devices like the Steam 
 - `D` - Minimize window
 
 **Gamepad Shortcuts:**
+- `Select + L1 + R1 + Y` - **Toggle Quick Menu** (NEW!)
 - `Start + Select + L1 + R1` - Quit stream
 - `Select + L1 + R1 + X` - Toggle performance stats overlay
-- `Select + L1 + R1 + Y` - Toggle Quick Menu
 - Long press `Start` - Toggle mouse emulation mode
 
 > **Note:** The Quick Menu provides easy access to clipboard sync, server commands, and other streaming controls during your session.
 
 ## 📥 Downloads
 
-### Latest Release
+### 🎯 Stable Releases
+Get the latest stable version with full testing and documentation:
 - **[Windows x64/ARM64](https://github.com/wjbeckett/artemis/releases/latest)** - Native Windows builds
 - **[macOS Universal](https://github.com/wjbeckett/artemis/releases/latest)** - Intel and Apple Silicon support
 - **[Linux AppImage](https://github.com/wjbeckett/artemis/releases/latest)** - Universal Linux compatibility
 - **[Steam Deck Package](https://github.com/wjbeckett/artemis/releases/latest)** - Optimized for Steam Deck
 - **[Flatpak](https://github.com/wjbeckett/artemis/releases/latest)** - Sandboxed Linux package
+
+### 🚧 Development Builds
+Want to test the latest features? Try our automated development builds:
+- **[Development Releases](https://github.com/wjbeckett/artemis/releases?q=prerelease%3Atrue)** - Latest features with automatic changelogs
+- **Available for all platforms** - Windows, macOS, Linux, AppImage, Flatpak, Steam Deck
+- **Updated automatically** - New builds created with every development push
+- **⚠️ Warning:** Development builds are unstable and intended for testing only
+
+> **🔥 Latest Development Features:**
+> - UUID-based app launching for modern Apollo/Sunshine servers
+> - Enhanced error handling and logging
+> - Improved compatibility with latest server versions
 
 ## 🎮 Moonlight Features (Inherited)
  - Hardware accelerated video decoding on Windows, Mac, and Linux
@@ -176,16 +197,42 @@ nmake  # Windows
 | Multi-touch Support | ✅ | ✅ |
 | **Clipboard Sync** | ❌ | ✅ |
 | **Server Commands** | ❌ | ✅ |
-|| **OTP Pairing** | ❌ | ✅ |
-|| **Quick Menu** | ❌ | ✅ |
-|| **Fractional Refresh Rates** | ❌ | ✅ |
-|| **Resolution Scaling** | ❌ | ✅ |
-|| **Virtual Display Control** | ❌ | ✅ |
+| **OTP Pairing** | ❌ | 🚧 |
+| **Quick Menu** | ❌ | ✅ |
+| **Fractional Refresh Rates** | ❌ | ✅ |
+| **Resolution Scaling** | ❌ | ✅ |
+| **Virtual Display Control** | ❌ | ✅ |
+| **UUID-Based App Launching** | ❌ | ✅ |
+| **Development Builds** | ❌ | ✅ |
 | **Custom App Ordering** | ❌ | 📋 |
 | **Permission Viewing** | ❌ | 📋 |
 | **Input-Only Mode** | ❌ | 📋 |
 
 Legend: ✅ Available, 🚧 In Development, 📋 Planned
+
+## 🆕 What's New
+
+### Recent Improvements
+- **🆔 UUID-Based App Launching** - Modern app identification system that works seamlessly with Apollo/Sunshine servers
+- **🔄 Smart Fallback System** - Automatically uses legacy app IDs when UUIDs aren't available
+- **🚀 Automated Development Builds** - Get the latest features with automatic changelogs for all platforms
+- **🎮 Enhanced Quick Menu** - Improved `Ctrl+Alt+Shift+Tab` shortcut and `Select+L1+R1+Y` gamepad combo
+- **📋 Better Error Handling** - Improved logging and error messages for troubleshooting
+
+### What's Coming Next
+- **🔐 OTP Pairing** - Enhanced security with One-Time Password authentication
+- **📱 Custom App Ordering** - Organize your game library exactly how you want
+- **🔍 Permission Management** - View and control server-side permissions
+- **🎯 Input-Only Mode** - Remote control without video streaming for lightweight scenarios
+
+### Development Process
+We now have **automated development builds** that:
+- 🔄 Build automatically on every development push
+- 📋 Generate detailed changelogs from commit messages
+- 🎯 Support all platforms (Windows, macOS, Linux, AppImage, Flatpak, Steam Deck)
+- ⚡ Let you test new features immediately
+
+Want to help test new features? Check out our [development releases](https://github.com/wjbeckett/artemis/releases?q=prerelease%3Atrue)!
 
 ## 🤝 Contributing
 
