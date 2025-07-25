@@ -462,7 +462,7 @@ jobs:
               - find . -name "Makefile*" -delete || true
               - rm -rf AntiHooking/ || true
               - rm -rf config.tests/SL/ || true
-              - rm -f app/test_*.cpp app/masterhook.c app/masterhook_internal.c || true
+              - rm -f app/test_*.cpp || true
               - qmake6 moonlight-qt.pro CONFIG+=release
               - make -j$(nproc)
               - install -Dm755 app/moonlight /app/bin/artemis-dev
