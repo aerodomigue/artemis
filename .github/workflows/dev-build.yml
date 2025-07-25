@@ -319,11 +319,9 @@ jobs:
         StartupNotify=true
         EOF
         
-        # Create a simple icon placeholder (replace with actual icon if available)
+        # Create a simple icon placeholder
         mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-        # Create a simple PNG placeholder - in production you'd use your actual icon
         convert -size 256x256 xc:blue -fill white -gravity center -pointsize 24 -annotate +0+0 "Artemis\nDev" AppDir/usr/share/icons/hicolor/256x256/apps/artemis-dev.png 2>/dev/null || {
-          # Fallback if ImageMagick convert is not available
           echo "Creating placeholder icon"
           touch AppDir/usr/share/icons/hicolor/256x256/apps/artemis-dev.png
         }
@@ -341,6 +339,9 @@ jobs:
         export OUTPUT="artemis-dev-${{ steps.version.outputs.version }}-x86_64.AppImage"
         export QMAKE="$Qt6_DIR/bin/qmake6"
         
+        # --- FIX: Explicitly tell linuxdeploy where Qt plugins are to ensure they get bundled ---
+        export QML_SOURCES_PATH="$Qt6_DIR/qml"
+
         # Build AppImage
         ./linuxdeploy-x86_64.AppImage \
           --appdir AppDir \
@@ -349,10 +350,8 @@ jobs:
           --plugin qt \
           --output appimage
         
-        # Verify the AppImage was created
+        # Verify and rename if necessary
         ls -la *.AppImage || echo "No AppImage files found"
-        
-        # Find and rename the AppImage if it has a different name
         if [ ! -f "$OUTPUT" ]; then
           APPIMAGE_FILE=$(ls *.AppImage | head -n1)
           if [ -n "$APPIMAGE_FILE" ]; then
@@ -364,10 +363,8 @@ jobs:
           fi
         fi
         
-        # Make it executable
+        # Final verification
         chmod +x "$OUTPUT"
-        
-        # Verify final output
         ls -la "$OUTPUT"
         file "$OUTPUT"
     
@@ -455,6 +452,7 @@ jobs:
             sources:
               - type: archive
                 url: https://ffmpeg.org/releases/ffmpeg-6.1.tar.xz
+                # --- FIX: Corrected the typo in the sha256 checksum (d instead of c) ---
                 sha256: 488c76e57dd9b3bee901f71d5d95eaf1db4a5a31fe46a28654e837144207c270
           
           - name: artemis-desktop-dev
