@@ -470,7 +470,8 @@ jobs:
               - type: dir
                 path: .
             post-install:
-              - install -Dm644 /dev/stdin /app/share/applications/com.artemisdesktop.ArtemisDesktopDev.desktop << 'EOD'
+              - |
+                install -Dm644 /dev/stdin /app/share/applications/com.artemisdesktop.ArtemisDesktopDev.desktop << 'EOD'
                 [Desktop Entry]
                 Type=Application
                 Name=Artemis Desktop (Dev)
