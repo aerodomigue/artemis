@@ -2,19 +2,38 @@ name: Development Build
 
 on:
   push:
-    branches: 
+    branches:
       - develop
       - dev
       - 'feature/**'
       - 'feat/**'
-  workflow_dispatch:  # Allow manual triggering
+  workflow_dispatch: # Allow manual triggering
 
 env:
   QT_VERSION: '6.8.1'
 
 jobs:
+  setup-version:
+    name: Setup Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Get version info
+        id: version
+        run: |
+          # Replace slashes in branch name to create a valid string for tags and filenames
+          branch_name_sanitized=$(echo "${{ github.ref_name }}" | sed 's/\//-/g')
+          commit_short="${{ github.sha }}"
+          commit_short="${commit_short:0:7}"
+          timestamp=$(date +"%Y%m%d-%H%M")
+          version="dev-${branch_name_sanitized}-${commit_short}-${timestamp}"
+          echo "version=${version}" >> $GITHUB_OUTPUT
+          echo "Generated version: ${version}"
+
   build-windows-dev:
     name: Windows Development Build
+    needs: setup-version
     runs-on: windows-latest
     
     steps:
@@ -22,17 +41,10 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: 'recursive'
-        fetch-depth: 0  # Needed for version info
-    
-    - name: Get version info
-      id: version
-      run: |
-        $branch = "${{ github.ref_name }}"
-        $commit = "${{ github.sha }}".Substring(0,7)
-        $timestamp = Get-Date -Format "yyyyMMdd-HHmm"
-        $version = "dev-$branch-$commit-$timestamp"
-        echo "version=$version" >> $env:GITHUB_OUTPUT
-        echo "Development version: $version"
+        fetch-depth: 0 # Needed for version info
+
+    - name: Display version info
+      run: echo "Using development version ${{ needs.setup-version.outputs.version }}"
     
     - name: Setup Qt
       uses: jurplel/install-qt-action@v3
@@ -51,27 +63,30 @@ jobs:
         $env:PATH += ";$env:Qt6_DIR\bin"
         qmake6 moonlight-qt.pro CONFIG+=release
         nmake
-    
+
     - name: Package Windows Development Build
+      env:
+        VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
         mkdir windows-dev-package
         copy app\release\moonlight.exe windows-dev-package\artemis-dev.exe
         echo "Artemis Desktop Development Build" > windows-dev-package\README.txt
-        echo "Version: ${{ steps.version.outputs.version }}" >> windows-dev-package\README.txt
+        echo "Version: $env:VERSION" >> windows-dev-package\README.txt
         echo "Branch: ${{ github.ref_name }}" >> windows-dev-package\README.txt
         echo "Commit: ${{ github.sha }}" >> windows-dev-package\README.txt
         echo "Built: $(Get-Date)" >> windows-dev-package\README.txt
-        Compress-Archive -Path windows-dev-package\* -DestinationPath artemis-windows-${{ steps.version.outputs.version }}.zip
+        Compress-Archive -Path windows-dev-package\* -DestinationPath artemis-windows-$env:VERSION.zip
     
     - name: Upload Development Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: artemis-windows-dev-${{ steps.version.outputs.version }}
-        path: artemis-windows-${{ steps.version.outputs.version }}.zip
-        retention-days: 30  # Keep dev builds for 30 days
+        name: artemis-windows-dev-${{ needs.setup-version.outputs.version }}
+        path: artemis-windows-${{ needs.setup-version.outputs.version }}.zip
+        retention-days: 30
 
   build-macos-dev:
     name: macOS Development Build
+    needs: setup-version
     runs-on: macos-latest
     
     steps:
@@ -80,17 +95,9 @@ jobs:
       with:
         submodules: 'recursive'
         fetch-depth: 0
-    
-    - name: Get version info
-      id: version
-      run: |
-        branch="${{ github.ref_name }}"
-        commit="${{ github.sha }}"
-        commit_short="${commit:0:7}"
-        timestamp=$(date +"%Y%m%d-%H%M")
-        version="dev-${branch}-${commit_short}-${timestamp}"
-        echo "version=${version}" >> $GITHUB_OUTPUT
-        echo "Development version: ${version}"
+
+    - name: Display version info
+      run: echo "Using development version ${{ needs.setup-version.outputs.version }}"
     
     - name: Setup Qt
       uses: jurplel/install-qt-action@v3
@@ -122,28 +129,31 @@ jobs:
         make -j$(sysctl -n hw.ncpu)
     
     - name: Package macOS Development Build
+      env:
+        VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
         # Create info file
         cat > build_info.txt << EOF
         Artemis Desktop Development Build
-        Version: ${{ steps.version.outputs.version }}
+        Version: $VERSION
         Branch: ${{ github.ref_name }}
         Commit: ${{ github.sha }}
         Built: $(date)
         EOF
         
         # Package with version info
-        tar -czf artemis-macos-${{ steps.version.outputs.version }}.tar.gz -C app Moonlight.app -C .. build_info.txt
+        tar -czf artemis-macos-$VERSION.tar.gz -C app Moonlight.app -C .. build_info.txt
     
     - name: Upload Development Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: artemis-macos-dev-${{ steps.version.outputs.version }}
-        path: artemis-macos-${{ steps.version.outputs.version }}.tar.gz
+        name: artemis-macos-dev-${{ needs.setup-version.outputs.version }}
+        path: artemis-macos-${{ needs.setup-version.outputs.version }}.tar.gz
         retention-days: 30
 
   build-linux-dev:
     name: Linux Development Build
+    needs: setup-version
     runs-on: ubuntu-22.04
     
     steps:
@@ -152,17 +162,9 @@ jobs:
       with:
         submodules: 'recursive'
         fetch-depth: 0
-    
-    - name: Get version info
-      id: version
-      run: |
-        branch="${{ github.ref_name }}"
-        commit="${{ github.sha }}"
-        commit_short="${commit:0:7}"
-        timestamp=$(date +"%Y%m%d-%H%M")
-        version="dev-${branch}-${commit_short}-${timestamp}"
-        echo "version=${version}" >> $GITHUB_OUTPUT
-        echo "Development version: ${version}"
+
+    - name: Display version info
+      run: echo "Using development version ${{ needs.setup-version.outputs.version }}"
     
     - name: Setup Qt
       uses: jurplel/install-qt-action@v3
@@ -204,28 +206,31 @@ jobs:
         make -j$(nproc)
     
     - name: Package Linux Development Build
+      env:
+        VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
         # Create info file
         cat > build_info.txt << EOF
         Artemis Desktop Development Build
-        Version: ${{ steps.version.outputs.version }}
+        Version: $VERSION
         Branch: ${{ github.ref_name }}
         Commit: ${{ github.sha }}
         Built: $(date)
         EOF
         
         # Package with version info
-        tar -czf artemis-linux-${{ steps.version.outputs.version }}.tar.gz -C app moonlight -C .. build_info.txt
+        tar -czf artemis-linux-$VERSION.tar.gz -C app moonlight -C .. build_info.txt
     
     - name: Upload Development Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: artemis-linux-dev-${{ steps.version.outputs.version }}
-        path: artemis-linux-${{ steps.version.outputs.version }}.tar.gz
+        name: artemis-linux-dev-${{ needs.setup-version.outputs.version }}
+        path: artemis-linux-${{ needs.setup-version.outputs.version }}.tar.gz
         retention-days: 30
 
   build-appimage-dev:
     name: AppImage Development Build
+    needs: setup-version
     runs-on: ubuntu-22.04
     
     steps:
@@ -234,16 +239,9 @@ jobs:
       with:
         submodules: 'recursive'
         fetch-depth: 0
-    
-    - name: Get version info
-      id: version
-      run: |
-        branch="${{ github.ref_name }}"
-        commit="${{ github.sha }}"
-        commit_short="${commit:0:7}"
-        timestamp=$(date +"%Y%m%d-%H%M")
-        version="dev-${branch}-${commit_short}-${timestamp}"
-        echo "version=${version}" >> $GITHUB_OUTPUT
+
+    - name: Display version info
+      run: echo "Using development version ${{ needs.setup-version.outputs.version }}"
     
     - name: Setup Qt
       uses: jurplel/install-qt-action@v3
@@ -267,7 +265,7 @@ jobs:
           libxext-dev libxi-dev libxinerama-dev libxrandr-dev \
           libxss-dev libxt-dev libxv-dev libxxf86vm-dev \
           libxcb-dri3-dev libx11-xcb-dev file wget desktop-file-utils \
-          libxcb-cursor-dev
+          libxcb-cursor-dev imagemagick
     
     - name: Clean any existing build
       run: |
@@ -298,6 +296,8 @@ jobs:
         ldd app/moonlight || echo "ldd failed"
     
     - name: Create AppImage
+      env:
+        VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
         # Download linuxdeploy and Qt plugin
         wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
@@ -322,25 +322,20 @@ jobs:
         
         # Create a simple icon placeholder
         mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-        convert -size 256x256 xc:blue -fill white -gravity center -pointsize 24 -annotate +0+0 "Artemis\nDev" AppDir/usr/share/icons/hicolor/256x256/apps/artemis-dev.png 2>/dev/null || {
-          echo "Creating placeholder icon"
-          touch AppDir/usr/share/icons/hicolor/256x256/apps/artemis-dev.png
-        }
+        convert -size 256x256 xc:blue -fill white -gravity center -pointsize 24 -annotate +0+0 "Artemis\nDev" AppDir/usr/share/icons/hicolor/256x256/apps/artemis-dev.png
         
         # Create build info
         cat > AppDir/build_info.txt << EOF
         Artemis Desktop Development Build (AppImage)
-        Version: ${{ steps.version.outputs.version }}
+        Version: $VERSION
         Branch: ${{ github.ref_name }}
         Commit: ${{ github.sha }}
         Built: $(date)
         EOF
         
         # Set environment variables for linuxdeploy
-        export OUTPUT="artemis-dev-${{ steps.version.outputs.version }}-x86_64.AppImage"
+        export OUTPUT="artemis-dev-${VERSION}-x86_64.AppImage"
         export QMAKE="$Qt6_DIR/bin/qmake6"
-        
-        # --- FIX: Explicitly tell linuxdeploy where Qt plugins are to ensure they get bundled ---
         export QML_SOURCES_PATH="$Qt6_DIR/qml"
 
         # Build AppImage
@@ -351,20 +346,8 @@ jobs:
           --plugin qt \
           --output appimage
         
-        # Verify and rename if necessary
-        ls -la *.AppImage || echo "No AppImage files found"
-        if [ ! -f "$OUTPUT" ]; then
-          APPIMAGE_FILE=$(ls *.AppImage | head -n1)
-          if [ -n "$APPIMAGE_FILE" ]; then
-            mv "$APPIMAGE_FILE" "$OUTPUT"
-            echo "Renamed $APPIMAGE_FILE to $OUTPUT"
-          else
-            echo "Error: No AppImage file was created"
-            exit 1
-          fi
-        fi
-        
         # Final verification
+        mv *.AppImage "$OUTPUT"
         chmod +x "$OUTPUT"
         ls -la "$OUTPUT"
         file "$OUTPUT"
@@ -372,12 +355,13 @@ jobs:
     - name: Upload AppImage Development Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: artemis-appimage-dev-${{ steps.version.outputs.version }}
-        path: artemis-dev-${{ steps.version.outputs.version }}-x86_64.AppImage
+        name: artemis-appimage-dev-${{ needs.setup-version.outputs.version }}
+        path: artemis-dev-${{ needs.setup-version.outputs.version }}-x86_64.AppImage
         retention-days: 30
 
   build-flatpak-dev:
     name: Flatpak Development Build
+    needs: setup-version
     runs-on: ubuntu-22.04
     
     steps:
@@ -387,15 +371,8 @@ jobs:
         submodules: 'recursive'
         fetch-depth: 0
     
-    - name: Get version info
-      id: version
-      run: |
-        branch="${{ github.ref_name }}"
-        commit="${{ github.sha }}"
-        commit_short="${commit:0:7}"
-        timestamp=$(date +"%Y%m%d-%H%M")
-        version="dev-${branch}-${commit_short}-${timestamp}"
-        echo "version=${version}" >> $GITHUB_OUTPUT
+    - name: Display version info
+      run: echo "Using development version ${{ needs.setup-version.outputs.version }}"
     
     - name: Install Flatpak and dependencies
       run: |
@@ -483,19 +460,22 @@ jobs:
         EOF
     
     - name: Build Flatpak
+      env:
+        VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
         flatpak-builder --force-clean --repo=repo build-dir com.artemisdesktop.ArtemisDesktopDev.yml
-        flatpak build-bundle repo artemis-desktop-dev-${{ steps.version.outputs.version }}.flatpak com.artemisdesktop.ArtemisDesktopDev
+        flatpak build-bundle repo artemis-desktop-dev-$VERSION.flatpak com.artemisdesktop.ArtemisDesktopDev
     
     - name: Upload Flatpak Development Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: artemis-flatpak-dev-${{ steps.version.outputs.version }}
-        path: artemis-desktop-dev-${{ steps.version.outputs.version }}.flatpak
+        name: artemis-flatpak-dev-${{ needs.setup-version.outputs.version }}
+        path: artemis-desktop-dev-${{ needs.setup-version.outputs.version }}.flatpak
         retention-days: 30
 
   build-steamdeck-dev:
     name: Steam Deck Development Build
+    needs: setup-version
     runs-on: ubuntu-22.04
     
     steps:
@@ -505,15 +485,8 @@ jobs:
         submodules: 'recursive'
         fetch-depth: 0
     
-    - name: Get version info
-      id: version
-      run: |
-        branch="${{ github.ref_name }}"
-        commit="${{ github.sha }}"
-        commit_short="${commit:0:7}"
-        timestamp=$(date +"%Y%m%d-%H%M")
-        version="dev-${branch}-${commit_short}-${timestamp}"
-        echo "version=${version}" >> $GITHUB_OUTPUT
+    - name: Display version info
+      run: echo "Using development version ${{ needs.setup-version.outputs.version }}"
     
     - name: Setup Qt
       uses: jurplel/install-qt-action@v3
@@ -547,6 +520,8 @@ jobs:
         make -j$(nproc)
     
     - name: Package Steam Deck Development Build
+      env:
+        VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
         mkdir -p steamdeck-package
         cp app/moonlight steamdeck-package/artemis-dev
@@ -585,7 +560,7 @@ jobs:
         # Create build info
         cat > steamdeck-package/build_info.txt << EOF
         Artemis Desktop Development Build (Steam Deck)
-        Version: ${{ steps.version.outputs.version }}
+        Version: $VERSION
         Branch: ${{ github.ref_name }}
         Commit: ${{ github.sha }}
         Built: $(date)
@@ -616,36 +591,26 @@ jobs:
         - Check the build_info.txt for version details
         EOF
         
-        tar -czf artemis-steamdeck-dev-${{ steps.version.outputs.version }}.tar.gz -C steamdeck-package .
+        tar -czf artemis-steamdeck-dev-$VERSION.tar.gz -C steamdeck-package .
     
     - name: Upload Steam Deck Development Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: artemis-steamdeck-dev-${{ steps.version.outputs.version }}
-        path: artemis-steamdeck-dev-${{ steps.version.outputs.version }}.tar.gz
+        name: artemis-steamdeck-dev-${{ needs.setup-version.outputs.version }}
+        path: artemis-steamdeck-dev-${{ needs.setup-version.outputs.version }}.tar.gz
         retention-days: 30
 
   create-dev-release:
     name: Create Development Release
-    needs: [build-windows-dev, build-macos-dev, build-linux-dev, build-appimage-dev, build-flatpak-dev, build-steamdeck-dev]
+    needs: [setup-version, build-windows-dev, build-macos-dev, build-linux-dev, build-appimage-dev, build-flatpak-dev, build-steamdeck-dev]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'  # Only create releases for develop branch
+    if: github.ref == 'refs/heads/develop'
     
     steps:
     - name: Checkout
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # Need full history for changelog
-    
-    - name: Get version info
-      id: version
-      run: |
-        branch="${{ github.ref_name }}"
-        commit="${{ github.sha }}"
-        commit_short="${commit:0:7}"
-        timestamp=$(date +"%Y%m%d-%H%M")
-        version="dev-${branch}-${commit_short}-${timestamp}"
-        echo "version=${version}" >> $GITHUB_OUTPUT
+        fetch-depth: 0 # Need full history for changelog
     
     - name: Generate Changelog
       id: changelog
@@ -654,7 +619,7 @@ jobs:
         LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
         
         if [ -z "$LAST_TAG" ]; then
-          # If no previous tag, get commits from last 50 commits or 7 days, whichever is less
+          # If no previous tag, get commits from last 7 days
           SINCE_DATE=$(date -d '7 days ago' '+%Y-%m-%d')
           echo "No previous release found. Getting commits since $SINCE_DATE"
           COMMITS=$(git log --since="$SINCE_DATE" --pretty=format:"%h|%s|%an|%ad" --date=short)
@@ -663,20 +628,15 @@ jobs:
           COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"%h|%s|%an|%ad" --date=short)
         fi
         
-        # Initialize changelog sections
         FEATURES=""
         BUGFIXES=""
         IMPROVEMENTS=""
         OTHER=""
         
-        # Process each commit
         while IFS='|' read -r hash subject author date; do
           if [ -z "$hash" ]; then continue; fi
-          
-          # Clean up the subject line
           subject=$(echo "$subject" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
           
-          # Categorize commits based on keywords and patterns
           if echo "$subject" | grep -iE "^(feat|feature|add|implement|new)[:|\s]|add.*support|implement.*|new.*feature" > /dev/null; then
             FEATURES="${FEATURES}- ${subject} (${hash})\n"
           elif echo "$subject" | grep -iE "^(fix|bug|resolve|correct)[:|\s]|fix.*|bug.*fix|resolve.*|correct.*" > /dev/null; then
@@ -688,41 +648,23 @@ jobs:
           fi
         done <<< "$COMMITS"
         
-        # Build the changelog
         CHANGELOG="## 🚧 Development Build Changelog\n\n"
+        if [ ! -z "$FEATURES" ]; then CHANGELOG="${CHANGELOG}### ✨ New Features\n${FEATURES}\n"; fi
+        if [ ! -z "$BUGFIXES" ]; then CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes\n${BUGFIXES}\n"; fi
+        if [ ! -z "$IMPROVEMENTS" ]; then CHANGELOG="${CHANGELOG}### 🔧 Improvements\n${IMPROVEMENTS}\n"; fi
+        if [ ! -z "$OTHER" ]; then CHANGELOG="${CHANGELOG}### 📝 Other Changes\n${OTHER}\n"; fi
         
-        if [ ! -z "$FEATURES" ]; then
-          CHANGELOG="${CHANGELOG}### ✨ New Features\n${FEATURES}\n"
-        fi
-        
-        if [ ! -z "$BUGFIXES" ]; then
-          CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes\n${BUGFIXES}\n"
-        fi
-        
-        if [ ! -z "$IMPROVEMENTS" ]; then
-          CHANGELOG="${CHANGELOG}### 🔧 Improvements\n${IMPROVEMENTS}\n"
-        fi
-        
-        if [ ! -z "$OTHER" ]; then
-          CHANGELOG="${CHANGELOG}### 📝 Other Changes\n${OTHER}\n"
-        fi
-        
-        # If no categorized changes, show a simple list
         if [ -z "$FEATURES" ] && [ -z "$BUGFIXES" ] && [ -z "$IMPROVEMENTS" ] && [ -z "$OTHER" ]; then
           CHANGELOG="${CHANGELOG}### 📝 Recent Changes\n"
           while IFS='|' read -r hash subject author date; do
-            if [ ! -z "$hash" ]; then
-              CHANGELOG="${CHANGELOG}- ${subject} (${hash})\n"
-            fi
+            if [ ! -z "$hash" ]; then CHANGELOG="${CHANGELOG}- ${subject} (${hash})\n"; fi
           done <<< "$COMMITS"
         fi
         
-        # Save changelog to file and output
         echo -e "$CHANGELOG" > changelog.md
         echo "Generated changelog:"
         cat changelog.md
         
-        # Set output for use in release
         {
           echo 'changelog<<EOF'
           cat changelog.md
@@ -733,12 +675,15 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         path: artifacts
+
+    - name: List downloaded files for debugging
+      run: ls -R artifacts
     
     - name: Create Development Release
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ steps.version.outputs.version }}
-        name: "🚧 Development Build ${{ steps.version.outputs.version }}"
+        tag_name: ${{ needs.setup-version.outputs.version }}
+        name: "🚧 Development Build ${{ needs.setup-version.outputs.version }}"
         body: |
           🚧 **Development Build** 🚧
           
@@ -763,12 +708,12 @@ jobs:
           
           | Platform | File | Notes |
           |----------|------|-------|
-          | 🪟 Windows | `artemis-windows-${{ steps.version.outputs.version }}.zip` | Standard Windows build |
-          | 🍎 macOS | `artemis-macos-${{ steps.version.outputs.version }}.tar.gz` | macOS app bundle |
-          | 🐧 Linux | `artemis-linux-${{ steps.version.outputs.version }}.tar.gz` | Generic Linux binary |
-          | 📦 AppImage | `artemis-dev-${{ steps.version.outputs.version }}-x86_64.AppImage` | Portable Linux app |
-          | 📱 Flatpak | `artemis-desktop-dev-${{ steps.version.outputs.version }}.flatpak` | Sandboxed Linux app |
-          | 🎮 Steam Deck | `artemis-steamdeck-dev-${{ steps.version.outputs.version }}.tar.gz` | Optimized for Steam Deck |
+          | 🪟 Windows | `artemis-windows-${{ needs.setup-version.outputs.version }}.zip` | Standard Windows build |
+          | 🍎 macOS | `artemis-macos-${{ needs.setup-version.outputs.version }}.tar.gz` | macOS app bundle |
+          | 🐧 Linux | `artemis-linux-${{ needs.setup-version.outputs.version }}.tar.gz` | Generic Linux binary |
+          | 📦 AppImage | `artemis-dev-${{ needs.setup-version.outputs.version }}-x86_64.AppImage` | Portable Linux app |
+          | 📱 Flatpak | `artemis-desktop-dev-${{ needs.setup-version.outputs.version }}.flatpak` | Sandboxed Linux app |
+          | 🎮 Steam Deck | `artemis-steamdeck-dev-${{ needs.setup-version.outputs.version }}.tar.gz` | Optimized for Steam Deck |
           
           ## 🔄 Installation
           1. Download the appropriate file for your platform
@@ -778,12 +723,7 @@ jobs:
           ## 🐛 Found a Bug?
           Please report issues on our [GitHub Issues](https://github.com/${{ github.repository }}/issues) page.
         files: |
-          artifacts/artemis-windows-dev-${{ steps.version.outputs.version }}/*
-          artifacts/artemis-macos-dev-${{ steps.version.outputs.version }}/*
-          artifacts/artemis-linux-dev-${{ steps.version.outputs.version }}/*
-          artifacts/artemis-appimage-dev-${{ steps.version.outputs.version }}/*
-          artifacts/artemis-flatpak-dev-${{ steps.version.outputs.version }}/*
-          artifacts/artemis-steamdeck-dev-${{ steps.version.outputs.version }}/*
+          artifacts/*/*
         prerelease: true
         draft: false
       env:
