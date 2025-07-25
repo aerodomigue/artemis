@@ -170,6 +170,7 @@ public:
     startApp(QString verb,
              bool isGfe,
              int appId,
+             QString appUuid,
              PSTREAM_CONFIGURATION streamConfig,
              bool sops,
              bool localAudio,

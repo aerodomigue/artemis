@@ -12,6 +12,7 @@ public:
     {
         return id == other.id &&
                 name == other.name &&
+                uuid == other.uuid &&
                 hdrSupported == other.hdrSupported &&
                 isAppCollectorGame == other.isAppCollectorGame &&
                 hidden == other.hidden &&
@@ -33,6 +34,7 @@ public:
 
     int id = 0;
     QString name;
+    QString uuid;
     bool hdrSupported = false;
     bool isAppCollectorGame = false;
     bool hidden = false;

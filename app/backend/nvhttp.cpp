@@ -185,14 +185,15 @@ NvHTTP::getServerInfo(NvLogLevel logLevel, bool fastFail)
 
 void
 NvHTTP::startApp(QString verb,
-                 bool isGfe,
-                 int appId,
-                 PSTREAM_CONFIGURATION streamConfig,
-                 bool sops,
-                 bool localAudio,
-                 int gamepadMask,
-                 bool persistGameControllersOnDisconnect,
-                 QString& rtspSessionUrl)
+                bool isGfe,
+                int appId,
+                QString appUuid,
+                PSTREAM_CONFIGURATION streamConfig,
+                bool sops,
+                bool localAudio,
+                int gamepadMask,
+                bool persistGameControllersOnDisconnect,
+                QString& rtspSessionUrl)
 {
     int riKeyId;
 
@@ -202,10 +203,27 @@ NvHTTP::startApp(QString verb,
     // Get streaming preferences for Apollo parameters
     StreamingPreferences* prefs = StreamingPreferences::get();
     
-    // Build base parameters
+    // Build base parameters - prefer UUID when available, fallback to appId
     QString baseParams = "appid="+QString::number(appId)+
                         "&mode="+QString::number(streamConfig->width)+"x"+
                         QString::number(streamConfig->height)+"x";
+
+    // TODO: Future State - replace teh above block with the below.
+    // Build base parameters - prefer UUID when available, fallback to appId
+    //QString baseParams;
+
+    //if (!appUuid.isEmpty()) {
+        // If a UUID is present, use it and omit the appID
+    //    baseParams = "appuuid=" + appUuid;
+    //    qInfo() << "Launching with UUID:" << appUuid;
+    //} else {
+        // Otherwise, fall back to using the appID
+    //    baseParams = "appid=" + QString::number(appId);
+    //    qInfo() << "Launching with App ID:" << appId;
+    //}
+
+    //baseParams += "&mode=" + QString::number(streamConfig->width) + "x" +
+    //            QString::number(streamConfig->height) + "x";
     
     // Handle fractional refresh rate for Apollo servers
     if (prefs->enableFractionalRefreshRate) {
@@ -219,20 +237,28 @@ NvHTTP::startApp(QString verb,
         // on GFE 3.20.3. We don't need this hack for Sunshine.
         baseParams += QString::number((streamConfig->fps > 60 && isGfe) ? 0 : streamConfig->fps);
     }
+
+    // TODO: Remove this block in future state
+    if (!appUuid.isEmpty()) {
+        baseParams += "&appuuid="+appUuid;
+        qInfo() << "Launching app with ID:" << appId << "and UUID:" << appUuid;
+    } else {
+        qInfo() << "Launching app with ID:" << appId << "(no UUID available)";
+    }
     
     // Continue with standard parameters
     QString allParams = baseParams +
-                       "&additionalStates=1&sops="+QString::number(sops ? 1 : 0)+
-                       "&rikey="+QByteArray(streamConfig->remoteInputAesKey, sizeof(streamConfig->remoteInputAesKey)).toHex()+
-                       "&rikeyid="+QString::number(riKeyId)+
-                       ((streamConfig->supportedVideoFormats & VIDEO_FORMAT_MASK_10BIT) ?
-                           "&hdrMode=1&clientHdrCapVersion=0&clientHdrCapSupportedFlagsInUint32=0&clientHdrCapMetaDataId=NV_STATIC_METADATA_TYPE_1&clientHdrCapDisplayData=0x0x0x0x0x0x0x0x0x0x0" :
-                            "")+
-                       "&localAudioPlayMode="+QString::number(localAudio ? 1 : 0)+
-                       "&surroundAudioInfo="+QString::number(SURROUNDAUDIOINFO_FROM_AUDIO_CONFIGURATION(streamConfig->audioConfiguration))+
-                       "&remoteControllersBitmap="+QString::number(gamepadMask)+
-                       "&gcmap="+QString::number(gamepadMask)+
-                       "&gcpersist="+QString::number(persistGameControllersOnDisconnect ? 1 : 0);
+                    "&additionalStates=1&sops="+QString::number(sops ? 1 : 0)+
+                    "&rikey="+QByteArray(streamConfig->remoteInputAesKey, sizeof(streamConfig->remoteInputAesKey)).toHex()+
+                    "&rikeyid="+QString::number(riKeyId)+
+                    ((streamConfig->supportedVideoFormats & VIDEO_FORMAT_MASK_10BIT) ?
+                        "&hdrMode=1&clientHdrCapVersion=0&clientHdrCapSupportedFlagsInUint32=0&clientHdrCapMetaDataId=NV_STATIC_METADATA_TYPE_1&clientHdrCapDisplayData=0x0x0x0x0x0x0x0x0x0x0" :
+                        "")+
+                    "&localAudioPlayMode="+QString::number(localAudio ? 1 : 0)+
+                    "&surroundAudioInfo="+QString::number(SURROUNDAUDIOINFO_FROM_AUDIO_CONFIGURATION(streamConfig->audioConfiguration))+
+                    "&remoteControllersBitmap="+QString::number(gamepadMask)+
+                    "&gcmap="+QString::number(gamepadMask)+
+                    "&gcpersist="+QString::number(persistGameControllersOnDisconnect ? 1 : 0);
     
     // Add Apollo-specific parameters
     if (prefs->useVirtualDisplay) {
@@ -339,6 +365,9 @@ NvHTTP::getAppList()
             }
             else if (name == QString("ID")) {
                 apps.last().id = xmlReader.readElementText().toInt();
+            }
+            else if (name == QString("UUID")) {
+                apps.last().uuid = xmlReader.readElementText();
             }
             else if (name == QString("IsHdrSupported")) {
                 apps.last().hdrSupported = xmlReader.readElementText() == "1";
