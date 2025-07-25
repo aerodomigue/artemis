@@ -1,0 +1,383 @@
+name: Development Build
+
+on:
+  push:
+    branches: 
+      - develop
+      - dev
+      - 'feature/**'
+      - 'feat/**'
+  workflow_dispatch:  # Allow manual triggering
+
+env:
+  QT_VERSION: '6.8.1'
+
+jobs:
+  build-windows-dev:
+    name: Windows Development Build
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+        fetch-depth: 0  # Needed for version info
+    
+    - name: Get version info
+      id: version
+      run: |
+        $branch = "${{ github.ref_name }}"
+        $commit = "${{ github.sha }}".Substring(0,7)
+        $timestamp = Get-Date -Format "yyyyMMdd-HHmm"
+        $version = "dev-$branch-$commit-$timestamp"
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+        echo "Development version: $version"
+    
+    - name: Setup Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_64'
+        modules: 'qtmultimedia'
+    
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+    
+    - name: Build
+      run: |
+        $env:PATH += ";$env:Qt6_DIR\bin"
+        qmake6 moonlight-qt.pro CONFIG+=release
+        nmake
+    
+    - name: Package Windows Development Build
+      run: |
+        mkdir windows-dev-package
+        copy app\release\moonlight.exe windows-dev-package\artemis-dev.exe
+        echo "Artemis Desktop Development Build" > windows-dev-package\README.txt
+        echo "Version: ${{ steps.version.outputs.version }}" >> windows-dev-package\README.txt
+        echo "Branch: ${{ github.ref_name }}" >> windows-dev-package\README.txt
+        echo "Commit: ${{ github.sha }}" >> windows-dev-package\README.txt
+        echo "Built: $(Get-Date)" >> windows-dev-package\README.txt
+        Compress-Archive -Path windows-dev-package\* -DestinationPath artemis-windows-${{ steps.version.outputs.version }}.zip
+    
+    - name: Upload Development Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: artemis-windows-dev-${{ steps.version.outputs.version }}
+        path: artemis-windows-${{ steps.version.outputs.version }}.zip
+        retention-days: 30  # Keep dev builds for 30 days
+
+  build-macos-dev:
+    name: macOS Development Build
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+        fetch-depth: 0
+    
+    - name: Get version info
+      id: version
+      run: |
+        branch="${{ github.ref_name }}"
+        commit="${{ github.sha }}"
+        commit_short="${commit:0:7}"
+        timestamp=$(date +"%Y%m%d-%H%M")
+        version="dev-${branch}-${commit_short}-${timestamp}"
+        echo "version=${version}" >> $GITHUB_OUTPUT
+        echo "Development version: ${version}"
+    
+    - name: Setup Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'mac'
+        target: 'desktop'
+        modules: 'qtmultimedia'
+    
+    - name: Install dependencies
+      run: |
+        brew install create-dmg ffmpeg opus sdl2 sdl2_ttf
+    
+    - name: Clean any existing build
+      run: |
+        rm -f .qmake.stash .qmake.cache
+        find . -name "Makefile*" -delete
+        rm -rf moonlight-common-c/Makefile* moonlight-common-c/.qmake.stash
+        rm -rf qmdnsengine/Makefile* qmdnsengine/.qmake.stash 
+        rm -rf h264bitstream/Makefile* h264bitstream/.qmake.stash
+        rm -rf soundio/Makefile* soundio/.qmake.stash
+        rm -rf app/Makefile* app/.qmake.stash
+    
+    - name: Build
+      run: |
+        export PATH="$Qt6_DIR/bin:$PATH"
+        export QMAKE="$Qt6_DIR/bin/qmake6"
+        qmake6 moonlight-qt.pro CONFIG+=release CONFIG+=sdk_no_version_check
+        make -j$(sysctl -n hw.ncpu)
+    
+    - name: Package macOS Development Build
+      run: |
+        # Create info file
+        cat > build_info.txt << EOF
+        Artemis Desktop Development Build
+        Version: ${{ steps.version.outputs.version }}
+        Branch: ${{ github.ref_name }}
+        Commit: ${{ github.sha }}
+        Built: $(date)
+        EOF
+        
+        # Package with version info
+        tar -czf artemis-macos-${{ steps.version.outputs.version }}.tar.gz -C app Moonlight.app -C .. build_info.txt
+    
+    - name: Upload Development Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: artemis-macos-dev-${{ steps.version.outputs.version }}
+        path: artemis-macos-${{ steps.version.outputs.version }}.tar.gz
+        retention-days: 30
+
+  build-linux-dev:
+    name: Linux Development Build
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+        fetch-depth: 0
+    
+    - name: Get version info
+      id: version
+      run: |
+        branch="${{ github.ref_name }}"
+        commit="${{ github.sha }}"
+        commit_short="${commit:0:7}"
+        timestamp=$(date +"%Y%m%d-%H%M")
+        version="dev-${branch}-${commit_short}-${timestamp}"
+        echo "version=${version}" >> $GITHUB_OUTPUT
+        echo "Development version: ${version}"
+    
+    - name: Setup Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'linux'
+        target: 'desktop'
+        modules: 'qtmultimedia'
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libegl1-mesa-dev libgl1-mesa-dev libopus-dev libsdl2-dev \
+          libsdl2-ttf-dev libssl-dev libavcodec-dev libavformat-dev \
+          libswscale-dev libva-dev libvdpau-dev libxkbcommon-dev \
+          wayland-protocols libdrm-dev nasm libgbm-dev \
+          libfreetype6-dev libasound2-dev libdbus-1-dev \
+          libgles2-mesa-dev libglu1-mesa-dev libibus-1.0-dev \
+          libpulse-dev libudev-dev libx11-dev libxcursor-dev \
+          libxext-dev libxi-dev libxinerama-dev libxrandr-dev \
+          libxss-dev libxt-dev libxv-dev libxxf86vm-dev \
+          libxcb-dri3-dev libx11-xcb-dev
+    
+    - name: Clean any existing build
+      run: |
+        rm -f .qmake.stash .qmake.cache
+        find . -name "Makefile*" -delete
+        rm -rf moonlight-common-c/Makefile* moonlight-common-c/.qmake.stash
+        rm -rf qmdnsengine/Makefile* qmdnsengine/.qmake.stash 
+        rm -rf h264bitstream/Makefile* h264bitstream/.qmake.stash
+        rm -rf app/Makefile* app/.qmake.stash
+    
+    - name: Build
+      run: |
+        export PATH="$Qt6_DIR/bin:$PATH"
+        export QMAKE="$Qt6_DIR/bin/qmake6"
+        qmake6 moonlight-qt.pro CONFIG+=release
+        make -j$(nproc)
+    
+    - name: Package Linux Development Build
+      run: |
+        # Create info file
+        cat > build_info.txt << EOF
+        Artemis Desktop Development Build
+        Version: ${{ steps.version.outputs.version }}
+        Branch: ${{ github.ref_name }}
+        Commit: ${{ github.sha }}
+        Built: $(date)
+        EOF
+        
+        # Package with version info
+        tar -czf artemis-linux-${{ steps.version.outputs.version }}.tar.gz -C app moonlight -C .. build_info.txt
+    
+    - name: Upload Development Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: artemis-linux-dev-${{ steps.version.outputs.version }}
+        path: artemis-linux-${{ steps.version.outputs.version }}.tar.gz
+        retention-days: 30
+
+  create-dev-release:
+    name: Create Development Release
+    needs: [build-windows-dev, build-macos-dev, build-linux-dev]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'  # Only create releases for develop branch
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Need full history for changelog
+    
+    - name: Get version info
+      id: version
+      run: |
+        branch="${{ github.ref_name }}"
+        commit="${{ github.sha }}"
+        commit_short="${commit:0:7}"
+        timestamp=$(date +"%Y%m%d-%H%M")
+        version="dev-${branch}-${commit_short}-${timestamp}"
+        echo "version=${version}" >> $GITHUB_OUTPUT
+    
+    - name: Generate Changelog
+      id: changelog
+      run: |
+        # Get the last release tag (or use a fallback if none exists)
+        LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        
+        if [ -z "$LAST_TAG" ]; then
+          # If no previous tag, get commits from last 50 commits or 7 days, whichever is less
+          SINCE_DATE=$(date -d '7 days ago' '+%Y-%m-%d')
+          echo "No previous release found. Getting commits since $SINCE_DATE"
+          COMMITS=$(git log --since="$SINCE_DATE" --pretty=format:"%h|%s|%an|%ad" --date=short)
+        else
+          echo "Getting commits since last release: $LAST_TAG"
+          COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"%h|%s|%an|%ad" --date=short)
+        fi
+        
+        # Initialize changelog sections
+        FEATURES=""
+        BUGFIXES=""
+        IMPROVEMENTS=""
+        OTHER=""
+        
+        # Process each commit
+        while IFS='|' read -r hash subject author date; do
+          if [ -z "$hash" ]; then continue; fi
+          
+          # Clean up the subject line
+          subject=$(echo "$subject" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+          
+          # Categorize commits based on keywords and patterns
+          if echo "$subject" | grep -iE "^(feat|feature|add|implement|new)[:|\s]|add.*support|implement.*|new.*feature" > /dev/null; then
+            FEATURES="${FEATURES}- ${subject} (${hash})\n"
+          elif echo "$subject" | grep -iE "^(fix|bug|resolve|correct)[:|\s]|fix.*|bug.*fix|resolve.*|correct.*" > /dev/null; then
+            BUGFIXES="${BUGFIXES}- ${subject} (${hash})\n"
+          elif echo "$subject" | grep -iE "^(improve|enhance|update|optimize|refactor)[:|\s]|improve.*|enhance.*|update.*|optimize.*|refactor.*" > /dev/null; then
+            IMPROVEMENTS="${IMPROVEMENTS}- ${subject} (${hash})\n"
+          else
+            OTHER="${OTHER}- ${subject} (${hash})\n"
+          fi
+        done <<< "$COMMITS"
+        
+        # Build the changelog
+        CHANGELOG="## 🚧 Development Build Changelog\n\n"
+        
+        if [ ! -z "$FEATURES" ]; then
+          CHANGELOG="${CHANGELOG}### ✨ New Features\n${FEATURES}\n"
+        fi
+        
+        if [ ! -z "$BUGFIXES" ]; then
+          CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes\n${BUGFIXES}\n"
+        fi
+        
+        if [ ! -z "$IMPROVEMENTS" ]; then
+          CHANGELOG="${CHANGELOG}### 🔧 Improvements\n${IMPROVEMENTS}\n"
+        fi
+        
+        if [ ! -z "$OTHER" ]; then
+          CHANGELOG="${CHANGELOG}### 📝 Other Changes\n${OTHER}\n"
+        fi
+        
+        # If no categorized changes, show a simple list
+        if [ -z "$FEATURES" ] && [ -z "$BUGFIXES" ] && [ -z "$IMPROVEMENTS" ] && [ -z "$OTHER" ]; then
+          CHANGELOG="${CHANGELOG}### 📝 Recent Changes\n"
+          while IFS='|' read -r hash subject author date; do
+            if [ ! -z "$hash" ]; then
+              CHANGELOG="${CHANGELOG}- ${subject} (${hash})\n"
+            fi
+          done <<< "$COMMITS"
+        fi
+        
+        # Save changelog to file and output
+        echo -e "$CHANGELOG" > changelog.md
+        echo "Generated changelog:"
+        cat changelog.md
+        
+        # Set output for use in release
+        {
+          echo 'changelog<<EOF'
+          cat changelog.md
+          echo EOF
+        } >> $GITHUB_OUTPUT
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+    
+    - name: Create Development Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.version.outputs.version }}
+        name: "🚧 Development Build ${{ steps.version.outputs.version }}"
+        body: |
+          🚧 **Development Build** 🚧
+          
+          This is an automated development build from the `${{ github.ref_name }}` branch.
+          
+          **⚠️ Warning**: Development builds are unstable and intended for testing purposes only. Use at your own risk!
+          
+          ---
+          
+          ${{ steps.changelog.outputs.changelog }}
+          
+          ---
+          
+          ## 📋 Build Information
+          - **Branch**: `${{ github.ref_name }}`
+          - **Commit**: `${{ github.sha }}`
+          - **Build**: #${{ github.run_number }}
+          - **Built**: $(date '+%Y-%m-%d %H:%M:%S UTC')
+          
+          ## 📥 Downloads
+          Choose the appropriate build for your platform:
+          
+          | Platform | File | 
+          |----------|------|
+          | 🪟 Windows | `artemis-windows-${{ steps.version.outputs.version }}.zip` |
+          | 🍎 macOS | `artemis-macos-${{ steps.version.outputs.version }}.tar.gz` |
+          | 🐧 Linux | `artemis-linux-${{ steps.version.outputs.version }}.tar.gz` |
+          
+          ## 🔄 Installation
+          1. Download the appropriate file for your platform
+          2. Extract the archive
+          3. Run the executable (may require additional setup on some platforms)
+          
+          ## 🐛 Found a Bug?
+          Please report issues on our [GitHub Issues](https://github.com/${{ github.repository }}/issues) page.
+        files: |
+          artifacts/artemis-windows-dev-${{ steps.version.outputs.version }}/*
+          artifacts/artemis-macos-dev-${{ steps.version.outputs.version }}/*
+          artifacts/artemis-linux-dev-${{ steps.version.outputs.version }}/*
+        prerelease: true
+        draft: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
