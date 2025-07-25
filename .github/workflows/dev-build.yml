@@ -285,7 +285,7 @@ jobs:
         # Clean any problematic files
         rm -rf AntiHooking/ || true
         rm -rf config.tests/SL/ || true
-        rm -f app/test_*.cpp app/masterhook.c app/masterhook_internal.c || true
+        rm -f app/test_*.cpp || true
         # Build with proper configuration
         qmake6 moonlight-qt.pro CONFIG+=release
         make -j$(nproc)
@@ -452,7 +452,7 @@ jobs:
             sources:
               - type: archive
                 url: https://ffmpeg.org/releases/ffmpeg-6.1.tar.xz
-                sha256: 488c76e57dd9b3bee901f71d5d95eaf1db4a5a31fe46a28654e837144207c270
+                sha256: 488c76e57dd9b3bee901f71d5c95eaf1db4a5a31fe46a28654e837144207c270
           
           - name: artemis-desktop-dev
             buildsystem: simple
