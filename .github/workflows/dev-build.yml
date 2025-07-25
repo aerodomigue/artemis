@@ -226,7 +226,7 @@ jobs:
 
   build-appimage-dev:
     name: AppImage Sanity Check
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     
     steps:
     - name: Checkout
