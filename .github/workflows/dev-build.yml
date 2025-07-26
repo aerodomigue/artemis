@@ -57,7 +57,7 @@ jobs:
     - name: Install dependencies
       run: |
         # Install vcpkg dependencies for Windows
-        vcpkg install sdl2:x64-windows sdl2-ttf:x64-windows opus:x64-windows ffmpeg:x64-windows openssl:x64-windows libplacebo:x64-windows
+        vcpkg install sdl2:x64-windows sdl2-ttf:x64-windows opus:x64-windows ffmpeg:x64-windows openssl:x64-windows
         # Set environment variables for vcpkg
         echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
         echo "CMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake" >> $env:GITHUB_ENV
