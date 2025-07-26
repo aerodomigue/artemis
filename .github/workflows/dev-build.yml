@@ -125,6 +125,17 @@ jobs:
         if (Test-Path "C:\vcpkg\installed\x64-windows\bin\libplacebo-*.dll") {
           copy "C:\vcpkg\installed\x64-windows\bin\libplacebo-*.dll" windows-dev-package\
         }
+        if (Test-Path "libs\windows\lib\x64\libplacebo-349.dll") {
+          copy "libs\windows\lib\x64\libplacebo-349.dll" windows-dev-package\
+        }
+
+        # Copy freetype DLL from vcpkg or your repo
+        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\freetype.dll") {
+          copy "C:\vcpkg\installed\x64-windows\bin\freetype.dll" windows-dev-package\
+        }
+        if (Test-Path "libs\windows\lib\x64\freetype.dll") {
+          copy "libs\windows\lib\x64\freetype.dll" windows-dev-package\
+        }
 
         # Copy discord-rpc.dll from repo libs
         if (Test-Path "libs\windows\lib\x64\discord-rpc.dll") {
@@ -690,89 +701,54 @@ jobs:
     - name: Get version info
       id: version
       run: |
-        branch="${{ github.ref_name }}"
-        commit="${{ github.sha }}"
-        commit_short="${commit:0:7}"
-        timestamp=$(date +"%Y%m%d-%H%M")
-        version="${branch}-${commit_short}-${timestamp}"
-        echo "version=${version}" >> $GITHUB_OUTPUT
-    
+        VERSION="v0.1.0-dev-${{ github.run_number }}-${GITHUB_SHA:0:7}"
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "Generated version: ${VERSION}"
+
+    - name: Create tag for release
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git tag ${{ steps.version.outputs.version }}
+        git push origin ${{ steps.version.outputs.version }}
+
     - name: Generate Changelog
       id: changelog
       run: |
-        # Get the last release tag (or use a fallback if none exists)
-        LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-        
-        if [ -z "$LAST_TAG" ]; then
-          # If no previous tag, get commits from last 50 commits or 7 days, whichever is less
+        PREV_TAG=$(git tag --sort=-creatordate | grep -v "${{ steps.version.outputs.version }}" | head -n1)
+        if [ -z "$PREV_TAG" ]; then
           SINCE_DATE=$(date -d '7 days ago' '+%Y-%m-%d')
           echo "No previous release found. Getting commits since $SINCE_DATE"
-          COMMITS=$(git log --since="$SINCE_DATE" --pretty=format:"%h|%s|%an|%ad" --date=short)
+          COMMITS=$(git log --since="$SINCE_DATE" --pretty=format:"%h|%s|%an|%ad" --date=short --no-merges)
         else
-          echo "Getting commits since last release: $LAST_TAG"
-          COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"%h|%s|%an|%ad" --date=short)
+          echo "Getting commits since last release: $PREV_TAG"
+          COMMITS=$(git log ${PREV_TAG}..${{ steps.version.outputs.version }} --pretty=format:"%h|%s|%an|%ad" --date=short --no-merges)
         fi
-        
-        # Initialize changelog sections
         FEATURES=""
         BUGFIXES=""
         IMPROVEMENTS=""
         OTHER=""
-        
-        # Process each commit
         while IFS='|' read -r hash subject author date; do
           if [ -z "$hash" ]; then continue; fi
-          
-          # Clean up the subject line
           subject=$(echo "$subject" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-          
-          # Categorize commits based on keywords and patterns
-          if echo "$subject" | grep -iE "^(feat|feature|add|implement|new)[:|\s]|add.*support|implement.*|new.*feature" > /dev/null; then
+          if echo "$subject" | grep -iE "^(feat|feature|add|implement|new)[:|\s]" > /dev/null; then
             FEATURES="${FEATURES}- ${subject} (${hash})\n"
-          elif echo "$subject" | grep -iE "^(fix|bug|resolve|correct)[:|\s]|fix.*|bug.*fix|resolve.*|correct.*" > /dev/null; then
+          elif echo "$subject" | grep -iE "^(fix|bug|resolve|correct)[:|\s]" > /dev/null; then
             BUGFIXES="${BUGFIXES}- ${subject} (${hash})\n"
-          elif echo "$subject" | grep -iE "^(improve|enhance|update|optimize|refactor)[:|\s]|improve.*|enhance.*|update.*|optimize.*|refactor.*" > /dev/null; then
+          elif echo "$subject" | grep -iE "^(improve|enhance|update|optimize|refactor)[:|\s]" > /dev/null; then
             IMPROVEMENTS="${IMPROVEMENTS}- ${subject} (${hash})\n"
           else
             OTHER="${OTHER}- ${subject} (${hash})\n"
           fi
         done <<< "$COMMITS"
-        
-        # Build the changelog
         CHANGELOG="## 🚧 Development Build Changelog\n\n"
-        
-        if [ ! -z "$FEATURES" ]; then
-          CHANGELOG="${CHANGELOG}### ✨ New Features\n${FEATURES}\n"
-        fi
-        
-        if [ ! -z "$BUGFIXES" ]; then
-          CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes\n${BUGFIXES}\n"
-        fi
-        
-        if [ ! -z "$IMPROVEMENTS" ]; then
-          CHANGELOG="${CHANGELOG}### 🔧 Improvements\n${IMPROVEMENTS}\n"
-        fi
-        
-        if [ ! -z "$OTHER" ]; then
-          CHANGELOG="${CHANGELOG}### 📝 Other Changes\n${OTHER}\n"
-        fi
-        
-        # If no categorized changes, show a simple list
-        if [ -z "$FEATURES" ] && [ -z "$BUGFIXES" ] && [ -z "$IMPROVEMENTS" ] && [ -z "$OTHER" ]; then
-          CHANGELOG="${CHANGELOG}### 📝 Recent Changes\n"
-          while IFS='|' read -r hash subject author date; do
-            if [ ! -z "$hash" ]; then
-              CHANGELOG="${CHANGELOG}- ${subject} (${hash})\n"
-            fi
-          done <<< "$COMMITS"
-        fi
-        
-        # Save changelog to file and output
+        [ ! -z "$FEATURES" ] && CHANGELOG="${CHANGELOG}### ✨ New Features\n${FEATURES}\n"
+        [ ! -z "$BUGFIXES" ] && CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes\n${BUGFIXES}\n"
+        [ ! -z "$IMPROVEMENTS" ] && CHANGELOG="${CHANGELOG}### 🔧 Improvements\n${IMPROVEMENTS}\n"
+        [ ! -z "$OTHER" ] && CHANGELOG="${CHANGELOG}### 📝 Other Changes\n${OTHER}\n"
         echo -e "$CHANGELOG" > changelog.md
         echo "Generated changelog:"
         cat changelog.md
-        
-        # Set output for use in release
         {
           echo 'changelog<<EOF'
           cat changelog.md
