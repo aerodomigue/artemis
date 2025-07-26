@@ -27,7 +27,7 @@ jobs:
           commit_short="${{ github.sha }}"
           commit_short="${commit_short:0:7}"
           timestamp=$(date +"%Y%m%d-%H%M")
-          version="dev-${branch_name_sanitized}-${commit_short}-${timestamp}"
+          version="${branch_name_sanitized}-${commit_short}-${timestamp}"
           echo "version=${version}" >> $GITHUB_OUTPUT
           echo "Generated version: ${version}"
   build-windows-dev:
@@ -117,7 +117,7 @@ jobs:
     - name: Upload Development Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: artemis-windows-dev-${{ needs.setup-version.outputs.version }}
+        name: artemis-windows-${{ needs.setup-version.outputs.version }}
         path: artemis-windows-${{ needs.setup-version.outputs.version }}.zip
         retention-days: 30
 
@@ -184,7 +184,7 @@ jobs:
     - name: Upload Development Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: artemis-macos-dev-${{ needs.setup-version.outputs.version }}
+        name: artemis-macos-${{ needs.setup-version.outputs.version }}
         path: artemis-macos-${{ needs.setup-version.outputs.version }}.tar.gz
         retention-days: 30
 
@@ -260,7 +260,7 @@ jobs:
     - name: Upload Development Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: artemis-linux-dev-${{ needs.setup-version.outputs.version }}
+        name: artemis-linux-${{ needs.setup-version.outputs.version }}
         path: artemis-linux-${{ needs.setup-version.outputs.version }}.tar.gz
         retention-days: 30
 
@@ -373,7 +373,7 @@ jobs:
         EOF
         
         # Set environment variables for linuxdeploy
-        export OUTPUT="artemis-dev-${VERSION}-x86_64.AppImage"
+        export OUTPUT="artemis-${VERSION}-x86_64.AppImage"
         export QMAKE="$Qt6_DIR/bin/qmake6"
         export QML_SOURCES_PATH="$Qt6_DIR/qml"
 
@@ -406,8 +406,8 @@ jobs:
     - name: Upload AppImage Development Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: artemis-appimage-dev-${{ needs.setup-version.outputs.version }}
-        path: artemis-dev-${{ needs.setup-version.outputs.version }}-x86_64.AppImage
+        name: artemis-appimage-${{ needs.setup-version.outputs.version }}
+        path: artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage
         retention-days: 30
 
   build-flatpak-dev:
@@ -499,13 +499,13 @@ jobs:
         VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
         flatpak-builder --force-clean --repo=repo build-dir com.artemisdesktop.ArtemisDesktopDev.yml
-        flatpak build-bundle repo artemis-desktop-dev-$VERSION.flatpak com.artemisdesktop.ArtemisDesktopDev
+        flatpak build-bundle repo artemis-desktop-$VERSION.flatpak com.artemisdesktop.ArtemisDesktopDev
     
     - name: Upload Flatpak Development Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: artemis-flatpak-dev-${{ needs.setup-version.outputs.version }}
-        path: artemis-desktop-dev-${{ needs.setup-version.outputs.version }}.flatpak
+        name: artemis-flatpak-${{ needs.setup-version.outputs.version }}
+        path: artemis-desktop-${{ needs.setup-version.outputs.version }}.flatpak
         retention-days: 30
 
   build-steamdeck-dev:
@@ -626,13 +626,13 @@ jobs:
         - Check the build_info.txt for version details
         EOF
         
-        tar -czf artemis-steamdeck-dev-$VERSION.tar.gz -C steamdeck-package .
+        tar -czf artemis-steamdeck-$VERSION.tar.gz -C steamdeck-package .
     
     - name: Upload Steam Deck Development Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: artemis-steamdeck-dev-${{ needs.setup-version.outputs.version }}
-        path: artemis-steamdeck-dev-${{ needs.setup-version.outputs.version }}.tar.gz
+        name: artemis-steamdeck-${{ needs.setup-version.outputs.version }}
+        path: artemis-steamdeck-${{ needs.setup-version.outputs.version }}.tar.gz
         retention-days: 30
 
   create-dev-release:
@@ -654,7 +654,7 @@ jobs:
         commit="${{ github.sha }}"
         commit_short="${commit:0:7}"
         timestamp=$(date +"%Y%m%d-%H%M")
-        version="dev-${branch}-${commit_short}-${timestamp}"
+        version="${branch}-${commit_short}-${timestamp}"
         echo "version=${version}" >> $GITHUB_OUTPUT
     
     - name: Generate Changelog
@@ -779,9 +779,9 @@ jobs:
           | 🪟 Windows | `artemis-windows-${{ steps.version.outputs.version }}.zip` | Standard Windows build |
           | 🍎 macOS | `artemis-macos-${{ steps.version.outputs.version }}.tar.gz` | macOS app bundle |
           | 🐧 Linux | `artemis-linux-${{ steps.version.outputs.version }}.tar.gz` | Generic Linux binary |
-          | 📦 AppImage | `artemis-dev-${{ steps.version.outputs.version }}-x86_64.AppImage` | Portable Linux app |
-          | 📱 Flatpak | `artemis-desktop-dev-${{ steps.version.outputs.version }}.flatpak` | Sandboxed Linux app |
-          | 🎮 Steam Deck | `artemis-steamdeck-dev-${{ steps.version.outputs.version }}.tar.gz` | Optimized for Steam Deck |
+          | 📦 AppImage | `artemis-${{ steps.version.outputs.version }}-x86_64.AppImage` | Portable Linux app |
+          | 📱 Flatpak | `artemis-desktop-${{ steps.version.outputs.version }}.flatpak` | Sandboxed Linux app |
+          | 🎮 Steam Deck | `artemis-steamdeck-${{ steps.version.outputs.version }}.tar.gz` | Optimized for Steam Deck |
           
           ## 🔄 Installation
           1. Download the appropriate file for your platform
