@@ -57,7 +57,7 @@ jobs:
     - name: Install dependencies
       run: |
         # Install vcpkg dependencies for Windows
-        vcpkg install sdl2:x64-windows sdl2-ttf:x64-windows opus:x64-windows ffmpeg:x64-windows
+        vcpkg install sdl2:x64-windows sdl2-ttf:x64-windows opus:x64-windows ffmpeg:x64-windows openssl:x64-windows libplacebo:x64-windows
         # Set environment variables for vcpkg
         echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
         echo "CMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake" >> $env:GITHUB_ENV
@@ -72,18 +72,26 @@ jobs:
         # Configure with vcpkg dependencies
         qmake6 moonlight-qt.pro CONFIG+=release "INCLUDEPATH+=C:\vcpkg\installed\x64-windows\include" "LIBS+=-LC:\vcpkg\installed\x64-windows\lib"
         nmake
-    
+
+    - name: Build AntiHooking.dll
+      run: |
+        $env:PATH += ";$env:Qt6_DIR\bin"
+        cd AntiHooking
+        qmake6 AntiHooking.pro CONFIG+=release
+        nmake
+        cd ..
+
     - name: Package Windows Development Build
       env:
-          VERSION: ${{ needs.setup-version.outputs.version }}
+        VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
         mkdir windows-dev-package
         copy app\release\moonlight.exe windows-dev-package\artemis-dev.exe
-        
+
         # Use windeployqt to bundle Qt dependencies
         $env:PATH += ";$env:Qt6_DIR\bin"
         windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw windows-dev-package\artemis-dev.exe
-        
+
         # Copy vcpkg DLLs manually
         copy "C:\vcpkg\installed\x64-windows\bin\SDL2.dll" windows-dev-package\
         copy "C:\vcpkg\installed\x64-windows\bin\SDL2_ttf.dll" windows-dev-package\
@@ -104,14 +112,46 @@ jobs:
         if (Test-Path "C:\vcpkg\installed\x64-windows\bin\swscale*.dll") {
           copy "C:\vcpkg\installed\x64-windows\bin\swscale*.dll" windows-dev-package\
         }
-        
+
+        # Copy OpenSSL DLLs (libcrypto-3-x64.dll)
+        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\libcrypto-3-x64.dll") {
+          copy "C:\vcpkg\installed\x64-windows\bin\libcrypto-3-x64.dll" windows-dev-package\
+        }
+        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\libssl-3-x64.dll") {
+          copy "C:\vcpkg\installed\x64-windows\bin\libssl-3-x64.dll" windows-dev-package\
+        }
+
+        # Copy libplacebo DLL
+        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\libplacebo-*.dll") {
+          copy "C:\vcpkg\installed\x64-windows\bin\libplacebo-*.dll" windows-dev-package\
+        }
+
+        # Copy discord-rpc.dll from repo libs
+        if (Test-Path "libs\windows\lib\x64\discord-rpc.dll") {
+          copy "libs\windows\lib\x64\discord-rpc.dll" windows-dev-package\
+        }
+
+        # Copy AntiHooking.dll from build output
+        if (Test-Path "AntiHooking\release\AntiHooking.dll") {
+          copy "AntiHooking\release\AntiHooking.dll" windows-dev-package\
+        } else {
+          echo "Warning: AntiHooking.dll not found in AntiHooking/release/. Ensure it builds correctly." > windows-dev-package\ANTIHOOOKING_INFO.txt
+        }
+
         # Create info file
         echo "Artemis Desktop Development Build" > windows-dev-package\README.txt
         echo "Version: $env:VERSION" >> windows-dev-package\README.txt
         echo "Branch: ${{ github.ref_name }}" >> windows-dev-package\README.txt
         echo "Commit: ${{ github.sha }}" >> windows-dev-package\README.txt
         echo "Built: $(Get-Date)" >> windows-dev-package\README.txt
-        
+        echo "" >> windows-dev-package\README.txt
+        echo "This package includes all necessary DLLs for running Artemis Desktop." >> windows-dev-package\README.txt
+        echo "Simply extract and run artemis-dev.exe" >> windows-dev-package\README.txt
+        echo "" >> windows-dev-package\README.txt
+        echo "Optional features:" >> windows-dev-package\README.txt
+        echo "- Discord RPC: Included" >> windows-dev-package\README.txt
+        echo "- AntiHooking: Included if build succeeded" >> windows-dev-package\README.txt
+
         Compress-Archive -Path windows-dev-package\* -DestinationPath artemis-windows-$env:VERSION.zip
     
     - name: Upload Development Artifacts
