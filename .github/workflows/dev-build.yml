@@ -54,13 +54,23 @@ jobs:
         arch: 'win64_msvc2022_64'
         modules: 'qtmultimedia'
     
+    - name: Install dependencies
+      run: |
+        # Install vcpkg dependencies for Windows
+        vcpkg install sdl2:x64-windows sdl2-ttf:x64-windows opus:x64-windows ffmpeg:x64-windows
+        # Set environment variables for vcpkg
+        echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
+        echo "CMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake" >> $env:GITHUB_ENV
+    
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
     
     - name: Build
       run: |
         $env:PATH += ";$env:Qt6_DIR\bin"
-        qmake6 moonlight-qt.pro CONFIG+=release
+        $env:PATH += ";C:\vcpkg\installed\x64-windows\bin"
+        # Configure with vcpkg dependencies
+        qmake6 moonlight-qt.pro CONFIG+=release "INCLUDEPATH+=C:\vcpkg\installed\x64-windows\include" "LIBS+=-LC:\vcpkg\installed\x64-windows\lib"
         nmake
     
     - name: Package Windows Development Build
@@ -69,11 +79,39 @@ jobs:
       run: |
         mkdir windows-dev-package
         copy app\release\moonlight.exe windows-dev-package\artemis-dev.exe
+        
+        # Use windeployqt to bundle Qt dependencies
+        $env:PATH += ";$env:Qt6_DIR\bin"
+        windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw windows-dev-package\artemis-dev.exe
+        
+        # Copy vcpkg DLLs manually
+        copy "C:\vcpkg\installed\x64-windows\bin\SDL2.dll" windows-dev-package\
+        copy "C:\vcpkg\installed\x64-windows\bin\SDL2_ttf.dll" windows-dev-package\
+        copy "C:\vcpkg\installed\x64-windows\bin\opus.dll" windows-dev-package\
+        # Copy FFmpeg DLLs if they exist
+        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\avcodec*.dll") {
+          copy "C:\vcpkg\installed\x64-windows\bin\avcodec*.dll" windows-dev-package\
+        }
+        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\avformat*.dll") {
+          copy "C:\vcpkg\installed\x64-windows\bin\avformat*.dll" windows-dev-package\
+        }
+        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\avutil*.dll") {
+          copy "C:\vcpkg\installed\x64-windows\bin\avutil*.dll" windows-dev-package\
+        }
+        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\swresample*.dll") {
+          copy "C:\vcpkg\installed\x64-windows\bin\swresample*.dll" windows-dev-package\
+        }
+        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\swscale*.dll") {
+          copy "C:\vcpkg\installed\x64-windows\bin\swscale*.dll" windows-dev-package\
+        }
+        
+        # Create info file
         echo "Artemis Desktop Development Build" > windows-dev-package\README.txt
         echo "Version: $env:VERSION" >> windows-dev-package\README.txt
         echo "Branch: ${{ github.ref_name }}" >> windows-dev-package\README.txt
         echo "Commit: ${{ github.sha }}" >> windows-dev-package\README.txt
         echo "Built: $(Get-Date)" >> windows-dev-package\README.txt
+        
         Compress-Archive -Path windows-dev-package\* -DestinationPath artemis-windows-$env:VERSION.zip
     
     - name: Upload Development Artifacts
@@ -428,22 +466,6 @@ jobs:
               - type: archive
                 url: https://github.com/libsdl-org/SDL_ttf/releases/download/release-2.20.2/SDL2_ttf-2.20.2.tar.gz
                 sha256: 9dc71ed93487521b107a2c4a9ca6bf43fb62f6bddd5c26b055e6b91418a22053
-          
-          - name: ffmpeg
-            config-opts:
-              - --enable-shared
-              - --disable-static
-              - --enable-gnutls
-              - --disable-doc
-              - --disable-programs
-              - --disable-encoders
-              - --disable-muxers
-              - --disable-devices
-              - --disable-filters
-            sources:
-              - type: archive
-                url: https://ffmpeg.org/releases/ffmpeg-6.1.tar.xz
-                sha256: 488c76e57dd9b3bee901f71d5c95eaf1db4a5a31fe46a28654e837144207c270
           
           - name: artemis-desktop-dev
             buildsystem: simple
