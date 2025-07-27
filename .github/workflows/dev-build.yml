@@ -93,92 +93,13 @@ jobs:
         windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw windows-dev-package\artemis-dev.exe
 
         # Copy vcpkg DLLs manually
-        copy "C:\vcpkg\installed\x64-windows\bin\SDL2.dll" windows-dev-package\
-        copy "C:\vcpkg\installed\x64-windows\bin\SDL2_ttf.dll" windows-dev-package\
-        copy "C:\vcpkg\installed\x64-windows\bin\opus.dll" windows-dev-package\
-        # Copy FFmpeg DLLs if they exist
-        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\avcodec*.dll") {
-          copy "C:\vcpkg\installed\x64-windows\bin\avcodec*.dll" windows-dev-package\
-        }
-        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\avformat*.dll") {
-          copy "C:\vcpkg\installed\x64-windows\bin\avformat*.dll" windows-dev-package\
-        }
-        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\avutil*.dll") {
-          copy "C:\vcpkg\installed\x64-windows\bin\avutil*.dll" windows-dev-package\
-        }
-        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\swresample*.dll") {
-          copy "C:\vcpkg\installed\x64-windows\bin\swresample*.dll" windows-dev-package\
-        }
-        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\swscale*.dll") {
-          copy "C:\vcpkg\installed\x64-windows\bin\swscale*.dll" windows-dev-package\
-        }
-
-        # Copy OpenSSL DLLs (libcrypto-3-x64.dll)
-        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\libcrypto-3-x64.dll") {
-          copy "C:\vcpkg\installed\x64-windows\bin\libcrypto-3-x64.dll" windows-dev-package\
-        }
-        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\libssl-3-x64.dll") {
-          copy "C:\vcpkg\installed\x64-windows\bin\libssl-3-x64.dll" windows-dev-package\
-        }
-
-        # Copy libplacebo DLL
-        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\libplacebo-*.dll") {
-          copy "C:\vcpkg\installed\x64-windows\bin\libplacebo-*.dll" windows-dev-package\
-        }
-        if (Test-Path "libs\windows\lib\x64\libplacebo-349.dll") {
-          copy "libs\windows\lib\x64\libplacebo-349.dll" windows-dev-package\
-        }
-
-        # Copy freetype DLL from vcpkg or your repo
-        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\freetype.dll") {
-          copy "C:\vcpkg\installed\x64-windows\bin\freetype.dll" windows-dev-package\
-        }
-        if (Test-Path "libs\windows\lib\x64\freetype.dll") {
-          copy "libs\windows\lib\x64\freetype.dll" windows-dev-package\
-        }
-
-        # Copy discord-rpc.dll from repo libs
-        if (Test-Path "libs\windows\lib\x64\discord-rpc.dll") {
-          copy "libs\windows\lib\x64\discord-rpc.dll" windows-dev-package\
-        }
+        copy "libs\windows\lib\x64\*.dll" windows-dev-package\
 
         # Copy AntiHooking.dll from build output
         if (Test-Path "AntiHooking\release\AntiHooking.dll") {
           copy "AntiHooking\release\AntiHooking.dll" windows-dev-package\
         } else {
           echo "Warning: AntiHooking.dll not found in AntiHooking/release/. Ensure it builds correctly." > windows-dev-package\ANTIHOOOKING_INFO.txt
-        }
-
-        # Copy bz2.dll
-        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\bz2.dll") {
-          copy "C:\vcpkg\installed\x64-windows\bin\bz2.dll" windows-dev-package\
-        }
-        if (Test-Path "libs\windows\lib\x64\bz2.dll") {
-          copy "libs\windows\lib\x64\bz2.dll" windows-dev-package\
-        }
-
-        # Copy libpng16.dll
-        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\libpng16.dll") {
-          copy "C:\vcpkg\installed\x64-windows\bin\libpng16.dll" windows-dev-package\
-        }
-        if (Test-Path "libs\windows\lib\x64\libpng16.dll") {
-          copy "libs\windows\lib\x64\libpng16.dll" windows-dev-package\
-        }
-
-        # Copy brotlidec.dll
-        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\brotlidec.dll") {
-          copy "C:\vcpkg\installed\x64-windows\bin\brotlidec.dll" windows-dev-package\
-        }
-        if (Test-Path "libs\windows\lib\x64\brotlidec.dll") {
-          copy "libs\windows\lib\x64\brotlidec.dll" windows-dev-package\
-        }
-        
-        # Copy brotlicommon.dll
-        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\brotlicommon.dll") {
-          copy "C:\vcpkg\installed\x64-windows\bin\brotlicommon.dll" windows-dev-package\
-        }
-        if (Test-Path "libs\windows\lib\x64\brotlicommon.dll") {
-          copy "libs\windows\lib\x64\brotlicommon.dll" windows-dev-package\
         }
         # Create info file
         echo "Artemis Desktop Development Build" > windows-dev-package\README.txt
@@ -732,7 +653,7 @@ jobs:
     - name: Get version info
       id: version
       run: |
-        VERSION="v0.1.1-dev-${{ github.run_number }}-${GITHUB_SHA:0:7}"
+        VERSION="v0.1.2-dev-${{ github.run_number }}-${GITHUB_SHA:0:7}"
         echo "version=${VERSION}" >> $GITHUB_OUTPUT
         echo "Generated version: ${VERSION}"
 
