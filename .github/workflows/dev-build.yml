@@ -54,74 +54,93 @@ jobs:
         arch: 'win64_msvc2022_64'
         modules: 'qtmultimedia'
     
-    - name: Install dependencies
+    - name: Install WiX Toolset
       run: |
-        # Install vcpkg dependencies for Windows
-        vcpkg install sdl2:x64-windows sdl2-ttf:x64-windows opus:x64-windows ffmpeg:x64-windows openssl:x64-windows
-        # Set environment variables for vcpkg
-        echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
-        echo "CMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake" >> $env:GITHUB_ENV
+        choco install wixtoolset --version=5.0.1 -y
+        # Add WiX to PATH
+        echo "C:\Program Files (x86)\WiX Toolset v5.0\bin" >> $env:GITHUB_PATH
     
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
     
-    - name: Build
-      run: |
-        $env:PATH += ";$env:Qt6_DIR\bin"
-        $env:PATH += ";C:\vcpkg\installed\x64-windows\bin"
-        # Configure with vcpkg dependencies
-        qmake6 moonlight-qt.pro CONFIG+=release "INCLUDEPATH+=C:\vcpkg\installed\x64-windows\include" "LIBS+=-LC:\vcpkg\installed\x64-windows\lib"
-        nmake
-
-    - name: Build AntiHooking.dll
-      run: |
-        $env:PATH += ";$env:Qt6_DIR\bin"
-        cd AntiHooking
-        qmake6 AntiHooking.pro CONFIG+=release
-        nmake
-        cd ..
-
-    - name: Package Windows Development Build
+    - name: Update version file for development build
       env:
         VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
-        mkdir windows-dev-package
-        copy app\release\moonlight.exe windows-dev-package\artemis-dev.exe
-
-        # Use windeployqt to bundle Qt dependencies
-        $env:PATH += ";$env:Qt6_DIR\bin"
-        windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw windows-dev-package\artemis-dev.exe
-
-        # Copy vcpkg DLLs manually
-        copy "libs\windows\lib\x64\*.dll" windows-dev-package\
-
-        # Copy AntiHooking.dll from build output
-        if (Test-Path "AntiHooking\release\AntiHooking.dll") {
-          copy "AntiHooking\release\AntiHooking.dll" windows-dev-package\
-        } else {
-          echo "Warning: AntiHooking.dll not found in AntiHooking/release/. Ensure it builds correctly." > windows-dev-package\ANTIHOOOKING_INFO.txt
-        }
-        # Create info file
-        echo "Artemis Desktop Development Build" > windows-dev-package\README.txt
-        echo "Version: $env:VERSION" >> windows-dev-package\README.txt
-        echo "Branch: ${{ github.ref_name }}" >> windows-dev-package\README.txt
-        echo "Commit: ${{ github.sha }}" >> windows-dev-package\README.txt
-        echo "Built: $(Get-Date)" >> windows-dev-package\README.txt
-        echo "" >> windows-dev-package\README.txt
-        echo "This package includes all necessary DLLs for running Artemis Desktop." >> windows-dev-package\README.txt
-        echo "Simply extract and run artemis-dev.exe" >> windows-dev-package\README.txt
-        echo "" >> windows-dev-package\README.txt
-        echo "Optional features:" >> windows-dev-package\README.txt
-        echo "- Discord RPC: Included" >> windows-dev-package\README.txt
-        echo "- AntiHooking: Included if build succeeded" >> windows-dev-package\README.txt
-
-        Compress-Archive -Path windows-dev-package\* -DestinationPath artemis-windows-$env:VERSION.zip
+        echo $env:VERSION > app\version.txt
     
-    - name: Upload Development Artifacts
+    - name: Build using build-artemis-arch.bat script
+      env:
+        VERSION: ${{ needs.setup-version.outputs.version }}
+      run: |
+        # Add Qt to PATH for the build script
+        $env:PATH = "$env:Qt6_DIR\bin;$env:PATH"
+        
+        # Run our Artemis build script that handles everything
+        cmd /c "scripts\build-artemis-arch.bat release"
+        
+        if ($LASTEXITCODE -ne 0) {
+          echo "Build failed with exit code $LASTEXITCODE"
+          exit $LASTEXITCODE
+        }
+    
+    - name: Rename artifacts for development build
+      env:
+        VERSION: ${{ needs.setup-version.outputs.version }}
+      run: |
+        # Find the generated MSI and portable ZIP files
+        $msiFile = Get-ChildItem -Path "build\installer-x64-release" -Filter "*.msi" | Select-Object -First 1
+        $zipFile = Get-ChildItem -Path "build\installer-x64-release" -Filter "ArtemisPortable-*.zip" | Select-Object -First 1
+        
+        if ($msiFile) {
+          # Rename MSI installer for Artemis
+          $newMsiName = "artemis-windows-installer-$env:VERSION.msi"
+          Move-Item $msiFile.FullName $newMsiName
+          echo "Created MSI installer: $newMsiName"
+        }
+        
+        if ($zipFile) {
+          # Rename portable ZIP for Artemis
+          $newZipName = "artemis-windows-portable-$env:VERSION.zip"
+          Move-Item $zipFile.FullName $newZipName
+          echo "Created portable ZIP: $newZipName"
+        }
+        
+        # Create info file
+        @"
+        Artemis Desktop Development Build
+        Version: $env:VERSION
+        Branch: ${{ github.ref_name }}
+        Commit: ${{ github.sha }}
+        Built: $(Get-Date)
+        
+        This build includes:
+        - MSI Installer with proper dependency handling
+        - Portable ZIP package
+        - All required Windows runtime dependencies
+        "@ | Out-File -FilePath "build_info.txt" -Encoding utf8
+    
+    - name: Upload MSI Installer
       uses: actions/upload-artifact@v4
       with:
-        name: artemis-windows-${{ needs.setup-version.outputs.version }}
-        path: artemis-windows-${{ needs.setup-version.outputs.version }}.zip
+        name: artemis-windows-installer-${{ needs.setup-version.outputs.version }}
+        path: artemis-windows-installer-${{ needs.setup-version.outputs.version }}.msi
+        retention-days: 30
+        if-no-files-found: warn
+    
+    - name: Upload Portable ZIP
+      uses: actions/upload-artifact@v4
+      with:
+        name: artemis-windows-portable-${{ needs.setup-version.outputs.version }}
+        path: artemis-windows-portable-${{ needs.setup-version.outputs.version }}.zip
+        retention-days: 30
+        if-no-files-found: warn
+    
+    - name: Upload Build Info
+      uses: actions/upload-artifact@v4
+      with:
+        name: artemis-windows-build-info-${{ needs.setup-version.outputs.version }}
+        path: build_info.txt
         retention-days: 30
 
   build-macos-dev:
