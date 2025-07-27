@@ -172,6 +172,14 @@ jobs:
         if (Test-Path "libs\windows\lib\x64\brotlidec.dll") {
           copy "libs\windows\lib\x64\brotlidec.dll" windows-dev-package\
         }
+        
+        # Copy brotlicommon.dll
+        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\brotlicommon.dll") {
+          copy "C:\vcpkg\installed\x64-windows\bin\brotlicommon.dll" windows-dev-package\
+        }
+        if (Test-Path "libs\windows\lib\x64\brotlicommon.dll") {
+          copy "libs\windows\lib\x64\brotlicommon.dll" windows-dev-package\
+        }
         # Create info file
         echo "Artemis Desktop Development Build" > windows-dev-package\README.txt
         echo "Version: $env:VERSION" >> windows-dev-package\README.txt
@@ -447,7 +455,7 @@ jobs:
         EOF
         
         # Set environment variables for linuxdeploy
-        export OUTPUT="artemis-${VERSION}-x86_64.AppImage"
+        export OUTPUT="artemis-appimage-${VERSION}-x86_64.AppImage"
         export QMAKE="$Qt6_DIR/bin/qmake6"
         export QML_SOURCES_PATH="$Qt6_DIR/qml"
 
@@ -573,7 +581,7 @@ jobs:
         VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
         flatpak-builder --force-clean --repo=repo build-dir com.artemisdesktop.ArtemisDesktopDev.yml
-        flatpak build-bundle repo artemis-desktop-$VERSION.flatpak com.artemisdesktop.ArtemisDesktopDev
+        flatpak build-bundle repo artemis-flatpak-$VERSION.flatpak com.artemisdesktop.ArtemisDesktopDev
     
     - name: Upload Flatpak Development Artifacts
       uses: actions/upload-artifact@v4
