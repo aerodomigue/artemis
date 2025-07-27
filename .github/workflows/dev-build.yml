@@ -56,9 +56,14 @@ jobs:
     
     - name: Install WiX Toolset
       run: |
-        choco install wixtoolset --version=5.0.1 -y
-        # Add WiX to PATH
-        echo "C:\Program Files (x86)\WiX Toolset v5.0\bin" >> $env:GITHUB_PATH
+        # Install .NET SDK first (required for WiX v5)
+        choco install dotnet-sdk -y
+        
+        # Install WiX Toolset v5 as a .NET tool (recommended approach for v5)
+        dotnet tool install --global wix --version 5.0.1
+        
+        # Verify installation
+        wix --version
     
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
@@ -672,7 +677,7 @@ jobs:
     - name: Get version info
       id: version
       run: |
-        VERSION="v0.1.2-dev-${{ github.run_number }}-${GITHUB_SHA:0:7}"
+        VERSION="v0.1.3-dev-${{ github.run_number }}-${GITHUB_SHA:0:7}"
         echo "version=${VERSION}" >> $GITHUB_OUTPUT
         echo "Generated version: ${VERSION}"
 

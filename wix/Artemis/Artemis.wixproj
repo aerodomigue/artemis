@@ -3,11 +3,11 @@
     <DefineConstants>Debug</DefineConstants>
   </PropertyGroup>
   <PropertyGroup>
-    <OutputPath>$(BUILD_FOLDER)\</OutputPath>
-    <IntermediateOutputPath>$(BUILD_FOLDER)\</IntermediateOutputPath>
+    <OutputPath Condition="'$(OutputPath)' == ''">$(BUILD_FOLDER)\</OutputPath>
+    <IntermediateOutputPath Condition="'$(IntermediateOutputPath)' == ''">$(BUILD_FOLDER)\</IntermediateOutputPath>
   </PropertyGroup>
   <PropertyGroup>
-    <DefineConstants>DeployDir=$(DEPLOY_FOLDER);BuildDir=$(BUILD_FOLDER)</DefineConstants>
+    <DefineConstants>DeployDir=$(DEPLOY_FOLDER);BuildDir=$(BUILD_FOLDER);Configuration=$(Configuration)</DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition="$(SIGN)!=''">
     <SignOutput>true</SignOutput>
