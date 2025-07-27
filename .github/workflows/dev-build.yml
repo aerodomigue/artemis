@@ -149,6 +149,29 @@ jobs:
           echo "Warning: AntiHooking.dll not found in AntiHooking/release/. Ensure it builds correctly." > windows-dev-package\ANTIHOOOKING_INFO.txt
         }
 
+        # Copy bz2.dll
+        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\bz2.dll") {
+          copy "C:\vcpkg\installed\x64-windows\bin\bz2.dll" windows-dev-package\
+        }
+        if (Test-Path "libs\windows\lib\x64\bz2.dll") {
+          copy "libs\windows\lib\x64\bz2.dll" windows-dev-package\
+        }
+
+        # Copy libpng16.dll
+        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\libpng16.dll") {
+          copy "C:\vcpkg\installed\x64-windows\bin\libpng16.dll" windows-dev-package\
+        }
+        if (Test-Path "libs\windows\lib\x64\libpng16.dll") {
+          copy "libs\windows\lib\x64\libpng16.dll" windows-dev-package\
+        }
+
+        # Copy brotlidec.dll
+        if (Test-Path "C:\vcpkg\installed\x64-windows\bin\brotlidec.dll") {
+          copy "C:\vcpkg\installed\x64-windows\bin\brotlidec.dll" windows-dev-package\
+        }
+        if (Test-Path "libs\windows\lib\x64\brotlidec.dll") {
+          copy "libs\windows\lib\x64\brotlidec.dll" windows-dev-package\
+        }
         # Create info file
         echo "Artemis Desktop Development Build" > windows-dev-package\README.txt
         echo "Version: $env:VERSION" >> windows-dev-package\README.txt
@@ -458,7 +481,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: artemis-appimage-${{ needs.setup-version.outputs.version }}
-        path: artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage
+        path: artemis-appimage-${{ needs.setup-version.outputs.version }}-x86_64.AppImage
         retention-days: 30
 
   build-flatpak-dev:
@@ -556,7 +579,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: artemis-flatpak-${{ needs.setup-version.outputs.version }}
-        path: artemis-desktop-${{ needs.setup-version.outputs.version }}.flatpak
+        path: artemis-flatpak-${{ needs.setup-version.outputs.version }}.flatpak
         retention-days: 30
 
   build-steamdeck-dev:
@@ -701,7 +724,7 @@ jobs:
     - name: Get version info
       id: version
       run: |
-        VERSION="v0.1.0-dev-${{ github.run_number }}-${GITHUB_SHA:0:7}"
+        VERSION="v0.1.1-dev-${{ github.run_number }}-${GITHUB_SHA:0:7}"
         echo "version=${VERSION}" >> $GITHUB_OUTPUT
         echo "Generated version: ${VERSION}"
 
@@ -795,8 +818,8 @@ jobs:
           | 🪟 Windows | `artemis-windows-${{ steps.version.outputs.version }}.zip` | Standard Windows build |
           | 🍎 macOS | `artemis-macos-${{ steps.version.outputs.version }}.tar.gz` | macOS app bundle |
           | 🐧 Linux | `artemis-linux-${{ steps.version.outputs.version }}.tar.gz` | Generic Linux binary |
-          | 📦 AppImage | `artemis-${{ steps.version.outputs.version }}-x86_64.AppImage` | Portable Linux app |
-          | 📱 Flatpak | `artemis-desktop-${{ steps.version.outputs.version }}.flatpak` | Sandboxed Linux app |
+          | 📦 AppImage | `artemis-appimage-${{ steps.version.outputs.version }}-x86_64.AppImage` | Portable Linux app |
+          | 📱 Flatpak | `artemis-flatpak-${{ steps.version.outputs.version }}.flatpak` | Sandboxed Linux app |
           | 🎮 Steam Deck | `artemis-steamdeck-${{ steps.version.outputs.version }}.tar.gz` | Optimized for Steam Deck |
           
           ## 🔄 Installation
