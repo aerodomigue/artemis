@@ -732,9 +732,7 @@ int main(int argc, char *argv[])
                                                    });
     qmlRegisterSingletonType<ClipboardManager>("ClipboardManager", 1, 0,
                                                "ClipboardManager",
-                                               [](QQmlEngine*, QJSEngine*) -> QObject* {
-                                                   return new ClipboardManager();
-                                               });
+                                               &ClipboardManager::create);
     qmlRegisterSingletonType<ServerCommandManager>("ServerCommandManager", 1, 0,
                                                    "ServerCommandManager",
                                                    [](QQmlEngine*, QJSEngine*) -> QObject* {

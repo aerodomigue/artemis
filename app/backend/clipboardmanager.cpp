@@ -1,6 +1,7 @@
 #include "clipboardmanager.h"
 #include "nvcomputer.h"
 #include "nvhttp.h"
+#include "settings/artemissettings.h"
 #include <QGuiApplication>
 #include <QMimeData>
 #include <QDebug>
@@ -11,6 +12,9 @@
 
 // Matches Android CLIPBOARD_IDENTIFIER constant
 const QString ClipboardManager::CLIPBOARD_IDENTIFIER = "artemis_qt_clipboard_sync";
+
+// Static instance for singleton pattern
+ClipboardManager* ClipboardManager::s_instance = nullptr;
 
 ClipboardManager::ClipboardManager(QObject *parent)
     : QObject(parent)
@@ -31,11 +35,48 @@ ClipboardManager::ClipboardManager(QObject *parent)
 {
     // Connect to clipboard changes (matches Android behavior)
     connect(m_clipboard, &QClipboard::dataChanged, this, &ClipboardManager::onClipboardChanged);
+    
+    // Load settings from persistent storage
+    loadSettings();
+}
+
+void ClipboardManager::loadSettings()
+{
+    auto settings = ArtemisSettings::instance();
+    
+    // Load clipboard sync settings
+    m_enabled = settings->clipboardSyncEnabled();
+    m_smartSyncEnabled = m_enabled; // Smart sync follows enabled state
+    m_bidirectionalSync = settings->clipboardSyncBidirectional();
+    m_maxClipboardSize = settings->clipboardSyncMaxSize();
+    m_maxContentSizeMB = m_maxClipboardSize / (1024 * 1024); // Convert bytes to MB
+    
+    qDebug() << "ClipboardManager: Loaded settings - enabled:" << m_enabled 
+             << "bidirectional:" << m_bidirectionalSync 
+             << "maxSize:" << m_maxClipboardSize << "bytes";
 }
 
 ClipboardManager::~ClipboardManager()
 {
     disconnect();
+    if (s_instance == this) {
+        s_instance = nullptr;
+    }
+}
+
+ClipboardManager* ClipboardManager::instance()
+{
+    if (!s_instance) {
+        s_instance = new ClipboardManager();
+    }
+    return s_instance;
+}
+
+ClipboardManager* ClipboardManager::create(QQmlEngine *qmlEngine, QJSEngine *jsEngine)
+{
+    Q_UNUSED(qmlEngine)
+    Q_UNUSED(jsEngine)
+    return instance();
 }
 
 void ClipboardManager::setConnection(NvComputer *computer, NvHTTP *http)
@@ -194,7 +235,17 @@ int ClipboardManager::getMaxClipboardSize() const
 
 void ClipboardManager::setBidirectionalSync(bool enabled)
 {
-    m_bidirectionalSync = enabled;
+    if (m_bidirectionalSync != enabled) {
+        m_bidirectionalSync = enabled;
+        
+        // Save to persistent settings
+        auto settings = ArtemisSettings::instance();
+        settings->setClipboardSyncBidirectional(enabled);
+        settings->save();
+        
+        emit bidirectionalSyncChanged();
+        qDebug() << "ClipboardManager: Bidirectional sync changed to" << enabled;
+    }
 }
 
 bool ClipboardManager::isBidirectionalSyncEnabled() const
@@ -385,8 +436,17 @@ void ClipboardManager::setEnabled(bool enabled)
 {
     if (m_enabled != enabled) {
         m_enabled = enabled;
+        
+        // Enable/disable smart sync when clipboard sync is enabled/disabled
+        enableSmartSync(enabled);
+        
+        // Save to persistent settings
+        auto settings = ArtemisSettings::instance();
+        settings->setClipboardSyncEnabled(enabled);
+        settings->save();
+        
         emit enabledChanged();
-        qDebug() << "ClipboardManager: Enabled changed to" << enabled;
+        qDebug() << "ClipboardManager: Enabled changed to" << enabled << "(smart sync:" << (enabled ? "enabled" : "disabled") << ")";
     }
 }
 
@@ -404,6 +464,12 @@ void ClipboardManager::setMaxContentSizeMB(int sizeMB)
     if (m_maxContentSizeMB != sizeMB) {
         m_maxContentSizeMB = sizeMB;
         m_maxClipboardSize = sizeMB * 1024 * 1024; // Convert to bytes
+        
+        // Save to persistent settings
+        auto settings = ArtemisSettings::instance();
+        settings->setClipboardSyncMaxSize(m_maxClipboardSize);
+        settings->save();
+        
         emit maxContentSizeMBChanged();
         qDebug() << "ClipboardManager: Max content size changed to" << sizeMB << "MB";
     }

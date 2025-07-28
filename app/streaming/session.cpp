@@ -596,7 +596,7 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
     m_DropAudioEndTime(0),
     m_QuickMenuManager(new QuickMenuManager()),
     m_ServerCommandManager(new ServerCommandManager()),
-    m_ClipboardManager(new ClipboardManager())
+    m_ClipboardManager(ClipboardManager::instance())
 {
 }
 
@@ -2177,6 +2177,11 @@ void Session::execInternal()
                     m_AudioMuted = true;
                 }
                 m_InputHandler->notifyFocusLost();
+                
+                // Trigger clipboard sync from server when focus is lost
+                if (m_ClipboardManager) {
+                    m_ClipboardManager->onFocusLost();
+                }
                 break;
             case SDL_WINDOWEVENT_FOCUS_GAINED:
                 if (m_Preferences->muteOnFocusLoss) {
