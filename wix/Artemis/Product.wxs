@@ -98,7 +98,7 @@
         <File Id="ArtemisExe"
               KeyPath="yes"
               Checksum="yes"
-              Source="$(var.BuildDir)\app\$(var.Configuration)\Moonlight.exe">
+              Source="$(var.BuildDir)\app\$(var.Configuration)\Artemis.exe">
           <fire:FirewallException Id="ArtemisFirewallException"
                                   Scope="any"
                                   IgnoreFailure="yes"
