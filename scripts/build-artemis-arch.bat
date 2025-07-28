@@ -219,7 +219,7 @@ if "%SIGN%"=="1" (
 echo Building MSI
 set DEPLOY_FOLDER=%DEPLOY_FOLDER%
 set BUILD_FOLDER=%BUILD_FOLDER%
-msbuild %SOURCE_ROOT%\wix\Artemis\Artemis.wixproj /p:Configuration=%BUILD_CONFIG% /p:Platform=%ARCH% /p:OutputPath=%INSTALLER_FOLDER%\ /p:DEPLOY_FOLDER=%DEPLOY_FOLDER% /p:BUILD_FOLDER=%BUILD_FOLDER%
+msbuild %SOURCE_ROOT%\wix\Artemis\Artemis.wixproj -Restore /p:Configuration=%BUILD_CONFIG% /p:Platform=%ARCH% /p:OutputPath=%INSTALLER_FOLDER%\ /p:DEPLOY_FOLDER=%DEPLOY_FOLDER% /p:BUILD_FOLDER=%BUILD_FOLDER%
 if !ERRORLEVEL! NEQ 0 goto Error
 
 echo Copying application binary to deployment directory
