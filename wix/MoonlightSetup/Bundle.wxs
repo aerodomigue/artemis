@@ -20,8 +20,8 @@
           DisableModify="yes"
           IconSourceFile="..\..\app\artemis.ico">
 
-    <bal:Condition Message="This version of Moonlight requires Windows 10 or later." Condition="VersionNT &gt;= v10.0" />
-    <bal:Condition Message="This version of Moonlight requires a 64-bit version of Windows." Condition="NativeMachine &lt;&gt; 332" />
+    <bal:Condition Message="This version of Artemis requires Windows 10 or later." Condition="VersionNT &gt;= v10.0" />
+    <bal:Condition Message="This version of Artemis requires a 64-bit version of Windows." Condition="NativeMachine &lt;&gt; 332" />
 
     <Variable Name="InstallFolder" Type="formatted" Value="[ProgramFiles6432Folder]Artemis Game Streaming" />
 
@@ -48,7 +48,7 @@
     <BootstrapperApplication>
       <bal:WixStandardBootstrapperApplication ShowVersion="yes"
                                               LicenseFile="license.rtf"
-                                              LogoFile="..\..\app\moonlight_wix.png"
+                                              LogoFile="..\..\app\artemis_wix.png"
                                               LaunchTarget="[InstallFolder]\Artemis.exe"
                                               ThemeFile="RtfTheme.xml"
                                               Theme="rtfLicense" />
@@ -96,18 +96,18 @@
         <ExitCode Value="1638" Behavior="success" />
       </ExePackage>
 
-      <MsiPackage Id="Moonlight_x64"
-                  SourceFile="$(env.BUILD_ROOT)\build-x64-$(env.BUILD_CONFIG)\Moonlight.msi"
-                  Name="Moonlight_x64.msi"
+      <MsiPackage Id="Artemis_x64"
+                  SourceFile="$(env.BUILD_ROOT)\build-x64-$(env.BUILD_CONFIG)\Artemis.msi"
+                  Name="Artemis_x64.msi"
                   InstallCondition="(VersionNT64 AND NOT NativeMachine) OR (NativeMachine = 34404)"
                   Vital="yes">
         <MsiProperty Name="INSTALLFOLDER" Value="[InstallFolder]" />
         <MsiProperty Name="ADDDESKTOPSHORTCUT" Value="[AddDesktopShortcutCheckbox]" />
       </MsiPackage>
 
-      <MsiPackage Id="Moonlight_arm64"
-                  SourceFile="$(env.BUILD_ROOT)\build-arm64-$(env.BUILD_CONFIG)\Moonlight.msi"
-                  Name="Moonlight_arm64.msi"
+      <MsiPackage Id="Artemis_arm64"
+                  SourceFile="$(env.BUILD_ROOT)\build-arm64-$(env.BUILD_CONFIG)\Artemis.msi"
+                  Name="Artemis_arm64.msi"
                   InstallCondition="NativeMachine = 43620"
                   Vital="yes">
         <MsiProperty Name="INSTALLFOLDER" Value="[InstallFolder]" />
