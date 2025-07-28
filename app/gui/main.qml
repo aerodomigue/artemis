@@ -298,8 +298,7 @@ ApplicationWindow {
 
             NavigableToolButton {
                 id: discordButton
-                visible: SystemProperties.hasBrowser &&
-                         qmltypeof(stackView.currentItem, "SettingsView")
+                visible: false // Temporarily disabled for Artemis
 
                 iconSource: "qrc:/res/discord.svg"
 

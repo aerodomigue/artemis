@@ -43,8 +43,8 @@ void AutoUpdateChecker::start()
     QT_WARNING_POP
 #endif
 
-    // We'll get a callback when this is finished
-    QUrl url("https://moonlight-stream.org/updates/qt.json");
+    // Point to Artemis GitHub releases instead of moonlight-stream.org
+    QUrl url("https://api.github.com/repos/wjbeckett/artemis/releases/latest");
     QNetworkRequest request(url);
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
     request.setAttribute(QNetworkRequest::Http2AllowedAttribute, true);
@@ -133,83 +133,42 @@ void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
             return;
         }
 
-        QJsonArray array = jsonDoc.array();
-        if (array.isEmpty()) {
-            qWarning() << "Update manifest doesn't contain an array";
+        // GitHub API returns a single object for latest release, not an array
+        QJsonObject releaseObj = jsonDoc.object();
+        if (releaseObj.isEmpty()) {
+            qWarning() << "GitHub API response doesn't contain release object";
             return;
         }
 
-        for (QJsonValueRef updateEntry : array) {
-            if (updateEntry.isObject()) {
-                QJsonObject updateObj = updateEntry.toObject();
-                if (!updateObj.contains("platform") ||
-                        !updateObj.contains("arch") ||
-                        !updateObj.contains("version") ||
-                        !updateObj.contains("browser_url")) {
-                    qWarning() << "Update manifest entry missing vital field";
-                    continue;
-                }
-
-                if (!updateObj["platform"].isString() ||
-                        !updateObj["arch"].isString() ||
-                        !updateObj["version"].isString() ||
-                        !updateObj["browser_url"].isString()) {
-                    qWarning() << "Update manifest entry has unexpected vital field type";
-                    continue;
-                }
-
-                if (updateObj["arch"] == QSysInfo::buildCpuArchitecture() &&
-                        updateObj["platform"] == getPlatform()) {
-
-                    // Check the kernel version minimum if one exists
-                    if (updateObj.contains("kernel_version_at_least") && updateObj["kernel_version_at_least"].isString()) {
-                        QVector<int> requiredVersionQuad;
-                        QVector<int> actualVersionQuad;
-
-                        QString requiredVersion = updateObj["kernel_version_at_least"].toString();
-                        QString actualVersion = QSysInfo::kernelVersion();
-                        parseStringToVersionQuad(requiredVersion, requiredVersionQuad);
-                        parseStringToVersionQuad(actualVersion, actualVersionQuad);
-
-                        if (compareVersion(actualVersionQuad, requiredVersionQuad) < 0) {
-                            qDebug() << "Skipping manifest entry due to kernel version (" << actualVersion << "<" << requiredVersion << ")";
-                            continue;
-                        }
-                    }
-
-                    qDebug() << "Found update manifest match for current platform";
-
-                    QString latestVersion = updateObj["version"].toString();
-                    qDebug() << "Latest version of Moonlight for this platform is:" << latestVersion;
-
-                    QVector<int> latestVersionQuad;
-                    parseStringToVersionQuad(latestVersion, latestVersionQuad);
-
-                    int res = compareVersion(m_CurrentVersionQuad, latestVersionQuad);
-                    if (res < 0) {
-                        // m_CurrentVersionQuad < latestVersionQuad
-                        qDebug() << "Update available";
-                        emit onUpdateAvailable(updateObj["version"].toString(),
-                                               updateObj["browser_url"].toString());
-                        return;
-                    }
-                    else if (res > 0) {
-                        qDebug() << "Update manifest version lower than current version";
-                        return;
-                    }
-                    else {
-                        qDebug() << "Update manifest version equal to current version";
-                        return;
-                    }
-                }
-            }
-            else {
-                qWarning() << "Update manifest contained unrecognized entry:" << updateEntry.toString();
-            }
+        // Extract version from tag_name (remove 'v' prefix if present)
+        QString tagName = releaseObj["tag_name"].toString();
+        QString version = tagName.startsWith("v") ? tagName.mid(1) : tagName;
+        
+        if (version.isEmpty()) {
+            qWarning() << "GitHub release missing tag_name";
+            return;
         }
 
-        qWarning() << "No entry in update manifest found for current platform:"
-                   << QSysInfo::buildCpuArchitecture() << getPlatform() << QSysInfo::kernelVersion();
+        qDebug() << "Latest version of Artemis from GitHub:" << version;
+
+        QVector<int> latestVersionQuad;
+        parseStringToVersionQuad(version, latestVersionQuad);
+
+        int res = compareVersion(m_CurrentVersionQuad, latestVersionQuad);
+        if (res < 0) {
+            // Current version < latest version
+            qDebug() << "Update available";
+            emit onUpdateAvailable(version, releaseObj["html_url"].toString());
+            return;
+        }
+        else if (res > 0) {
+            qDebug() << "GitHub release version lower than current version";
+            return;
+        }
+        else {
+            qDebug() << "GitHub release version equal to current version";
+            return;
+        }
     }
     else {
         qWarning() << "Update checking failed with error:" << reply->error();
