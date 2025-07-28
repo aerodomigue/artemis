@@ -18,18 +18,73 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      numeric_version: ${{ steps.version.outputs.numeric_version }}
+      is_prerelease: ${{ steps.version.outputs.is_prerelease }}
     steps:
-      - name: Get version info
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for proper versioning
+      
+      - name: Generate semantic version
         id: version
         run: |
-          # Replace slashes in branch name to create a valid string for tags and filenames
-          branch_name_sanitized=$(echo "${{ github.ref_name }}" | sed 's/\//-/g')
-          commit_short="${{ github.sha }}"
-          commit_short="${commit_short:0:7}"
-          timestamp=$(date +"%Y%m%d-%H%M")
-          version="${branch_name_sanitized}-${commit_short}-${timestamp}"
-          echo "version=${version}" >> $GITHUB_OUTPUT
-          echo "Generated version: ${version}"
+          # Base version from app/version.txt
+          BASE_VERSION=$(cat app/version.txt | tr -d '\n\r')
+          
+          # Get branch info
+          BRANCH_NAME="${{ github.ref_name }}"
+          BRANCH_SANITIZED=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9._-]/-/g')
+          
+          # Get commit info
+          COMMIT_SHORT="${{ github.sha }}"
+          COMMIT_SHORT="${COMMIT_SHORT:0:7}"
+          
+          # Get timestamp info
+          TIMESTAMP=$(date +"%Y%m%d")
+          BUILD_NUMBER=$(date +"%H%M")
+          
+          # Determine if this is a prerelease
+          IS_PRERELEASE="true"
+          PRERELEASE_SUFFIX=""
+          
+          if [[ "$BRANCH_NAME" == "main" || "$BRANCH_NAME" == "master" ]]; then
+            # Main branch = stable release
+            VERSION="$BASE_VERSION"
+            IS_PRERELEASE="false"
+          elif [[ "$BRANCH_NAME" == "develop" ]]; then
+            # Develop branch = development prerelease
+            VERSION="$BASE_VERSION-dev.$TIMESTAMP.$BUILD_NUMBER+$COMMIT_SHORT"
+            PRERELEASE_SUFFIX="dev"
+          elif [[ "$BRANCH_NAME" =~ ^(feature|feat)/ ]]; then
+            # Feature branch = feature prerelease
+            FEATURE_NAME=$(echo "$BRANCH_NAME" | sed 's|^.*/||' | sed 's/[^a-zA-Z0-9._-]/-/g')
+            VERSION="$BASE_VERSION-feature.$FEATURE_NAME.$TIMESTAMP.$BUILD_NUMBER+$COMMIT_SHORT"
+            PRERELEASE_SUFFIX="feature"
+          elif [[ "$BRANCH_NAME" =~ ^(hotfix|fix)/ ]]; then
+            # Hotfix branch = hotfix prerelease
+            VERSION="$BASE_VERSION-hotfix.$TIMESTAMP.$BUILD_NUMBER+$COMMIT_SHORT"
+            PRERELEASE_SUFFIX="hotfix"
+          else
+            # Other branches = alpha prerelease
+            VERSION="$BASE_VERSION-alpha.$BRANCH_SANITIZED.$TIMESTAMP.$BUILD_NUMBER+$COMMIT_SHORT"
+            PRERELEASE_SUFFIX="alpha"
+          fi
+          
+          # Create numeric version for Windows RC files (extract major.minor.patch + build number)
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
+          NUMERIC_VERSION="$MAJOR.$MINOR.$PATCH.$BUILD_NUMBER"
+          
+          # Output all versions
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "numeric_version=$NUMERIC_VERSION" >> $GITHUB_OUTPUT
+          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          
+          echo "Generated versions:"
+          echo "  Semantic Version: $VERSION"
+          echo "  Numeric Version: $NUMERIC_VERSION"
+          echo "  Is Prerelease: $IS_PRERELEASE"
+          echo "  Branch: $BRANCH_NAME"
   build-windows-dev:
     name: Windows Development Build
     needs: setup-version
@@ -43,7 +98,10 @@ jobs:
         fetch-depth: 0  # Needed for version info
     
     - name: Display version info
-      run: echo "Using development version ${{ needs.setup-version.outputs.version }}"
+      run: |
+        echo "Using semantic version: ${{ needs.setup-version.outputs.version }}"
+        echo "Using numeric version: ${{ needs.setup-version.outputs.numeric_version }}"
+        echo "Is prerelease: ${{ needs.setup-version.outputs.is_prerelease }}"
     
     - name: Setup Qt
       uses: jurplel/install-qt-action@v3
@@ -70,13 +128,25 @@ jobs:
     
     - name: Update version file for development build
       env:
-        VERSION: ${{ needs.setup-version.outputs.version }}
+        SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
+        NUMERIC_VERSION: ${{ needs.setup-version.outputs.numeric_version }}
       run: |
-        echo $env:VERSION > app\version.txt
+        # Write numeric version for Windows RC compilation
+        echo $env:NUMERIC_VERSION > app\version.txt
+        
+        # Create detailed version info file for reference  
+        @"
+        Semantic Version: $env:SEMANTIC_VERSION
+        Numeric Version: $env:NUMERIC_VERSION
+        Is Prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
+        Branch: ${{ github.ref_name }}
+        Commit: ${{ github.sha }}
+        Build Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')
+        "@ | Out-File -FilePath "build_version_info.txt" -Encoding utf8
     
     - name: Build using build-artemis-arch.bat script
       env:
-        VERSION: ${{ needs.setup-version.outputs.version }}
+        SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
         # Add Qt to PATH for the build script
         $env:PATH = "$env:Qt6_DIR\bin;$env:PATH"
@@ -91,37 +161,39 @@ jobs:
     
     - name: Rename artifacts for development build
       env:
-        VERSION: ${{ needs.setup-version.outputs.version }}
+        SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
         # Find the generated MSI and portable ZIP files
         $msiFile = Get-ChildItem -Path "build\installer-x64-release" -Filter "*.msi" | Select-Object -First 1
         $zipFile = Get-ChildItem -Path "build\installer-x64-release" -Filter "ArtemisPortable-*.zip" | Select-Object -First 1
         
         if ($msiFile) {
-          # Rename MSI installer for Artemis
-          $newMsiName = "artemis-windows-installer-$env:VERSION.msi"
+          # Rename MSI installer for Artemis using semantic version
+          $newMsiName = "artemis-windows-installer-$env:SEMANTIC_VERSION.msi"
           Move-Item $msiFile.FullName $newMsiName
           echo "Created MSI installer: $newMsiName"
         }
         
         if ($zipFile) {
-          # Rename portable ZIP for Artemis
-          $newZipName = "artemis-windows-portable-$env:VERSION.zip"
+          # Rename portable ZIP for Artemis using semantic version
+          $newZipName = "artemis-windows-portable-$env:SEMANTIC_VERSION.zip"
           Move-Item $zipFile.FullName $newZipName
           echo "Created portable ZIP: $newZipName"
         }
         
-        # Create info file
+        # Create info file with semantic versioning
         @"
         Artemis Desktop Development Build
-        Version: $env:VERSION
+        Version: $env:SEMANTIC_VERSION
+        Numeric Version: ${{ needs.setup-version.outputs.numeric_version }}
+        Is Prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
         Branch: ${{ github.ref_name }}
         Commit: ${{ github.sha }}
-        Built: $(Get-Date)
+        Built: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')
         
         This build includes:
         - MSI Installer with proper dependency handling
-        - Portable ZIP package
+        - Portable ZIP package  
         - All required Windows runtime dependencies
         "@ | Out-File -FilePath "build_info.txt" -Encoding utf8
     
@@ -161,7 +233,10 @@ jobs:
         fetch-depth: 0
     
     - name: Display version info
-      run: echo "Using development version ${{ needs.setup-version.outputs.version }}"
+      run: |
+        echo "Using semantic version: ${{ needs.setup-version.outputs.version }}"
+        echo "Using numeric version: ${{ needs.setup-version.outputs.numeric_version }}"
+        echo "Is prerelease: ${{ needs.setup-version.outputs.is_prerelease }}"
 
     - name: Setup Qt
       uses: jurplel/install-qt-action@v3
@@ -196,16 +271,18 @@ jobs:
       env:
         VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
-        # Create info file
+        # Create info file with semantic versioning
         cat > build_info.txt << EOF
         Artemis Desktop Development Build
         Version: $VERSION
+        Numeric Version: ${{ needs.setup-version.outputs.numeric_version }}
+        Is Prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
         Branch: ${{ github.ref_name }}
         Commit: ${{ github.sha }}
-        Built: $(date)
+        Built: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
         EOF
         
-        # Package with version info
+        # Package with semantic version
         tar -czf artemis-macos-$VERSION.tar.gz -C app Moonlight.app -C .. build_info.txt
     
     - name: Upload Development Artifacts
@@ -228,7 +305,10 @@ jobs:
         fetch-depth: 0
 
     - name: Display version info
-      run: echo "Using development version ${{ needs.setup-version.outputs.version }}"
+      run: |
+        echo "Using semantic version: ${{ needs.setup-version.outputs.version }}"
+        echo "Using numeric version: ${{ needs.setup-version.outputs.numeric_version }}"
+        echo "Is prerelease: ${{ needs.setup-version.outputs.is_prerelease }}"
     
     - name: Setup Qt
       uses: jurplel/install-qt-action@v3
@@ -273,16 +353,18 @@ jobs:
       env:
         VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
-        # Create info file
+        # Create info file with semantic versioning
         cat > build_info.txt << EOF
         Artemis Desktop Development Build
         Version: $VERSION
+        Numeric Version: ${{ needs.setup-version.outputs.numeric_version }}
+        Is Prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
         Branch: ${{ github.ref_name }}
         Commit: ${{ github.sha }}
-        Built: $(date)
+        Built: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
         EOF
         
-        # Package with version info
+        # Package with semantic version
         tar -czf artemis-linux-$VERSION.tar.gz -C app moonlight -C .. build_info.txt
     - name: Upload Development Artifacts
       uses: actions/upload-artifact@v4
@@ -664,7 +746,7 @@ jobs:
 
   create-dev-release:
     name: Create Development Release
-    needs: [build-windows-dev, build-macos-dev, build-linux-dev, build-appimage-dev, build-flatpak-dev, build-steamdeck-dev]
+    needs: [setup-version, build-windows-dev, build-macos-dev, build-linux-dev, build-appimage-dev, build-flatpak-dev, build-steamdeck-dev]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/develop'  # Only create releases for develop branch
     
@@ -674,31 +756,30 @@ jobs:
       with:
         fetch-depth: 0  # Need full history for changelog
     
-    - name: Get version info
-      id: version
+    - name: Display release version info
       run: |
-        VERSION="v0.1.3-dev-${{ github.run_number }}-${GITHUB_SHA:0:7}"
-        echo "version=${VERSION}" >> $GITHUB_OUTPUT
-        echo "Generated version: ${VERSION}"
+        echo "Creating release with version: ${{ needs.setup-version.outputs.version }}"
+        echo "Is prerelease: ${{ needs.setup-version.outputs.is_prerelease }}"
 
     - name: Create tag for release
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git tag ${{ steps.version.outputs.version }}
-        git push origin ${{ steps.version.outputs.version }}
+        git tag ${{ needs.setup-version.outputs.version }}
+        git push origin ${{ needs.setup-version.outputs.version }}
 
     - name: Generate Changelog
       id: changelog
       run: |
-        PREV_TAG=$(git tag --sort=-creatordate | grep -v "${{ steps.version.outputs.version }}" | head -n1)
+        CURRENT_VERSION="${{ needs.setup-version.outputs.version }}"
+        PREV_TAG=$(git tag --sort=-creatordate | grep -v "$CURRENT_VERSION" | head -n1)
         if [ -z "$PREV_TAG" ]; then
           SINCE_DATE=$(date -d '7 days ago' '+%Y-%m-%d')
           echo "No previous release found. Getting commits since $SINCE_DATE"
           COMMITS=$(git log --since="$SINCE_DATE" --pretty=format:"%h|%s|%an|%ad" --date=short --no-merges)
         else
           echo "Getting commits since last release: $PREV_TAG"
-          COMMITS=$(git log ${PREV_TAG}..${{ steps.version.outputs.version }} --pretty=format:"%h|%s|%an|%ad" --date=short --no-merges)
+          COMMITS=$(git log ${PREV_TAG}..$CURRENT_VERSION --pretty=format:"%h|%s|%an|%ad" --date=short --no-merges)
         fi
         FEATURES=""
         BUGFIXES=""
@@ -742,8 +823,8 @@ jobs:
     - name: Create Development Release
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ steps.version.outputs.version }}
-        name: "🚧 Development Build ${{ steps.version.outputs.version }}"
+        tag_name: ${{ needs.setup-version.outputs.version }}
+        name: "🚧 Development Build ${{ needs.setup-version.outputs.version }}"
         body: |
           🚧 **Development Build** 🚧
           
@@ -758,6 +839,8 @@ jobs:
           ---
           
           ## 📋 Build Information
+          - **Version**: `${{ needs.setup-version.outputs.version }}`
+          - **Numeric Version**: `${{ needs.setup-version.outputs.numeric_version }}`
           - **Branch**: `${{ github.ref_name }}`
           - **Commit**: `${{ github.sha }}`
           - **Build**: #${{ github.run_number }}
@@ -768,12 +851,12 @@ jobs:
           
           | Platform | File | Notes |
           |----------|------|-------|
-          | 🪟 Windows | `artemis-windows-${{ steps.version.outputs.version }}.zip` | Standard Windows build |
-          | 🍎 macOS | `artemis-macos-${{ steps.version.outputs.version }}.tar.gz` | macOS app bundle |
-          | 🐧 Linux | `artemis-linux-${{ steps.version.outputs.version }}.tar.gz` | Generic Linux binary |
-          | 📦 AppImage | `artemis-appimage-${{ steps.version.outputs.version }}-x86_64.AppImage` | Portable Linux app |
-          | 📱 Flatpak | `artemis-flatpak-${{ steps.version.outputs.version }}.flatpak` | Sandboxed Linux app |
-          | 🎮 Steam Deck | `artemis-steamdeck-${{ steps.version.outputs.version }}.tar.gz` | Optimized for Steam Deck |
+          | 🪟 Windows | `artemis-windows-${{ needs.setup-version.outputs.version }}.zip` | Standard Windows build |
+          | 🍎 macOS | `artemis-macos-${{ needs.setup-version.outputs.version }}.tar.gz` | macOS app bundle |
+          | 🐧 Linux | `artemis-linux-${{ needs.setup-version.outputs.version }}.tar.gz` | Generic Linux binary |
+          | 📦 AppImage | `artemis-appimage-${{ needs.setup-version.outputs.version }}-x86_64.AppImage` | Portable Linux app |
+          | 📱 Flatpak | `artemis-flatpak-${{ needs.setup-version.outputs.version }}.flatpak` | Sandboxed Linux app |
+          | 🎮 Steam Deck | `artemis-steamdeck-${{ needs.setup-version.outputs.version }}.tar.gz` | Optimized for Steam Deck |
           
           ## 🔄 Installation
           1. Download the appropriate file for your platform
@@ -784,7 +867,7 @@ jobs:
           Please report issues on our [GitHub Issues](https://github.com/${{ github.repository }}/issues) page.
         files: |
           artifacts/*/*
-        prerelease: true
+        prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
         draft: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
