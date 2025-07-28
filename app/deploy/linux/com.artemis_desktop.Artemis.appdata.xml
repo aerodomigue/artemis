@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop">
-	<id>com.moonlight_stream.Moonlight</id>
+	<id>com.artemis_desktop.Artemis</id>
 	<metadata_license>CC0-1.0</metadata_license>
 	<project_license>GPL-3.0+</project_license>
-	<name>Moonlight</name>
+	<name>Artemis</name>
 	<summary>Stream games and other applications from another PC running Sunshine or GeForce Experience</summary>
 
 	<description>
-		<p>Moonlight can stream games and other applications from another PC with Sunshine or GeForce Experience software installed.</p>
+		<p>Artemis can stream games and other applications from another PC with Sunshine or GeForce Experience software installed.</p>
 		<p>Features include:</p>
 		<ul>
 			<li>Hardware accelerated video decoding with VAAPI, VDPAU, and NVDEC support</li>
@@ -20,9 +20,9 @@
 		</ul>
 	</description>
 
-	<url type="homepage">https://moonlight-stream.org</url>
-	<url type="bugtracker">https://github.com/moonlight-stream/moonlight-qt/issues</url>
-	<url type="help">https://github.com/moonlight-stream/moonlight-docs/wiki/Setup-Guide</url>
+	<url type="homepage">https://github.com/wjbeckett/artemis</url>
+	<url type="bugtracker">https://github.com/wjbeckett/artemis/issues</url>
+	<url type="help">https://github.com/wjbeckett/artemis/wiki</url>
 
 	<screenshots>
 		<screenshot type="default">
