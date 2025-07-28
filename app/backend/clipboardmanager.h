@@ -34,11 +34,16 @@ class ClipboardManager : public QObject
     Q_PROPERTY(bool textOnlyMode READ textOnlyMode WRITE setTextOnlyMode NOTIFY textOnlyModeChanged)
     Q_PROPERTY(int maxContentSizeMB READ maxContentSizeMB WRITE setMaxContentSizeMB NOTIFY maxContentSizeMBChanged)
     Q_PROPERTY(bool showNotifications READ showNotifications WRITE setShowNotifications NOTIFY showNotificationsChanged)
+    Q_PROPERTY(bool bidirectionalSync READ isBidirectionalSyncEnabled WRITE setBidirectionalSync NOTIFY bidirectionalSyncChanged)
     QML_ELEMENT
 
 public:
     explicit ClipboardManager(QObject *parent = nullptr);
     ~ClipboardManager();
+    
+    // Singleton access for consistent instance across UI and Session
+    static ClipboardManager* instance();
+    static ClipboardManager* create(QQmlEngine *qmlEngine, QJSEngine *jsEngine);
 
     // Property getters
     bool isEnabled() const { return m_enabled; }
@@ -100,11 +105,15 @@ signals:
     void textOnlyModeChanged();
     void maxContentSizeMBChanged();
     void showNotificationsChanged();
+    void bidirectionalSyncChanged();
 
 private slots:
     void onClipboardChanged();
 
 private:
+    // Settings management
+    void loadSettings();
+    
     // Core clipboard operations (matches Android implementation)
     QString getClipboardContent(bool force = false);
     void setClipboardContent(const QString &content);
@@ -146,4 +155,7 @@ private:
     QString m_lastReceivedContent;
     QStringList m_ownContentHashes;
     bool m_syncInProgress;
+    
+    // Static instance for singleton pattern
+    static ClipboardManager* s_instance;
 };
