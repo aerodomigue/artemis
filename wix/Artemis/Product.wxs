@@ -1,9 +1,5 @@
 <?define ShortName = "Artemis" ?>
-<?define FullName = "Ar        <RegistryValue Root="HKCU"
-                     Key="Software\ArtemisDesktopProject"
-                     Name="InstallDir" <RegistryValue Root="HKCU"
-                     Key="Software\ArtemisDesktopProject"
-                     Name="InstallDir"is Desktop Game Streaming Client" ?>
+<?define FullName = "Artemis Desktop Game Streaming Client" ?>
 
 <?define ShortcutName = "$(var.ShortName)" ?>
 <?define ShortcutDesc = "Stream games and other applications from another PC" ?>
@@ -28,7 +24,7 @@
     </Property>
 
     <Launch Condition="Installed OR MPSSVC_START=&quot;#2&quot;"
-            Message="Setup cannot proceed because the Windows Firewall service has been improperly disabled or stopped. You must start the Windows Firewall service (MpsSvc) to continue. If you would like to disable Windows Firewall properly, use the Windows Firewall options in Control Panel." />
+            Message="Setup requires Windows Firewall service (MpsSvc) to be running. Please start the service and try again." />
 
     <Property Id="APPDATAFOLDER" Value="%LOCALAPPDATA%\Artemis Desktop Project" />
 
@@ -106,7 +102,7 @@
           <fire:FirewallException Id="ArtemisFirewallException"
                                   Scope="any"
                                   IgnoreFailure="yes"
-                                  Name="$(var.FullName)" />
+                                  Name="$(var.ShortName)" />
         </File>
       </Component>
     </DirectoryRef>
