@@ -1,10 +1,28 @@
 name: Development Build
 
+# This workflow handles development builds with intelligent build skipping:
+# - Feature branches: Build artifacts, no releases (testing only)  
+# - Develop branch: Build artifacts + create development releases (when meaningful changes are merged)
+# - Main/Master branch: ALWAYS build + create production releases (releases require fresh artifacts)
+#
+# Smart merge detection prevents redundant builds by:
+# - Main/Master: Always builds (never skip releases!)
+# - Detecting merge commits vs regular commits
+# - For merges: Analyzing actual changes being merged (not just the merge commit)
+# - For regular commits: Comparing against previous commit
+# - Skipping builds when only documentation/config files changed (.md, .txt, .yml, .yaml, .github/)
+# - Respecting [skip ci] or [ci skip] in commit messages (except on main/master)
+#
+# This ensures develop/main branches BUILD when feature branches are merged (as they should!)
+# while still preventing redundant builds when no meaningful code changes exist.
+
 on:
   push:
     branches: 
       - develop
       - dev
+      - main
+      - master
       - 'feature/**'
       - 'feat/**'
   workflow_dispatch:  # Allow manual triggering
@@ -20,11 +38,71 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       numeric_version: ${{ steps.version.outputs.numeric_version }}
       is_prerelease: ${{ steps.version.outputs.is_prerelease }}
+      should_build: ${{ steps.check-changes.outputs.should_build }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Need full history for proper versioning
+      
+      - name: Check for meaningful changes
+        id: check-changes
+        run: |
+          # Always build on main/master branch (releases)
+          if [[ "${{ github.ref_name }}" == "main" || "${{ github.ref_name }}" == "master" ]]; then
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "Always building on main/master branch for release"
+            exit 0
+          fi
+          
+          # Skip builds if commit message contains [skip ci] or [ci skip]
+          if echo "${{ github.event.head_commit.message }}" | grep -E "\[(skip ci|ci skip)\]" > /dev/null; then
+            echo "should_build=false" >> $GITHUB_OUTPUT
+            echo "Build skipped due to [skip ci] in commit message"
+            exit 0
+          fi
+          
+          # Check if this is a merge commit (has multiple parents)
+          PARENT_COUNT=$(git rev-list --parents -n 1 HEAD | wc -w)
+          PARENT_COUNT=$((PARENT_COUNT - 1))  # Subtract 1 because first item is the commit hash itself
+          
+          if [ "$PARENT_COUNT" -gt 1 ]; then
+            echo "Detected merge commit with $PARENT_COUNT parents"
+            
+            # For merge commits, check the actual changes being merged
+            # Compare against the first parent (the target branch before merge)
+            FIRST_PARENT=$(git rev-parse HEAD^1)
+            echo "Comparing changes against first parent: $FIRST_PARENT"
+            
+            # Get all changed files in this merge, excluding documentation/config files
+            CHANGED_FILES=$(git diff --name-only $FIRST_PARENT HEAD | grep -v -E "(\.md$|\.txt$|\.yml$|\.yaml$|^\.github/)" | wc -l)
+            echo "Meaningful files changed in merge: $CHANGED_FILES"
+            
+            if [ "$CHANGED_FILES" -eq 0 ]; then
+              echo "should_build=false" >> $GITHUB_OUTPUT
+              echo "Skipping build - merge contains no meaningful code changes"
+              exit 0
+            else
+              echo "should_build=true" >> $GITHUB_OUTPUT
+              echo "Build will proceed - merge contains $CHANGED_FILES meaningful changes"
+              exit 0
+            fi
+          else
+            echo "Regular commit (not a merge) - checking for meaningful changes"
+            
+            # For regular commits, check against previous commit
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -v -E "(\.md$|\.txt$|\.yml$|\.yaml$|^\.github/)" | wc -l)
+            echo "Meaningful files changed: $CHANGED_FILES"
+            
+            if [ "$CHANGED_FILES" -eq 0 ]; then
+              echo "should_build=false" >> $GITHUB_OUTPUT
+              echo "Skipping build - no meaningful code changes detected"
+              exit 0
+            fi
+          fi
+          
+          echo "should_build=true" >> $GITHUB_OUTPUT
+          echo "Build will proceed - meaningful changes detected"
       
       - name: Generate semantic version
         id: version
@@ -89,6 +167,7 @@ jobs:
     name: Windows Development Build
     needs: setup-version
     runs-on: windows-latest
+    if: needs.setup-version.outputs.should_build == 'true'
     
     steps:
     - name: Checkout
@@ -224,6 +303,7 @@ jobs:
     name: macOS Development Build
     needs: setup-version
     runs-on: macos-latest
+    if: needs.setup-version.outputs.should_build == 'true'
     
     steps:
     - name: Checkout
@@ -296,6 +376,7 @@ jobs:
     name: Linux Development Build
     needs: setup-version
     runs-on: ubuntu-22.04
+    if: needs.setup-version.outputs.should_build == 'true'
     
     steps:
     - name: Checkout
@@ -377,6 +458,7 @@ jobs:
     name: AppImage Development Build
     needs: setup-version
     runs-on: ubuntu-22.04
+    if: needs.setup-version.outputs.should_build == 'true'
     
     steps:
     - name: Checkout
@@ -523,6 +605,7 @@ jobs:
     name: Flatpak Development Build
     needs: setup-version
     runs-on: ubuntu-22.04
+    if: needs.setup-version.outputs.should_build == 'true'
     
     steps:
     - name: Checkout
@@ -621,6 +704,7 @@ jobs:
     name: Steam Deck Development Build
     needs: setup-version
     runs-on: ubuntu-22.04
+    if: needs.setup-version.outputs.should_build == 'true'
     
     steps:
     - name: Checkout
@@ -748,7 +832,7 @@ jobs:
     name: Create Development Release
     needs: [setup-version, build-windows-dev, build-macos-dev, build-linux-dev, build-appimage-dev, build-flatpak-dev, build-steamdeck-dev]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'  # Only create releases for develop branch
+    if: (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && needs.setup-version.outputs.should_build == 'true'  # Create releases for develop/main branches when builds ran
     
     steps:
     - name: Checkout
@@ -817,20 +901,92 @@ jobs:
       with:
         path: artifacts
 
+    - name: Check if artifacts exist (handle build skipping scenario)
+      id: check-artifacts
+      run: |
+        if [ -d "artifacts" ] && [ "$(ls -A artifacts)" ]; then
+          echo "artifacts_exist=true" >> $GITHUB_OUTPUT
+          echo "Artifacts found - proceeding with release"
+        else
+          echo "artifacts_exist=false" >> $GITHUB_OUTPUT
+          echo "No artifacts found - builds were skipped"
+          echo "Will attempt to find and link to previous build with same commit"
+          
+          # Try to find a previous release with the same commit hash
+          COMMIT_HASH="${{ github.sha }}"
+          echo "commit_hash=$COMMIT_HASH" >> $GITHUB_OUTPUT
+          echo "Looking for existing artifacts with commit: $COMMIT_HASH"
+        fi
+
+    - name: Find and download previous artifacts if builds were skipped
+      id: find-previous
+      if: steps.check-artifacts.outputs.artifacts_exist == 'false'
+      run: |
+        echo "Searching for previous release with commit ${{ steps.check-artifacts.outputs.commit_hash }}"
+        
+        # Use GitHub API to find releases
+        RELEASES=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          "https://api.github.com/repos/${{ github.repository }}/releases?per_page=50")
+        
+        # Look for a release with matching commit (in tag or body)
+        MATCHING_RELEASE=$(echo "$RELEASES" | jq -r '.[] | select(.body | contains("${{ steps.check-artifacts.outputs.commit_hash }}")) | .tag_name' | head -n1)
+        
+        if [ -n "$MATCHING_RELEASE" ] && [ "$MATCHING_RELEASE" != "null" ]; then
+          echo "Found matching release: $MATCHING_RELEASE"
+          echo "previous_release_tag=$MATCHING_RELEASE" >> $GITHUB_OUTPUT
+          
+          # Download assets from the matching release
+          mkdir -p reused-artifacts
+          RELEASE_INFO=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/$MATCHING_RELEASE")
+          
+          # Download all assets
+          echo "$RELEASE_INFO" | jq -r '.assets[].browser_download_url' | while read -r url; do
+            if [ -n "$url" ]; then
+              filename=$(basename "$url")
+              echo "Downloading: $filename"
+              curl -L -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -o "reused-artifacts/$filename" "$url"
+            fi
+          done
+          
+          echo "reused_artifacts_available=true" >> $GITHUB_OUTPUT
+          ls -la reused-artifacts/
+        else
+          echo "No matching release found with commit ${{ steps.check-artifacts.outputs.commit_hash }}"
+          echo "reused_artifacts_available=false" >> $GITHUB_OUTPUT
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - name: List downloaded files for debugging
+      if: steps.check-artifacts.outputs.artifacts_exist == 'true'
       run: ls -R artifacts
+      
+    - name: List reused artifacts for debugging
+      if: steps.check-artifacts.outputs.artifacts_exist == 'false'
+      run: |
+        if [ -d "reused-artifacts" ]; then
+          echo "Reused artifacts found:"
+          ls -la reused-artifacts/
+        else
+          echo "No reused artifacts available"
+        fi
     
     - name: Create Development Release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ needs.setup-version.outputs.version }}
-        name: "🚧 Development Build ${{ needs.setup-version.outputs.version }}"
+        name: "${{ (github.ref_name == 'main' || github.ref_name == 'master') && '🚀 Production Release' || '🚧 Development Build' }} ${{ needs.setup-version.outputs.version }}"
         body: |
-          🚧 **Development Build** 🚧
+          ${{ (github.ref_name == 'main' || github.ref_name == 'master') && '🚀 **Production Release** 🚀
+
+          This is an official production release of Artemis Desktop.
+
+          **✅ Stable**: This release has been tested and is recommended for general use.' || '🚧 **Development Build** 🚧
           
-          This is an automated development build from the `${{ github.ref_name }}` branch.
+          This is an automated development build from the `develop` branch.
           
-          **⚠️ Warning**: Development builds are unstable and intended for testing purposes only. Use at your own risk!
+          **⚠️ Warning**: Development builds are unstable and intended for testing purposes only. Use at your own risk!' }}
           
           ---
           
@@ -847,26 +1003,40 @@ jobs:
           - **Built**: $(date '+%Y-%m-%d %H:%M:%S UTC')
           
           ## 📥 Downloads
-          Choose the appropriate build for your platform:
-          
+          ${{ steps.check-artifacts.outputs.artifacts_exist == 'true' && 'Choose the appropriate build for your platform:
+
           | Platform | File | Notes |
           |----------|------|-------|
-          | 🪟 Windows | `artemis-windows-${{ needs.setup-version.outputs.version }}.zip` | Standard Windows build |
-          | 🍎 macOS | `artemis-macos-${{ needs.setup-version.outputs.version }}.tar.gz` | macOS app bundle |
-          | 🐧 Linux | `artemis-linux-${{ needs.setup-version.outputs.version }}.tar.gz` | Generic Linux binary |
-          | 📦 AppImage | `artemis-appimage-${{ needs.setup-version.outputs.version }}-x86_64.AppImage` | Portable Linux app |
-          | 📱 Flatpak | `artemis-flatpak-${{ needs.setup-version.outputs.version }}.flatpak` | Sandboxed Linux app |
-          | 🎮 Steam Deck | `artemis-steamdeck-${{ needs.setup-version.outputs.version }}.tar.gz` | Optimized for Steam Deck |
+          | 🪟 Windows | `artemis-windows-installer-' || needs.setup-version.outputs.version || '.msi` | MSI Installer with dependencies |
+          | 🪟 Windows Portable | `artemis-windows-portable-' || needs.setup-version.outputs.version || '.zip` | Portable ZIP package |
+          | 🍎 macOS | `artemis-macos-' || needs.setup-version.outputs.version || '.tar.gz` | macOS app bundle |
+          | 🐧 Linux | `artemis-linux-' || needs.setup-version.outputs.version || '.tar.gz` | Generic Linux binary |
+          | 📦 AppImage | `artemis-appimage-' || needs.setup-version.outputs.version || '-x86_64.AppImage` | Portable Linux app |
+          | 📱 Flatpak | `artemis-flatpak-' || needs.setup-version.outputs.version || '.flatpak` | Sandboxed Linux app |
+          | 🎮 Steam Deck | `artemis-steamdeck-' || needs.setup-version.outputs.version || '.tar.gz` | Optimized for Steam Deck |' || (steps.find-previous.outputs.reused_artifacts_available == 'true' && '**📦 Reused Artifacts Available**
+
+          This release reuses build artifacts from a previous build with identical code (commit `' || github.sha || '`).
+
+          All platform builds are available and were originally built from release: `' || steps.find-previous.outputs.previous_release_tag || '`
+
+          Choose the appropriate build for your platform - all artifacts are functionally identical to a fresh build.' || '**📦 No Artifacts Available**
+
+          This release contains no build artifacts because:
+          1. The builds were intelligently skipped (no meaningful code changes)
+          2. No previous build could be found with the same commit hash
+
+          This typically happens with documentation-only changes. If you need builds, please check recent feature branch releases or contact the maintainers.') }}
           
           ## 🔄 Installation
-          1. Download the appropriate file for your platform
-          2. Extract the archive
-          3. Run the executable (may require additional setup on some platforms)
+          ${{ (steps.check-artifacts.outputs.artifacts_exist == 'true' || steps.find-previous.outputs.reused_artifacts_available == 'true') && '1. Download the appropriate file for your platform
+          2. Extract the archive (if applicable)
+          3. Run the executable (may require additional setup on some platforms)' || 'No installation files are available for this release. Please check recent releases or feature branches for builds.' }}
           
           ## 🐛 Found a Bug?
           Please report issues on our [GitHub Issues](https://github.com/${{ github.repository }}/issues) page.
         files: |
-          artifacts/*/*
+          ${{ steps.check-artifacts.outputs.artifacts_exist == 'true' && 'artifacts/*/*' || '' }}
+          ${{ steps.check-artifacts.outputs.artifacts_exist == 'false' && 'reused-artifacts/*' || '' }}
         prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
         draft: false
       env:
