@@ -108,7 +108,6 @@
     <Feature Id="ProductFeature" Title="Artemis" Level="1" ConfigurableDirectory="INSTALLFOLDER">
       <ComponentRef Id="Artemis" />
       <ComponentRef Id="ArtemisShortcuts" />
-      <ComponentRef Id="ArtemisDesktopShortcutState" />
       <ComponentRef Id="ArtemisDesktopShortcut" />
       <ComponentGroupRef Id="ArtemisDependencies" />
     </Feature>
