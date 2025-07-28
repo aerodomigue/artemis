@@ -227,7 +227,7 @@ jobs:
         
         # Create icon (placeholder - you'll want to replace with actual Artemis icon)
         mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-        cp app/res/moonlight.svg AppDir/usr/share/icons/hicolor/256x256/apps/artemis.svg
+        cp app/res/artemis.svg AppDir/usr/share/icons/hicolor/256x256/apps/artemis.svg
         
         # Build AppImage
         export QML_SOURCES_PATHS=app/gui
