@@ -63,6 +63,7 @@
                      KeyPath="yes" />
     </Component>
 
+
     <Component Id="ArtemisDesktopShortcut" Directory="INSTALLFOLDER" Condition="ADDDESKTOPSHORTCUT=1">
       <Shortcut Id="DesktopShortcut"
                 Name="$(var.ShortcutName)"
@@ -77,14 +78,7 @@
                      Key="Software\Artemis Desktop Project"
                      Name="DesktopShortcutInstalled"
                      Type="integer"
-                     Value="1"
-                     KeyPath="yes" />
-    </Component>
-
-    <!-- Persist desktop shortcut's installed state to let Bundle.wxs know if
-         the desktop shortcut should installed by default when upgrading the
-         product -->
-    <Component Id="ArtemisDesktopShortcutState" Directory="INSTALLFOLDER">
+                     Value="1" />
       <RegistryValue Root="HKCU"
                      Key="Software\Artemis Desktop Project"
                      Name="DesktopShortcutInstallState"
