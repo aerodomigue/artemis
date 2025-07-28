@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleExecutable</key>
-	<string>Moonlight</string>
+	<string>Artemis</string>
 	<key>CFBundleGetInfoString</key>
 	<string>Stream games and other applications from another PC</string>
 	<key>CFBundleIconFile</key>
-	<string>moonlight</string>
+	<string>artemis</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.moonlight-stream.Moonlight</string>
+	<string>com.artemis_desktop.Artemis</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>CFBundlePackageType</key>
@@ -37,12 +37,12 @@
 		<true/>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Moonlight uses the local network to connect to your gaming PC for streaming.</string>
+	<string>Artemis uses the local network to connect to your gaming PC for streaming.</string>
 	<key>CFBundleVersion</key>
 	<string>6.1.0</string>
 	<key>CFBundleShortVersionString</key>
 	<string>6.1.0</string>
 	<key>CFBundleDisplayName</key>
-	<string>Moonlight</string>
+	<string>Artemis</string>
 </dict>
 </plist>

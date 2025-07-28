@@ -1201,8 +1201,8 @@ void ComputerManager::stopPollingAsync()
 
 void ComputerManager::addNewHostManually(QString address)
 {
-    QUrl url = QUrl::fromUserInput("moonlight://" + address);
-    if (url.isValid() && !url.host().isEmpty() && url.scheme() == "moonlight") {
+    QUrl url = QUrl::fromUserInput("art://" + address);
+    if (url.isValid() && !url.host().isEmpty() && url.scheme() == "art") {
         // If there wasn't a port specified, use the default
         addNewHost(NvAddress(url.host(), url.port(DEFAULT_HTTP_PORT)), false);
     }

@@ -344,7 +344,7 @@ jobs:
       run: |
         export PATH="$Qt6_DIR/bin:$PATH"
         export QMAKE="$Qt6_DIR/bin/qmake6"
-        qmake6 moonlight-qt.pro CONFIG+=release CONFIG+=sdk_no_version_check
+        qmake6 artemis.pro CONFIG+=release CONFIG+=sdk_no_version_check
         make -j$(sysctl -n hw.ncpu)
     
     - name: Package macOS Development Build
@@ -363,7 +363,7 @@ jobs:
         EOF
         
         # Package with semantic version
-        tar -czf artemis-macos-$VERSION.tar.gz -C app Moonlight.app -C .. build_info.txt
+        tar -czf artemis-macos-$VERSION.tar.gz -C app Artemis.app -C .. build_info.txt
     
     - name: Upload Development Artifacts
       uses: actions/upload-artifact@v4
@@ -427,7 +427,7 @@ jobs:
       run: |
         export PATH="$Qt6_DIR/bin:$PATH"
         export QMAKE="$Qt6_DIR/bin/qmake6"
-        qmake6 moonlight-qt.pro CONFIG+=release
+        qmake6 artemis.pro CONFIG+=release
         make -j$(nproc)
     
     - name: Package Linux Development Build
@@ -446,7 +446,7 @@ jobs:
         EOF
         
         # Package with semantic version
-        tar -czf artemis-linux-$VERSION.tar.gz -C app moonlight -C .. build_info.txt
+        tar -czf artemis-linux-$VERSION.tar.gz -C app artemis -C .. build_info.txt
     - name: Upload Development Artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -513,14 +513,14 @@ jobs:
         rm -rf config.tests/SL/ || true
         rm -f app/test_*.cpp || true
         # Build with proper configuration
-        qmake6 moonlight-qt.pro CONFIG+=release
+        qmake6 artemis.pro CONFIG+=release
         make -j$(nproc)
     
     - name: Verify build output
       run: |
         ls -la app/
-        file app/moonlight || echo "moonlight binary not found"
-        ldd app/moonlight || echo "ldd failed"
+        file app/artemis || echo "artemis binary not found"
+        ldd app/artemis || echo "ldd failed"
     
     - name: Create AppImage
       env:
@@ -533,7 +533,7 @@ jobs:
         
         # Create AppDir structure
         mkdir -p AppDir/usr/bin
-        cp app/moonlight AppDir/usr/bin/artemis-dev
+        cp app/artemis AppDir/usr/bin/artemis-dev
         
         # Create desktop file
         cat > AppDir/artemis-dev.desktop << 'EOF'
@@ -667,9 +667,9 @@ jobs:
               - rm -rf AntiHooking/ || true
               - rm -rf config.tests/SL/ || true
               - rm -f app/test_*.cpp || true
-              - qmake6 moonlight-qt.pro CONFIG+=release
+              - qmake6 artemis.pro CONFIG+=release
               - make -j$(nproc)
-              - install -Dm755 app/moonlight /app/bin/artemis-dev
+              - install -Dm755 app/artemis /app/bin/artemis-dev
             sources:
               - type: dir
                 path: .
@@ -744,7 +744,7 @@ jobs:
         export PATH="$Qt6_DIR/bin:$PATH"
         export QMAKE="$Qt6_DIR/bin/qmake6"
         # Build with Steam Deck optimizations
-        qmake6 moonlight-qt.pro CONFIG+=release CONFIG+=steamdeck
+        qmake6 artemis.pro CONFIG+=release CONFIG+=steamdeck
         make -j$(nproc)
     
     - name: Package Steam Deck Development Build
@@ -752,7 +752,7 @@ jobs:
         VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
         mkdir -p steamdeck-package
-        cp app/moonlight steamdeck-package/artemis-dev
+        cp app/artemis steamdeck-package/artemis-dev
         
         # Create Steam Deck specific files
         cat > steamdeck-package/artemis-dev.desktop << EOF

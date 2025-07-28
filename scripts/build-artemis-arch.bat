@@ -140,7 +140,7 @@ mkdir %SYMBOLS_FOLDER%
 
 echo Configuring the project
 pushd %BUILD_FOLDER%
-%QMAKE_CMD% %SOURCE_ROOT%\moonlight-qt.pro
+%QMAKE_CMD% %SOURCE_ROOT%\artemis.pro
 if !ERRORLEVEL! NEQ 0 goto Error
 popd
 
@@ -191,7 +191,7 @@ if not x%QT_PATH:\5.=%==x%QT_PATH% (
 )
 
 echo Deploying Qt dependencies
-%WINDEPLOYQT_CMD% --dir %DEPLOY_FOLDER% --%BUILD_CONFIG% --qmldir %SOURCE_ROOT%\app\gui --no-opengl-sw --no-compiler-runtime --no-sql %WINDEPLOYQT_ARGS% %BUILD_FOLDER%\app\%BUILD_CONFIG%\Moonlight.exe
+%WINDEPLOYQT_CMD% --dir %DEPLOY_FOLDER% --%BUILD_CONFIG% --qmldir %SOURCE_ROOT%\app\gui --no-opengl-sw --no-compiler-runtime --no-sql %WINDEPLOYQT_ARGS% %BUILD_FOLDER%\app\%BUILD_CONFIG%\Artemis.exe
 if !ERRORLEVEL! NEQ 0 goto Error
 
 echo Deleting unused styles
@@ -208,7 +208,7 @@ rmdir /s /q %DEPLOY_FOLDER%\qml\QtQuick\NativeStyle
 
 if "%SIGN%"=="1" (
     echo Signing deployed binaries
-    set FILES_TO_SIGN=%BUILD_FOLDER%\app\%BUILD_CONFIG%\Moonlight.exe
+    set FILES_TO_SIGN=%BUILD_FOLDER%\app\%BUILD_CONFIG%\Artemis.exe
     for /r "%DEPLOY_FOLDER%" %%f in (*.dll *.exe) do (
         set FILES_TO_SIGN=!FILES_TO_SIGN! %%f
     )
@@ -223,7 +223,7 @@ msbuild %SOURCE_ROOT%\wix\Artemis\Artemis.wixproj -Restore /p:Configuration=%BUI
 if !ERRORLEVEL! NEQ 0 goto Error
 
 echo Copying application binary to deployment directory
-copy %BUILD_FOLDER%\app\%BUILD_CONFIG%\Moonlight.exe %DEPLOY_FOLDER%\Artemis.exe
+copy %BUILD_FOLDER%\app\%BUILD_CONFIG%\Artemis.exe %DEPLOY_FOLDER%\Artemis.exe
 if !ERRORLEVEL! NEQ 0 goto Error
 
 echo Building portable package

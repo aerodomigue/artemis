@@ -2009,7 +2009,7 @@ void Session::execInternal()
                     "QuickMenuManager is null when trying to set geometry");
     }
 
-    QSvgRenderer svgIconRenderer(QString(":/res/moonlight.svg"));
+    QSvgRenderer svgIconRenderer(QString(":/res/artemis.svg"));
     QImage svgImage(ICON_SIZE, ICON_SIZE, QImage::Format_RGBA8888);
     svgImage.fill(0);
 

@@ -2,8 +2,6 @@
 
 [Artemis Qt](https://github.com/wjbeckett/artemis) is an enhanced cross-platform client for NVIDIA GameStream and [Apollo](https://github.com/ClassicOldSong/Apollo)/[Sunshine](https://github.com/LizardByte/Sunshine) servers. It brings the advanced features from [Artemis Android](https://github.com/ClassicOldSong/moonlight-android) to desktop platforms.
 
-**Perfect for Steam Deck and other handheld gaming devices!**
-
 ## 🙏 Attribution
 
 Artemis Qt is built upon the excellent foundation of [**Moonlight Qt**](https://github.com/moonlight-stream/moonlight-qt) by the [Moonlight Team](https://github.com/moonlight-stream). We extend our sincere gratitude to the original developers for creating such a robust and well-architected streaming client.
@@ -34,6 +32,7 @@ Artemis Qt includes all the features of Moonlight Qt, plus these enhanced capabi
 ### 🆕 Phase 3 (UUID & Modern Features) - Complete
 - **🆔 UUID-Based App Launching** - Modern app identification system for Apollo/Sunshine servers - ✅ **COMPLETE**
 - **🔄 Automatic Fallback** - Seamlessly falls back to legacy app IDs when UUIDs unavailable - ✅ **COMPLETE**
+- **🎨 Visual Rebranding** - Official Artemis icons and art:// protocol compatibility with Apollo Android - ✅ **COMPLETE**
 - **🚀 Development Builds** - Automated development builds with changelogs for all platforms - ✅ **COMPLETE**
 
 ### 🚀 Phase 4 (Advanced) - Future
@@ -102,9 +101,26 @@ Want to test the latest features? Try our automated development builds:
 - **⚠️ Warning:** Development builds are unstable and intended for testing only
 
 > **🔥 Latest Development Features:**
+> - Complete Artemis rebranding with official icons and art:// protocol support
 > - UUID-based app launching for modern Apollo/Sunshine servers
 > - Enhanced error handling and logging
 > - Improved compatibility with latest server versions
+
+## 💖 Support the Project
+
+If you find Artemis Qt useful and want to support continued development, you can:
+
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-☕-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://coff.ee/wjbeckett)
+
+**[☕ Support on Coffee](https://coff.ee/wjbeckett)**
+
+Your support helps cover development time, testing on multiple platforms, and keeping the project maintained. Every contribution, no matter how small, is greatly appreciated! 🙏
+
+**Other ways to support:**
+- ⭐ **Star the repository** to show your appreciation
+- 🐛 **Report bugs** and help improve the experience for everyone
+- 🔄 **Share Artemis** with other gamers and streamers
+- 💻 **Contribute code** or documentation improvements
 
 ## 🎮 Moonlight Features (Inherited)
  - Hardware accelerated video decoding on Windows, Mac, and Linux
@@ -116,12 +132,6 @@ Want to test the latest features? Try our automated development builds:
  - Gamepad support with force feedback and motion controls for up to 16 players
  - Support for both pointer capture (for games) and direct mouse control (for remote desktop)
  - Support for passing system-wide keyboard shortcuts like Alt+Tab to the host
-
-#### Special Thanks
-
-[![Hosted By: Cloudsmith](https://img.shields.io/badge/OSS%20hosting%20by-cloudsmith-blue?logo=cloudsmith&style=flat-square)](https://cloudsmith.com)
-
-Hosting for Moonlight's Debian and L4T package repositories is graciously provided for free by [Cloudsmith](https://cloudsmith.com).
 
 ## 🛠️ Building from Source
 
@@ -197,7 +207,7 @@ nmake  # Windows
 | Multi-touch Support | ✅ | ✅ |
 | **Clipboard Sync** | ❌ | ✅ |
 | **Server Commands** | ❌ | ✅ |
-| **OTP Pairing** | ❌ | 🚧 |
+| **OTP Pairing** | ❌ | ✅  |
 | **Quick Menu** | ❌ | ✅ |
 | **Fractional Refresh Rates** | ❌ | ✅ |
 | **Resolution Scaling** | ❌ | ✅ |
@@ -213,14 +223,15 @@ Legend: ✅ Available, 🚧 In Development, 📋 Planned
 ## 🆕 What's New
 
 ### Recent Improvements
-- **🆔 UUID-Based App Launching** - Modern app identification system that works seamlessly with Apollo/Sunshine servers
+- **   Complete Visual Rebranding** - Official Artemis icons and branding from Apollo developer, art:// protocol support
+- **   UUID-Based App Launching** - Modern app identification system that works seamlessly with Apollo/Sunshine servers
 - **🔄 Smart Fallback System** - Automatically uses legacy app IDs when UUIDs aren't available
+- **🔐 OTP Pairing** - Enhanced security with One-Time Password authentication
 - **🚀 Automated Development Builds** - Get the latest features with automatic changelogs for all platforms
 - **🎮 Enhanced Quick Menu** - Improved `Ctrl+Alt+Shift+Tab` shortcut and `Select+L1+R1+Y` gamepad combo
 - **📋 Better Error Handling** - Improved logging and error messages for troubleshooting
 
 ### What's Coming Next
-- **🔐 OTP Pairing** - Enhanced security with One-Time Password authentication
 - **📱 Custom App Ordering** - Organize your game library exactly how you want
 - **🔍 Permission Management** - View and control server-side permissions
 - **🎯 Input-Only Mode** - Remote control without video streaming for lightweight scenarios
