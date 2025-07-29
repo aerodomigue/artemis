@@ -14,7 +14,7 @@
   <Bundle Name="Artemis Game Streaming Client"
           Version="!(bind.PackageVersion.Artemis_x64)"
           Manufacturer="Artemis Desktop Project"
-          UpgradeCode="466fa35d-4be4-40ef-9ce5-afadc3b63bc5"
+          UpgradeCode="b9e5d2a7-3c8f-4a91-9e4b-1f7c6a8d5e2b"
           HelpUrl="https://github.com/wjbeckett/artemis/wiki/Setup-Guide"
           UpdateUrl="https://github.com/wjbeckett/artemis/releases"
           DisableModify="yes"
