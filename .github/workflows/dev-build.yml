@@ -351,6 +351,25 @@ jobs:
       env:
         VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
+        # Deploy Qt frameworks to the app bundle
+        echo "Deploying Qt frameworks using macdeployqt..."
+        macdeployqt app/Artemis.app -qmldir=app/gui -appstore-compliant || {
+          echo "macdeployqt failed, trying without -appstore-compliant"
+          macdeployqt app/Artemis.app -qmldir=app/gui
+        }
+        
+        # Verify frameworks were bundled
+        echo "Checking bundled frameworks:"
+        ls -la app/Artemis.app/Contents/Frameworks/ || echo "No Frameworks directory found"
+        
+        # Verify the app can find its dependencies
+        echo "Checking app dependencies:"
+        otool -L app/Artemis.app/Contents/MacOS/Artemis | head -20
+        
+        # Test that the app bundle structure is correct
+        echo "App bundle structure:"
+        find app/Artemis.app -name "*.framework" | head -10
+        
         # Create info file with semantic versioning
         cat > build_info.txt << EOF
         Artemis Desktop Development Build
@@ -362,7 +381,7 @@ jobs:
         Built: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
         EOF
         
-        # Package with semantic version
+        # Package with semantic version including the properly bundled app
         tar -czf artemis-macos-$VERSION.tar.gz -C app Artemis.app -C .. build_info.txt
     
     - name: Upload Development Artifacts
