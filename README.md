@@ -84,7 +84,23 @@ Artemis Qt is specifically optimized for handheld gaming devices like the Steam 
 > **Note:** The Quick Menu provides easy access to clipboard sync, server commands, and other streaming controls during your session.
 
 ## 📥 Downloads
-All downloads are available in (Releases)[https://github.com/wjbeckett/artemis/releases] 
+All downloads are available in [Releases](https://github.com/wjbeckett/artemis/releases) 
+
+### 🍎 macOS Installation Notes
+Development builds may show "Artemis.app is damaged" due to macOS security features. To fix this:
+
+**Option 1 (Recommended):**
+```bash
+# Remove quarantine attributes
+xattr -cr /path/to/Artemis.app
+```
+
+**Option 2:**
+1. Go to **System Preferences** > **Security & Privacy** > **General**
+2. Click **"Allow Anyway"** when prompted about Artemis
+3. Try launching the app again
+
+This is normal for development builds and doesn't indicate actual damage to the application. 
 
 > **🔥 Latest Development Features:**
 > - Permissino viewing from the client
