@@ -213,6 +213,7 @@ SOURCES += \
     backend/systemproperties.cpp \
     backend/clipboardmanager.cpp \
     backend/servercommandmanager.cpp \
+    backend/serverpermissions.cpp \
     backend/quickmenumanager.cpp \
     backend/otppairingmanager.cpp \
     settings/artemissettings.cpp \
@@ -255,6 +256,7 @@ HEADERS += \
     backend/systemproperties.h \
     backend/clipboardmanager.h \
     backend/servercommandmanager.h \
+    backend/serverpermissions.h \
     backend/quickmenumanager.h \
     backend/otppairingmanager.h \
     settings/artemissettings.h
