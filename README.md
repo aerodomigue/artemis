@@ -21,7 +21,7 @@ Artemis Qt includes all the features of Moonlight Qt, plus these enhanced capabi
 ### 🎯 Phase 1 (Foundation) - Complete
 - **📋 Clipboard Sync** - Seamlessly sync clipboard content between client and server - ✅ **COMPLETE**
 - **⚡ Server Commands** - Execute custom commands on the Apollo/Sunshine server - ✅ **COMPLETE**
-- **🔐 OTP Pairing** - One-Time Password pairing for enhanced security - ❌ **NOT COMPLETE**
+- **🔐 OTP Pairing** - One-Time Password pairing for enhanced security - ✅ **COMPLETE**
 - **🎮 Quick Menu** - In-stream overlay menu for easy access to controls - ✅ **COMPLETE**
 
 ### 🎮 Phase 2 (Client Controls) - Complete
@@ -35,9 +35,9 @@ Artemis Qt includes all the features of Moonlight Qt, plus these enhanced capabi
 - **🎨 Visual Rebranding** - Official Artemis icons and art:// protocol compatibility with Apollo Android - ✅ **COMPLETE**
 - **🚀 Development Builds** - Automated development builds with changelogs for all platforms - ✅ **COMPLETE**
 
-### 🚀 Phase 4 (Advanced) - Future
+### 🚀 Phase 4 (Advanced) - In Progress
 - **📱 App Ordering** - Custom app ordering without compatibility mode
-- **🔍 Permission Viewing** - View and manage server-side permissions
+- **🔍 Permission Viewing** - View and manage server-side permissions - ✅ **COMPLETE**
 - **🎯 Input-Only Mode** - Stream input without video for remote control scenarios
 
 ## 🎮 Perfect for Steam Deck
@@ -208,8 +208,9 @@ Legend: ✅ Available, 🚧 In Development, 📋 Planned
 ## 🆕 What's New
 
 ### Recent Improvements
-- **   Complete Visual Rebranding** - Official Artemis icons and branding from Apollo developer, art:// protocol support
-- **   UUID-Based App Launching** - Modern app identification system that works seamlessly with Apollo/Sunshine servers
+- **🔍 Permission Viewing** - View server-side permissions for clients
+- **Complete Visual Rebranding** - Official Artemis icons and branding from Apollo developer, art:// protocol support
+- **UUID-Based App Launching** - Modern app identification system that works seamlessly with Apollo/Sunshine servers
 - **🔄 Smart Fallback System** - Automatically uses legacy app IDs when UUIDs aren't available
 - **🔐 OTP Pairing** - Enhanced security with One-Time Password authentication
 - **🚀 Automated Development Builds** - Get the latest features with automatic changelogs for all platforms
@@ -218,7 +219,6 @@ Legend: ✅ Available, 🚧 In Development, 📋 Planned
 
 ### What's Coming Next
 - **📱 Custom App Ordering** - Organize your game library exactly how you want
-- **🔍 Permission Management** - View and control server-side permissions
 - **🎯 Input-Only Mode** - Remote control without video streaming for lightweight scenarios
 
 ### Development Process
