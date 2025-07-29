@@ -1045,32 +1045,6 @@ jobs:
           - **Branch**: `${{ github.ref_name }}`
           - **Commit**: `${{ github.sha }}`
           - **Build**: #${{ github.run_number }}
-          - **Built**: $(date '+%Y-%m-%d %H:%M:%S UTC')
-          
-          ## 📥 Downloads
-          ${{ steps.check-artifacts.outputs.artifacts_exist == 'true' && 'Choose the appropriate build for your platform:
-
-          | Platform | File | Notes |
-          |----------|------|-------|
-          | 🪟 Windows | `artemis-windows-installer-' || needs.setup-version.outputs.version || '.msi` | MSI Installer with dependencies |
-          | 🪟 Windows Portable | `artemis-windows-portable-' || needs.setup-version.outputs.version || '.zip` | Portable ZIP package |
-          | 🍎 macOS | `artemis-macos-' || needs.setup-version.outputs.version || '.tar.gz` | macOS app bundle |
-          | 🐧 Linux | `artemis-linux-' || needs.setup-version.outputs.version || '.tar.gz` | Generic Linux binary |
-          | 📦 AppImage | `artemis-appimage-' || needs.setup-version.outputs.version || '-x86_64.AppImage` | Portable Linux app |
-          | 📱 Flatpak | `artemis-flatpak-' || needs.setup-version.outputs.version || '.flatpak` | Sandboxed Linux app |
-          | 🎮 Steam Deck | `artemis-steamdeck-' || needs.setup-version.outputs.version || '.tar.gz` | Optimized for Steam Deck |' || (steps.find-previous.outputs.reused_artifacts_available == 'true' && '**📦 Reused Artifacts Available**
-
-          This release reuses build artifacts from a previous build with identical code (commit `' || github.sha || '`).
-
-          All platform builds are available and were originally built from release: `' || steps.find-previous.outputs.previous_release_tag || '`
-
-          Choose the appropriate build for your platform - all artifacts are functionally identical to a fresh build.' || '**📦 No Artifacts Available**
-
-          This release contains no build artifacts because:
-          1. The builds were intelligently skipped (no meaningful code changes)
-          2. No previous build could be found with the same commit hash
-
-          This typically happens with documentation-only changes. If you need builds, please check recent feature branch releases or contact the maintainers.') }}
           
           ## 🔄 Installation
           ${{ (steps.check-artifacts.outputs.artifacts_exist == 'true' || steps.find-previous.outputs.reused_artifacts_available == 'true') && '1. Download the appropriate file for your platform
