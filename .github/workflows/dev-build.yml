@@ -75,7 +75,7 @@ jobs:
             echo "Comparing changes against first parent: $FIRST_PARENT"
             
             # Get all changed files in this merge, excluding documentation/config files
-            CHANGED_FILES=$(git diff --name-only $FIRST_PARENT HEAD | grep -v -E "(\.md$|\.txt$|\.yml$|\.yaml$|^\.github/)" | wc -l)
+            CHANGED_FILES=$(git diff --name-only $FIRST_PARENT HEAD | grep -v -E "(\.md$|\.yml$|\.yaml$|^\.github/|test.*\.txt$|README.*\.txt$|CHANGELOG.*\.txt$)" | wc -l)
             echo "Meaningful files changed in merge: $CHANGED_FILES"
             
             if [ "$CHANGED_FILES" -eq 0 ]; then
@@ -91,7 +91,7 @@ jobs:
             echo "Regular commit (not a merge) - checking for meaningful changes"
             
             # For regular commits, check against previous commit
-            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -v -E "(\.md$|\.txt$|\.yml$|\.yaml$|^\.github/)" | wc -l)
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -v -E "(\.md$|\.yml$|\.yaml$|^\.github/|test.*\.txt$|README.*\.txt$|CHANGELOG.*\.txt$)" | wc -l)
             echo "Meaningful files changed: $CHANGED_FILES"
             
             if [ "$CHANGED_FILES" -eq 0 ]; then
