@@ -43,8 +43,9 @@ void AutoUpdateChecker::start()
     QT_WARNING_POP
 #endif
 
-    // Point to Artemis GitHub releases instead of moonlight-stream.org
-    QUrl url("https://api.github.com/repos/wjbeckett/artemis/releases/latest");
+    // Point to Artemis GitHub releases (all releases including prereleases)
+    // Using /releases instead of /releases/latest because we only have prereleases
+    QUrl url("https://api.github.com/repos/wjbeckett/artemis/releases");
     QNetworkRequest request(url);
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
     request.setAttribute(QNetworkRequest::Http2AllowedAttribute, true);
@@ -133,12 +134,15 @@ void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
             return;
         }
 
-        // GitHub API returns a single object for latest release, not an array
-        QJsonObject releaseObj = jsonDoc.object();
-        if (releaseObj.isEmpty()) {
-            qWarning() << "GitHub API response doesn't contain release object";
+        // GitHub API returns an array of releases, we want the first one (most recent)
+        QJsonArray releasesArray = jsonDoc.array();
+        if (releasesArray.isEmpty()) {
+            qWarning() << "GitHub API response doesn't contain any releases";
             return;
         }
+
+        // Get the most recent release (first in the array)
+        QJsonObject releaseObj = releasesArray[0].toObject();
 
         // Extract version from tag_name (remove 'v' prefix if present)
         QString tagName = releaseObj["tag_name"].toString();
@@ -149,7 +153,7 @@ void AutoUpdateChecker::handleUpdateCheckRequestFinished(QNetworkReply* reply)
             return;
         }
 
-        qDebug() << "Latest version of Artemis from GitHub:" << version;
+        qDebug() << "Latest version of Artemis from GitHub (including prereleases):" << version;
 
         QVector<int> latestVersionQuad;
         parseStringToVersionQuad(version, latestVersionQuad);
