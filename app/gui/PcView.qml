@@ -457,12 +457,66 @@ CenteredGridView {
         }
     }
 
-    NavigableMessageDialog {
+    NavigableDialog {
         id: showPcDetailsDialog
         property string pcDetails : "";
-        text: showPcDetailsDialog.pcDetails
-        imageSrc: "qrc:/res/baseline-help_outline-24px.svg"
+        title: qsTr("Computer Details")
         standardButtons: Dialog.Ok
+        
+        // Make the dialog larger
+        implicitWidth: 600
+        implicitHeight: 500
+        
+            ScrollView {
+            id: detailsScrollView
+            anchors.fill: parent
+            anchors.margins: 8  // Slightly larger margin for better appearance
+            clip: true
+            
+            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+            ScrollBar.horizontal.policy: ScrollBar.AsNeeded
+            
+            // Ensure scrollbars stay within bounds
+            ScrollBar.vertical.width: 12
+            ScrollBar.horizontal.height: 12
+            
+            TextArea {
+                id: detailsLabel
+                text: showPcDetailsDialog.pcDetails
+                wrapMode: Text.Wrap
+                selectByMouse: true
+                readOnly: true
+                font.family: "SF Pro Display, Segoe UI, system-ui, Arial"
+                font.pixelSize: 14  // Slightly larger for better readability
+                font.weight: Font.Normal
+                textFormat: Text.PlainText  // Use plain text to maintain transparent background
+                
+                // Use default text color for dark theme compatibility
+                // Enhanced padding for better spacing
+                padding: 20
+                
+                // Remove white border - use transparent background
+                background: Rectangle {
+                    color: "transparent"
+                    border.width: 0
+                }
+                
+                // Allow the text to expand naturally within the scroll area
+                width: Math.max(detailsScrollView.availableWidth, implicitWidth)
+                
+                Keys.onReturnPressed: {
+                    showPcDetailsDialog.accept()
+                }
+
+                Keys.onEnterPressed: {
+                    showPcDetailsDialog.accept()
+                }
+
+                Keys.onEscapePressed: {
+                    showPcDetailsDialog.reject()
+                }
+            }
+        }
     }
 
     NavigableDialog {

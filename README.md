@@ -21,7 +21,7 @@ Artemis Qt includes all the features of Moonlight Qt, plus these enhanced capabi
 ### 🎯 Phase 1 (Foundation) - Complete
 - **📋 Clipboard Sync** - Seamlessly sync clipboard content between client and server - ✅ **COMPLETE**
 - **⚡ Server Commands** - Execute custom commands on the Apollo/Sunshine server - ✅ **COMPLETE**
-- **🔐 OTP Pairing** - One-Time Password pairing for enhanced security - ❌ **NOT COMPLETE**
+- **🔐 OTP Pairing** - One-Time Password pairing for enhanced security - ✅ **COMPLETE**
 - **🎮 Quick Menu** - In-stream overlay menu for easy access to controls - ✅ **COMPLETE**
 
 ### 🎮 Phase 2 (Client Controls) - Complete
@@ -35,9 +35,9 @@ Artemis Qt includes all the features of Moonlight Qt, plus these enhanced capabi
 - **🎨 Visual Rebranding** - Official Artemis icons and art:// protocol compatibility with Apollo Android - ✅ **COMPLETE**
 - **🚀 Development Builds** - Automated development builds with changelogs for all platforms - ✅ **COMPLETE**
 
-### 🚀 Phase 4 (Advanced) - Future
+### 🚀 Phase 4 (Advanced) - In Progress
 - **📱 App Ordering** - Custom app ordering without compatibility mode
-- **🔍 Permission Viewing** - View and manage server-side permissions
+- **🔍 Permission Viewing** - View and manage server-side permissions - ✅ **COMPLETE**
 - **🎯 Input-Only Mode** - Stream input without video for remote control scenarios
 
 ## 🎮 Perfect for Steam Deck
@@ -84,23 +84,10 @@ Artemis Qt is specifically optimized for handheld gaming devices like the Steam 
 > **Note:** The Quick Menu provides easy access to clipboard sync, server commands, and other streaming controls during your session.
 
 ## 📥 Downloads
-
-### 🎯 Stable Releases
-Get the latest stable version with full testing and documentation:
-- **[Windows x64/ARM64](https://github.com/wjbeckett/artemis/releases/latest)** - Native Windows builds
-- **[macOS Universal](https://github.com/wjbeckett/artemis/releases/latest)** - Intel and Apple Silicon support
-- **[Linux AppImage](https://github.com/wjbeckett/artemis/releases/latest)** - Universal Linux compatibility
-- **[Steam Deck Package](https://github.com/wjbeckett/artemis/releases/latest)** - Optimized for Steam Deck
-- **[Flatpak](https://github.com/wjbeckett/artemis/releases/latest)** - Sandboxed Linux package
-
-### 🚧 Development Builds
-Want to test the latest features? Try our automated development builds:
-- **[Development Releases](https://github.com/wjbeckett/artemis/releases?q=prerelease%3Atrue)** - Latest features with automatic changelogs
-- **Available for all platforms** - Windows, macOS, Linux, AppImage, Flatpak, Steam Deck
-- **Updated automatically** - New builds created with every development push
-- **⚠️ Warning:** Development builds are unstable and intended for testing only
+All downloads are available in (Releases)[https://github.com/wjbeckett/artemis/releases] 
 
 > **🔥 Latest Development Features:**
+> - Permissino viewing from the client
 > - Complete Artemis rebranding with official icons and art:// protocol support
 > - UUID-based app launching for modern Apollo/Sunshine servers
 > - Enhanced error handling and logging
@@ -110,9 +97,7 @@ Want to test the latest features? Try our automated development builds:
 
 If you find Artemis Qt useful and want to support continued development, you can:
 
-[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-☕-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://coff.ee/wjbeckett)
-
-**[☕ Support on Coffee](https://coff.ee/wjbeckett)**
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/wjbeckett)
 
 Your support helps cover development time, testing on multiple platforms, and keeping the project maintained. Every contribution, no matter how small, is greatly appreciated! 🙏
 
@@ -214,8 +199,8 @@ nmake  # Windows
 | **Virtual Display Control** | ❌ | ✅ |
 | **UUID-Based App Launching** | ❌ | ✅ |
 | **Development Builds** | ❌ | ✅ |
+| **Permission Viewing** | ❌ | ✅ |
 | **Custom App Ordering** | ❌ | 📋 |
-| **Permission Viewing** | ❌ | 📋 |
 | **Input-Only Mode** | ❌ | 📋 |
 
 Legend: ✅ Available, 🚧 In Development, 📋 Planned
@@ -223,8 +208,9 @@ Legend: ✅ Available, 🚧 In Development, 📋 Planned
 ## 🆕 What's New
 
 ### Recent Improvements
-- **   Complete Visual Rebranding** - Official Artemis icons and branding from Apollo developer, art:// protocol support
-- **   UUID-Based App Launching** - Modern app identification system that works seamlessly with Apollo/Sunshine servers
+- **🔍 Permission Viewing** - View server-side permissions for clients
+- **Complete Visual Rebranding** - Official Artemis icons and branding from Apollo developer, art:// protocol support
+- **UUID-Based App Launching** - Modern app identification system that works seamlessly with Apollo/Sunshine servers
 - **🔄 Smart Fallback System** - Automatically uses legacy app IDs when UUIDs aren't available
 - **🔐 OTP Pairing** - Enhanced security with One-Time Password authentication
 - **🚀 Automated Development Builds** - Get the latest features with automatic changelogs for all platforms
@@ -233,7 +219,6 @@ Legend: ✅ Available, 🚧 In Development, 📋 Planned
 
 ### What's Coming Next
 - **📱 Custom App Ordering** - Organize your game library exactly how you want
-- **🔍 Permission Management** - View and control server-side permissions
 - **🎯 Input-Only Mode** - Remote control without video streaming for lightweight scenarios
 
 ### Development Process

@@ -141,7 +141,7 @@ void ArtemisSettings::load()
 
     // Permission viewing settings
     m_settings->beginGroup("Permissions");
-    m_showServerPermissions = m_settings->value("showServerPermissions", false).toBool();
+    m_showServerPermissions = m_settings->value("showServerPermissions", true).toBool(); // Temporarily enabled for testing
     m_settings->endGroup();
 
     // Input-only mode settings

@@ -119,6 +119,7 @@ bool NvComputer::isEqualSerialized(const NvComputer &that) const
            this->isNvidiaServerSoftware == that.isNvidiaServerSoftware &&
            this->apolloVersion == that.apolloVersion &&
            this->serverCommands == that.serverCommands &&
+           this->serverPermissions == that.serverPermissions &&
            this->appList == that.appList;
 }
 
@@ -222,6 +223,21 @@ NvComputer::NvComputer(NvHTTP& http, QString serverInfo)
     
     // Parse server commands (Apollo/Sunshine servers only)
     this->serverCommands = NvHTTP::getXmlArray(serverInfo, "ServerCommand");
+    
+    // Parse server permissions (Apollo servers only)
+    QString permissionStr = NvHTTP::getXmlString(serverInfo, "Permission");
+    if (!permissionStr.isEmpty()) {
+        bool ok;
+        this->serverPermissions = permissionStr.toUInt(&ok);
+        if (ok) {
+            qDebug() << "Apollo server permissions:" << QString("0x%1").arg(this->serverPermissions, 0, 16) << "(" << this->serverPermissions << ")";
+        } else {
+            qWarning() << "Failed to parse server permissions:" << permissionStr;
+            this->serverPermissions = 0;
+        }
+    } else {
+        this->serverPermissions = 0;
+    }
 }
 
 bool NvComputer::wake() const
@@ -579,6 +595,7 @@ bool NvComputer::update(const NvComputer& that)
     ASSIGN_IF_CHANGED_AND_NONNULL(serverCert);
     ASSIGN_IF_CHANGED_AND_NONEMPTY(displayModes);
     ASSIGN_IF_CHANGED(serverCommands);
+    ASSIGN_IF_CHANGED(serverPermissions);
 
     if (!that.appList.isEmpty()) {
         // updateAppList() handles merging client-side attributes
