@@ -300,6 +300,146 @@ jobs:
         path: build_info.txt
         retention-days: 30
 
+  build-windows-arm64-dev:
+    name: Windows ARM64 Development Build
+    needs: setup-version
+    runs-on: windows-latest
+    if: needs.setup-version.outputs.should_build == 'true'
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+        fetch-depth: 0  # Needed for version info
+    
+    - name: Display version info
+      run: |
+        echo "Using semantic version: ${{ needs.setup-version.outputs.version }}"
+        echo "Using numeric version: ${{ needs.setup-version.outputs.numeric_version }}"
+        echo "Is prerelease: ${{ needs.setup-version.outputs.is_prerelease }}"
+    
+    - name: Setup Qt for ARM64
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_arm64'
+        modules: 'qtmultimedia'
+    
+    - name: Install WiX Toolset
+      run: |
+        # Install .NET SDK first (required for WiX v5)
+        choco install dotnet-sdk -y
+        
+        # Install WiX Toolset v5 as a .NET tool (recommended approach for v5)
+        dotnet tool install --global wix --version 5.0.1
+        
+        # Verify installation
+        wix --version
+    
+    - name: Setup MSVC for ARM64
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: amd64_arm64  # Cross-compile from x64 host to ARM64 target
+    
+    - name: Update version file for development build
+      env:
+        SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
+        NUMERIC_VERSION: ${{ needs.setup-version.outputs.numeric_version }}
+      run: |
+        # Write numeric version for Windows RC compilation
+        echo $env:NUMERIC_VERSION > app\version.txt
+        
+        # Create detailed version info file for reference  
+        @"
+        Semantic Version: $env:SEMANTIC_VERSION
+        Numeric Version: $env:NUMERIC_VERSION
+        Is Prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
+        Branch: ${{ github.ref_name }}
+        Commit: ${{ github.sha }}
+        Build Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')
+        Architecture: ARM64
+        "@ | Out-File -FilePath "build_version_info_arm64.txt" -Encoding utf8
+    
+    - name: Build using build-artemis-arch.bat script for ARM64
+      env:
+        SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
+      run: |
+        # Add Qt to PATH for the build script
+        $env:PATH = "$env:Qt6_DIR\bin;$env:PATH"
+        
+        # Run our Artemis build script that handles everything
+        cmd /c "scripts\build-artemis-arch.bat release"
+        
+        if ($LASTEXITCODE -ne 0) {
+          echo "Build failed with exit code $LASTEXITCODE"
+          exit $LASTEXITCODE
+        }
+    
+    - name: Rename artifacts for ARM64 development build
+      env:
+        SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
+      run: |
+        # Find the generated MSI and portable ZIP files
+        $msiFile = Get-ChildItem -Path "build\installer-arm64-release" -Filter "*.msi" | Select-Object -First 1
+        $zipFile = Get-ChildItem -Path "build\installer-arm64-release" -Filter "ArtemisPortable-*.zip" | Select-Object -First 1
+        
+        if ($msiFile) {
+          # Rename MSI installer for Artemis ARM64 using semantic version
+          $newMsiName = "artemis-windows-arm64-installer-$env:SEMANTIC_VERSION.msi"
+          Move-Item $msiFile.FullName $newMsiName
+          echo "Created ARM64 MSI installer: $newMsiName"
+        }
+        
+        if ($zipFile) {
+          # Rename portable ZIP for Artemis ARM64 using semantic version
+          $newZipName = "artemis-windows-arm64-portable-$env:SEMANTIC_VERSION.zip"
+          Move-Item $zipFile.FullName $newZipName
+          echo "Created ARM64 portable ZIP: $newZipName"
+        }
+        
+        # Create info file with semantic versioning
+        @"
+        Artemis Desktop Development Build (ARM64)
+        Version: $env:SEMANTIC_VERSION
+        Numeric Version: ${{ needs.setup-version.outputs.numeric_version }}
+        Is Prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
+        Branch: ${{ github.ref_name }}
+        Commit: ${{ github.sha }}
+        Built: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')
+        Architecture: ARM64
+        
+        This build includes:
+        - MSI Installer with proper dependency handling for Windows ARM64
+        - Portable ZIP package for Windows ARM64  
+        - All required Windows ARM64 runtime dependencies
+        "@ | Out-File -FilePath "build_info_arm64.txt" -Encoding utf8
+    
+    - name: Upload ARM64 MSI Installer
+      uses: actions/upload-artifact@v4
+      with:
+        name: artemis-windows-arm64-installer-${{ needs.setup-version.outputs.version }}
+        path: artemis-windows-arm64-installer-${{ needs.setup-version.outputs.version }}.msi
+        retention-days: 30
+        if-no-files-found: warn
+    
+    - name: Upload ARM64 Portable ZIP
+      uses: actions/upload-artifact@v4
+      with:
+        name: artemis-windows-arm64-portable-${{ needs.setup-version.outputs.version }}
+        path: artemis-windows-arm64-portable-${{ needs.setup-version.outputs.version }}.zip
+        retention-days: 30
+        if-no-files-found: warn
+    
+    - name: Upload ARM64 Build Info
+      uses: actions/upload-artifact@v4
+      with:
+        name: artemis-windows-arm64-build-info-${{ needs.setup-version.outputs.version }}
+        path: build_info_arm64.txt
+        retention-days: 30
+
   build-macos-dev:
     name: macOS Development Build
     needs: setup-version
@@ -876,7 +1016,7 @@ jobs:
 
   create-dev-release:
     name: Create Development Release
-    needs: [setup-version, build-windows-dev, build-macos-dev, build-linux-dev, build-appimage-dev, build-flatpak-dev, build-steamdeck-dev]
+    needs: [setup-version, build-windows-dev, build-windows-arm64-dev, build-macos-dev, build-linux-dev, build-appimage-dev, build-flatpak-dev, build-steamdeck-dev]
     runs-on: ubuntu-latest
     if: (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && needs.setup-version.outputs.should_build == 'true'  # Create releases for develop/main branches when builds ran
     

@@ -52,6 +52,48 @@ jobs:
         name: artemis-windows
         path: artemis-windows.zip
 
+  build-windows-arm64:
+    name: Windows ARM64 Build
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+    
+    - name: Setup Qt for ARM64
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_arm64'
+        modules: 'qtmultimedia'
+    
+    - name: Setup MSVC for ARM64
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: amd64_arm64  # Cross-compile from x64 host to ARM64 target
+    
+    - name: Build
+      run: |
+        $env:PATH += ";$env:Qt6_DIR\bin"
+        qmake6 moonlight-qt.pro CONFIG+=release
+        nmake
+    
+    - name: Package Windows ARM64 Build
+      run: |
+        mkdir windows-arm64-package
+        copy app\release\moonlight.exe windows-arm64-package\
+        Compress-Archive -Path windows-arm64-package\* -DestinationPath artemis-windows-arm64.zip
+    
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: artemis-windows-arm64
+        path: artemis-windows-arm64.zip
+
   build-macos:
     name: macOS Build
     runs-on: macos-latest
