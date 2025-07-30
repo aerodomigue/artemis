@@ -11,9 +11,7 @@
 #include <QCursor>
 #include <QElapsedTimer>
 #include <QTemporaryFile>
-#include <QRegularEx    QCoreApplication::setOrganizationName("Artemis Desktop Project");
-    QCoreApplication::setOrganizationDomain("artemisdesktop.com");
-    QCoreApplication::setApplicationName("Artemis");ssion>
+#include <QRegularExpression>
 
 // Don't let SDL hook our main function, since Qt is already
 // doing the same thing. This needs to be before any headers
@@ -319,9 +317,9 @@ int main(int argc, char *argv[])
     // Set these here to allow us to use the default QSettings constructor.
     // These also ensure that our cache directory is named correctly. As such,
     // it is critical that these be called before Path::initialize().
-    QCoreApplication::setOrganizationName("Moonlight Game Streaming Project");
-    QCoreApplication::setOrganizationDomain("moonlight-stream.com");
-    QCoreApplication::setApplicationName("Moonlight");
+    QCoreApplication::setOrganizationName("Artemis Desktop Project");
+    QCoreApplication::setOrganizationDomain("artemisdesktop.com");
+    QCoreApplication::setApplicationName("Artemis");
 
     if (QFile(QDir::currentPath() + "/portable.dat").exists()) {
         QSettings::setDefaultFormat(QSettings::IniFormat);
