@@ -11,7 +11,7 @@
            Language="1033"
            Version="!(bind.fileVersion.ArtemisExe)"
            Manufacturer="Artemis Desktop Project"
-           UpgradeCode="5c09f94e-f809-4c6a-9b7b-597c99f041fe">
+           UpgradeCode="a7e3f8c1-4d92-41b6-8f15-2c9a7b8e5d3f">
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." Schedule="afterInstallInitialize" />
     <MediaTemplate CompressionLevel="high" EmbedCab="yes" />
 
