@@ -86,7 +86,21 @@ Artemis Qt is specifically optimized for handheld gaming devices like the Steam 
 ## 📥 Downloads
 All downloads are available in [Releases](https://github.com/wjbeckett/artemis/releases) 
 
-### 🍎 macOS Installation Notes
+### �️ Platform Support
+
+**Windows:**
+- **x64 (Intel/AMD)** - Full support with MSI installer and portable ZIP
+- **ARM64** - Native support for Windows on ARM devices (Surface Pro X, etc.)
+
+**macOS:**
+- **Universal Binary** - Native support for both Intel and Apple Silicon Macs
+
+**Linux:**
+- **x64 AppImage** - Universal Linux package for x64 systems
+- **x64 Flatpak** - Sandboxed package available via Flathub
+- **Steam Deck** - Optimized builds for Valve's handheld gaming device
+
+### �🍎 macOS Installation Notes
 Development builds may show "Artemis.app is damaged" due to macOS security features. To fix this:
 
 **Option 1 (Recommended):**
