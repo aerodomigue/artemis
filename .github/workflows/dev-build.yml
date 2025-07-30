@@ -25,6 +25,7 @@ on:
       - master
       - 'feature/**'
       - 'feat/**'
+      - 'fix/**'
   workflow_dispatch:  # Allow manual triggering
 
 env:
