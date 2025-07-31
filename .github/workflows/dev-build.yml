@@ -360,6 +360,15 @@ jobs:
       uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: amd64_arm64  # Cross-compile from x64 host to ARM64 target
+        
+    - name: Verify MSVC ARM64 Setup
+      run: |
+        echo "MSVC Environment Variables:"
+        echo "VSCMD_ARG_TGT_ARCH: $env:VSCMD_ARG_TGT_ARCH"
+        echo "VSCMD_ARG_HOST_ARCH: $env:VSCMD_ARG_HOST_ARCH"
+        echo "Platform: $env:Platform"
+        echo "LIB: $($env:LIB -split ';' | Select-Object -First 3)"
+        echo "INCLUDE: $($env:INCLUDE -split ';' | Select-Object -First 3)"
     
     - name: Update version file for development build
       env:
@@ -393,7 +402,10 @@ jobs:
         if (Test-Path $arm64QtPath) {
           echo "Found ARM64 Qt at: $arm64QtPath"
           $env:Qt6_DIR = $arm64QtPath
-          $env:PATH = "$arm64QtPath\bin;$env:PATH"
+          
+          # IMPORTANT: Clear the PATH of any other Qt installations first
+          $pathParts = $env:PATH -split ';' | Where-Object { $_ -notlike '*Qt*' -and $_ -notlike '*msvc2022*' }
+          $env:PATH = ($pathParts + "$arm64QtPath\bin") -join ';'
         } else {
           echo "ARM64 Qt not found at expected path: $arm64QtPath"
           echo "Available Qt installations:"
@@ -403,15 +415,19 @@ jobs:
         
         # Debug Qt installation
         echo "Qt6_DIR: $env:Qt6_DIR"
-        echo "PATH: $env:PATH"
-        echo "Qt path contents:"
-        Get-ChildItem "$env:Qt6_DIR" -ErrorAction SilentlyContinue | Select-Object Name
-        echo "Qt bin contents:"
-        Get-ChildItem "$env:Qt6_DIR\bin" -ErrorAction SilentlyContinue | Select-Object Name
+        echo "Clean PATH length: $($env:PATH.Length) characters"
         
-        # Check qmake detection
+        # Check that we're using the correct qmake
         echo "Which qmake:"
         where qmake* 2>$null || echo "No qmake found"
+        
+        # Verify qmake version and path
+        if (Test-Path "$env:Qt6_DIR\bin\qmake.bat") {
+          echo "Using qmake.bat from: $env:Qt6_DIR\bin\qmake.bat"
+        } else {
+          echo "ERROR: qmake.bat not found at expected location"
+          exit 1
+        }
         
         # Run our Artemis build script that handles everything
         echo "Running build script..."
