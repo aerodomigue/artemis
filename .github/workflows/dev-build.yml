@@ -389,7 +389,7 @@ jobs:
         Get-ChildItem "D:\a\artemis\Qt\6.8.3" -ErrorAction SilentlyContinue | Select-Object Name
         
         # Look for ARM64 Qt installation
-        $arm64QtPath = "D:\a\artemis\Qt\6.8.3\msvc2022_arm64_cross_compiled"
+        $arm64QtPath = "D:\a\artemis\Qt\6.8.3\msvc2022_arm64"
         if (Test-Path $arm64QtPath) {
           echo "Found ARM64 Qt at: $arm64QtPath"
           $env:Qt6_DIR = $arm64QtPath
