@@ -120,27 +120,36 @@ for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -property installationPath`
     for /f "delims=" %%j in ('dir /b "%%i\VC\Tools\MSVC"') do set "MSVC_VERSION=%%j"
 )
 
-rem Use vcvarsall.bat to set up the environment properly
-echo Setting up MSVC environment using vcvarsall for %VC_ARCH%
-set "VCVARSALL=%VS_INSTALL_PATH%\VC\Auxiliary\Build\vcvarsall.bat"
-if exist "%VCVARSALL%" (
-    call "%VCVARSALL%" %VC_ARCH%
-    if !ERRORLEVEL! NEQ 0 (
-        echo ERROR: vcvarsall.bat failed
+rem For ARM64, don't call vcvarsall.bat manually - let Qt handle it
+rem For other architectures, set up the environment
+if /I "%ARCH%" NEQ "arm64" (
+    echo Setting up MSVC environment using vcvarsall for %VC_ARCH%
+    set "VCVARSALL=%VS_INSTALL_PATH%\VC\Auxiliary\Build\vcvarsall.bat"
+    if exist "%VCVARSALL%" (
+        call "%VCVARSALL%" %VC_ARCH%
+        if !ERRORLEVEL! NEQ 0 (
+            echo ERROR: vcvarsall.bat failed
+            goto Error
+        )
+    ) else (
+        echo ERROR: vcvarsall.bat not found at %VCVARSALL%
         goto Error
     )
 ) else (
-    echo ERROR: vcvarsall.bat not found at %VCVARSALL%
-    goto Error
+    echo Skipping manual vcvarsall.bat for ARM64 - Qt will handle environment setup
 )
 
 echo MSVC Environment Setup:
 echo   VS Install Path: %VS_INSTALL_PATH%
 echo   MSVC Version: %MSVC_VERSION%
 echo   Target Arch: %VC_ARCH%
-echo   VCVARSALL: %VCVARSALL%
-echo   INCLUDE: %INCLUDE%
-echo   LIB: %LIB%
+if /I "%ARCH%" NEQ "arm64" (
+    echo   VCVARSALL: %VCVARSALL%
+    echo   INCLUDE: %INCLUDE%
+    echo   LIB: %LIB%
+) else (
+    echo   Environment: Qt will manage ARM64 cross-compilation environment
+)
 
 rem Find VC redistributable DLLs
 for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -find VC\Redist\MSVC\*\%ARCH%\Microsoft.VC*.CRT`) do set VC_REDIST_DLL_PATH=%%i
@@ -274,14 +283,18 @@ if exist "app\%BUILD_CONFIG%\Artemis.exe" (
 
 rem Debug: Check what was actually built
 echo Checking build output:
-dir app\%BUILD_CONFIG%\*.exe 2>nul || echo "No exe files found in app\%BUILD_CONFIG%"
+dir "app\%BUILD_CONFIG%\*.exe" 2>nul
+if !ERRORLEVEL! NEQ 0 echo No exe files found in app\%BUILD_CONFIG%
 if exist "app\%BUILD_CONFIG%\Artemis.exe" (
     echo Artemis.exe found, checking architecture...
-    file app\%BUILD_CONFIG%\Artemis.exe 2>nul || echo "file command not available"
-    dumpbin /headers app\%BUILD_CONFIG%\Artemis.exe | findstr "machine" 2>nul || echo "dumpbin not available"
+    file "app\%BUILD_CONFIG%\Artemis.exe" 2>nul
+    if !ERRORLEVEL! NEQ 0 echo file command not available
+    dumpbin /headers "app\%BUILD_CONFIG%\Artemis.exe" | findstr "machine" 2>nul
+    if !ERRORLEVEL! NEQ 0 echo dumpbin not available
 ) else (
     echo ERROR: Artemis.exe was not built!
-    dir app\* /s 2>nul || echo "No files in app directory"
+    dir app\* /s 2>nul
+    if !ERRORLEVEL! NEQ 0 echo No files in app directory
 )
 popd
 
