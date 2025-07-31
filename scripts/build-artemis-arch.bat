@@ -120,28 +120,25 @@ for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -property installationPath`
     for /f "delims=" %%j in ('dir /b "%%i\VC\Tools\MSVC"') do set "MSVC_VERSION=%%j"
 )
 
-rem Set up environment variables for the target architecture without calling vcvarsall
-echo Setting up MSVC environment for %VC_ARCH%
-set "MSVC_TOOLS_PATH=%VS_INSTALL_PATH%\VC\Tools\MSVC\%MSVC_VERSION%"
-
-rem Set include paths
-set "INCLUDE=%MSVC_TOOLS_PATH%\include;%MSVC_TOOLS_PATH%\atlmfc\include"
-
-rem Set library and binary paths based on architecture
-if /I "%VC_ARCH%" EQU "AMD64_ARM64" (
-    rem Cross-compiling from x64 to ARM64
-    set "LIB=%MSVC_TOOLS_PATH%\lib\arm64;%MSVC_TOOLS_PATH%\atlmfc\lib\arm64"
-    set "LIBPATH=%MSVC_TOOLS_PATH%\lib\arm64;%MSVC_TOOLS_PATH%\atlmfc\lib\arm64"
+rem Use vcvarsall.bat to set up the environment properly
+echo Setting up MSVC environment using vcvarsall for %VC_ARCH%
+set "VCVARSALL=%VS_INSTALL_PATH%\VC\Auxiliary\Build\vcvarsall.bat"
+if exist "%VCVARSALL%" (
+    call "%VCVARSALL%" %VC_ARCH%
+    if !ERRORLEVEL! NEQ 0 (
+        echo ERROR: vcvarsall.bat failed
+        goto Error
+    )
 ) else (
-    rem Native x64 compilation
-    set "LIB=%MSVC_TOOLS_PATH%\lib\x64;%MSVC_TOOLS_PATH%\atlmfc\lib\x64"
-    set "LIBPATH=%MSVC_TOOLS_PATH%\lib\x64;%MSVC_TOOLS_PATH%\atlmfc\lib\x64"
+    echo ERROR: vcvarsall.bat not found at %VCVARSALL%
+    goto Error
 )
 
 echo MSVC Environment Setup:
 echo   VS Install Path: %VS_INSTALL_PATH%
 echo   MSVC Version: %MSVC_VERSION%
 echo   Target Arch: %VC_ARCH%
+echo   VCVARSALL: %VCVARSALL%
 echo   INCLUDE: %INCLUDE%
 echo   LIB: %LIB%
 
@@ -175,13 +172,18 @@ if /I "%ARCH%" EQU "arm64" (
 )
 if !ERRORLEVEL! NEQ 0 goto Error
 
+echo DEBUG: qmake completed successfully, current directory: %CD%
+
 rem Verify the generated Makefile has the correct architecture
 if exist "Makefile" (
     echo Checking Makefile for architecture settings:
     findstr /C:"arm64" Makefile || echo "Warning: arm64 not found in Makefile"
     findstr /C:"ARCH" Makefile || echo "Warning: ARCH not found in Makefile"
 )
+
+echo DEBUG: About to popd from %CD%
 popd
+echo DEBUG: After popd, current directory: %CD%
 
 echo Compiling Artemis in %BUILD_CONFIG% configuration
 pushd %BUILD_FOLDER%
