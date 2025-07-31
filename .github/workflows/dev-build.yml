@@ -415,10 +415,10 @@ jobs:
         }
         
         $possibleArm64Paths = @(
+          "D:\a\artemis\Qt\6.8.3\msvc2022_arm64",
           "D:\a\artemis\Qt\6.8.3\win64_msvc2022_arm64_cross_compiled",
           "D:\a\artemis\Qt\6.8.3\msvc2022_arm64_cross_compiled",
-          "D:\a\artemis\Qt\6.8.3\win64_msvc2022_arm64",
-          "D:\a\artemis\Qt\6.8.3\msvc2022_arm64"
+          "D:\a\artemis\Qt\6.8.3\win64_msvc2022_arm64"
         )
         
         $arm64QtPath = $null
@@ -457,9 +457,26 @@ jobs:
         if ($arm64QtPath) {
           $env:Qt6_DIR = $arm64QtPath
           
-          # Add ARM64 Qt to PATH but keep essential Windows and MSVC paths
-          # DON'T clear INCLUDE, LIB, LIBPATH - these are needed for compilation!
-          $env:PATH = "$arm64QtPath\bin;$env:PATH"
+          # CRITICAL FIX: Be very careful about PATH length to avoid "input line too long" error
+          # Save original PATH and create a minimal PATH for Qt ARM64 build
+          $originalPath = $env:PATH
+          
+          # Extract only essential Windows paths to keep PATH short
+          $essentialPaths = @(
+            "C:\Windows\system32",
+            "C:\Windows",
+            "C:\Windows\System32\Wbem",
+            "C:\Windows\System32\WindowsPowerShell\v1.0\"
+          )
+          
+          # Add MSVC paths if they exist
+          $msvcPaths = $env:PATH -split ';' | Where-Object { $_ -like "*Microsoft Visual Studio*" -or $_ -like "*MSVC*" -or $_ -like "*VC\Tools*" }
+          
+          # Create minimal PATH with Qt ARM64 at the front
+          $minimalPath = @($arm64QtPath + "\bin") + $essentialPaths + $msvcPaths -join ';'
+          $env:PATH = $minimalPath
+          
+          echo "Reduced PATH from $($originalPath.Length) to $($env:PATH.Length) characters to avoid command line length limits"
           
         } else {
           echo "ARM64 Qt not found at any path!"
