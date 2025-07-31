@@ -33,34 +33,30 @@ if /I "%BUILD_CONFIG%"=="debug" (
     )
 )
 
-rem Locate qmake and determine if we're using qmake.exe or qmake.bat
-rem qmake.bat is an ARM64 forwarder to the x64 version of qmake.exe
-where qmake.bat
-if !ERRORLEVEL! EQU 0 (
-    set QMAKE_CMD=call qmake.bat
-) else (
-    where qmake.exe
-    if !ERRORLEVEL! EQU 0 (
-        set QMAKE_CMD=qmake.exe
-    ) else (
-        where qmake6.exe
-        if !ERRORLEVEL! EQU 0 (
-            set QMAKE_CMD=qmake6.exe
-        ) else (
-            echo Unable to find QMake. Did you add Qt bins to your PATH?
-            goto Error
-        )
-    )
+
+rem Locate qmake and determine if we're using qmake.exe, qmake.bat, or qmake6.bat
+set QMAKE_CMD=
+for %%Q in (qmake.bat qmake6.bat qmake.exe qmake6.exe) do (
+    where %%Q >nul 2>&1
+    if !ERRORLEVEL! EQU 0 if not defined QMAKE_CMD set QMAKE_CMD=%%Q
+)
+if not defined QMAKE_CMD (
+    echo Unable to find QMake. Did you add Qt bins to your PATH?
+    goto Error
 )
 
 rem Find Qt path to determine our architecture
-for /F %%i in ('where qmake* ^| findstr .exe') do set QT_PATH=%%i
+set QT_PATH=
+for %%Q in (qmake.bat qmake6.bat qmake.exe qmake6.exe) do (
+    for /F %%i in ('where %%Q 2^>nul') do if not defined QT_PATH set QT_PATH=%%i
+)
 
 rem Strip the qmake filename off the end to get the Qt bin directory itself
 set QT_PATH=%QT_PATH:\qmake.exe=%
 set QT_PATH=%QT_PATH:\qmake.bat=%
 set QT_PATH=%QT_PATH:\qmake.cmd=%
 set QT_PATH=%QT_PATH:\qmake6.exe=%
+set QT_PATH=%QT_PATH:\qmake6.bat=%
 
 echo QT_PATH=%QT_PATH%
 if not x%QT_PATH:_arm64=%==x%QT_PATH% (
