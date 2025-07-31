@@ -29,7 +29,7 @@ on:
   workflow_dispatch:  # Allow manual triggering
 
 env:
-  QT_VERSION: '6.8.1'
+  QT_VERSION: '6.8.3'
 
 jobs:
   setup-version:
@@ -75,27 +75,35 @@ jobs:
             FIRST_PARENT=$(git rev-parse HEAD^1)
             echo "Comparing changes against first parent: $FIRST_PARENT"
             
-            # Get all changed files in this merge, excluding documentation/config files
-            CHANGED_FILES=$(git diff --name-only $FIRST_PARENT HEAD | grep -v -E "(\.md$|\.yml$|\.yaml$|^\.github/|test.*\.txt$|README.*\.txt$|CHANGELOG.*\.txt$)" | wc -l)
+            # Get all changed files in this merge, excluding documentation/config files but allowing workflow changes
+            CHANGED_FILES=$(git diff --name-only $FIRST_PARENT HEAD | grep -v -E "(\.md$|test.*\.txt$|README.*\.txt$|CHANGELOG.*\.txt$)" | grep -v -E "(\.yml$|\.yaml$)" | wc -l)
+            WORKFLOW_FILES=$(git diff --name-only $FIRST_PARENT HEAD | grep -E "^\.github/workflows/.*\.(yml|yaml)$" | wc -l)
+            TOTAL_MEANINGFUL=$((CHANGED_FILES + WORKFLOW_FILES))
             echo "Meaningful files changed in merge: $CHANGED_FILES"
+            echo "Workflow files changed: $WORKFLOW_FILES"
+            echo "Total meaningful changes: $TOTAL_MEANINGFUL"
             
-            if [ "$CHANGED_FILES" -eq 0 ]; then
+            if [ "$TOTAL_MEANINGFUL" -eq 0 ]; then
               echo "should_build=false" >> $GITHUB_OUTPUT
               echo "Skipping build - merge contains no meaningful code changes"
               exit 0
             else
               echo "should_build=true" >> $GITHUB_OUTPUT
-              echo "Build will proceed - merge contains $CHANGED_FILES meaningful changes"
+              echo "Build will proceed - merge contains $TOTAL_MEANINGFUL meaningful changes (code: $CHANGED_FILES, workflows: $WORKFLOW_FILES)"
               exit 0
             fi
           else
             echo "Regular commit (not a merge) - checking for meaningful changes"
             
             # For regular commits, check against previous commit
-            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -v -E "(\.md$|\.yml$|\.yaml$|^\.github/|test.*\.txt$|README.*\.txt$|CHANGELOG.*\.txt$)" | wc -l)
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -v -E "(\.md$|test.*\.txt$|README.*\.txt$|CHANGELOG.*\.txt$)" | grep -v -E "(\.yml$|\.yaml$)" | wc -l)
+            WORKFLOW_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E "^\.github/workflows/.*\.(yml|yaml)$" | wc -l)
+            TOTAL_MEANINGFUL=$((CHANGED_FILES + WORKFLOW_FILES))
             echo "Meaningful files changed: $CHANGED_FILES"
+            echo "Workflow files changed: $WORKFLOW_FILES" 
+            echo "Total meaningful changes: $TOTAL_MEANINGFUL"
             
-            if [ "$CHANGED_FILES" -eq 0 ]; then
+            if [ "$TOTAL_MEANINGFUL" -eq 0 ]; then
               echo "should_build=false" >> $GITHUB_OUTPUT
               echo "Skipping build - no meaningful code changes detected"
               exit 0
@@ -103,7 +111,7 @@ jobs:
           fi
           
           echo "should_build=true" >> $GITHUB_OUTPUT
-          echo "Build will proceed - meaningful changes detected"
+          echo "Build will proceed - meaningful changes detected (including code and/or workflow changes)"
       
       - name: Generate semantic version
         id: version
@@ -335,32 +343,6 @@ jobs:
         host: 'windows'
         target: 'desktop'
         arch: 'win64_msvc2022_arm64'
-        modules: 'qtmultimedia'
-      continue-on-error: false
-      
-    - name: Fallback Qt Setup for ARM64 (if main setup fails)
-      if: failure()
-      run: echo "Main Qt ARM64 setup failed, trying fallback approach..."
-      
-    - name: Fallback Qt Desktop Setup (6.7.3)
-      if: failure()
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: '6.7.3'
-        host: 'windows'
-        target: 'desktop'
-        arch: 'win64_msvc2022_64'
-        modules: 'qtmultimedia'
-        
-    - name: Fallback Qt ARM64 Setup (6.7.3)
-      if: failure()
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: '6.7.3'  # Known working version for ARM64
-        host: 'windows'
-        target: 'desktop'
-        arch: 'win64_msvc2022_arm64'
-        modules: 'qtmultimedia'
     
     - name: Install WiX Toolset
       run: |

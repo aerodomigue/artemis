@@ -9,7 +9,7 @@ on:
     types: [ published ]
 
 env:
-  QT_VERSION: '6.8.1'
+  QT_VERSION: '6.8.3'
 
 jobs:
   build-windows:
@@ -78,37 +78,6 @@ jobs:
         host: 'windows'
         target: 'desktop'
         arch: 'win64_msvc2022_arm64'
-        modules: 'qtmultimedia'
-      continue-on-error: false
-      
-    - name: Fallback Qt Setup for ARM64 (if main setup fails)
-      if: failure()
-      run: echo "Main Qt ARM64 setup failed, trying fallback approach..."
-      
-    - name: Fallback Qt Desktop Setup (6.7.3)
-      if: failure()
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: '6.7.3'
-        host: 'windows'
-        target: 'desktop'
-        arch: 'win64_msvc2022_64'
-        modules: 'qtmultimedia'
-        
-    - name: Fallback Qt ARM64 Setup (6.7.3)
-      if: failure()
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: '6.7.3'  # Known working version for ARM64
-        host: 'windows'
-        target: 'desktop'
-        arch: 'win64_msvc2022_arm64'
-        modules: 'qtmultimedia'
-    
-    - name: Setup MSVC for ARM64
-      uses: ilammy/msvc-dev-cmd@v1
-      with:
-        arch: amd64_arm64  # Cross-compile from x64 host to ARM64 target
     
     - name: Build
       run: |
