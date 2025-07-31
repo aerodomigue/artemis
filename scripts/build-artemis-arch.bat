@@ -185,6 +185,9 @@ popd
 
 echo Compiling Artemis in %BUILD_CONFIG% configuration
 pushd %BUILD_FOLDER%
+echo DEBUG: Current directory after pushd: %CD%
+echo DEBUG: Architecture: %ARCH%
+echo DEBUG: About to enter ARM64 build section
 
 rem For ARM64 builds, we need to be very explicit about tool paths to avoid PATH issues
 if /I "%ARCH%" EQU "arm64" (
@@ -196,10 +199,11 @@ if /I "%ARCH%" EQU "arm64" (
     set "FOUND_QMAKE=%QT_PATH%\qmake.bat"
     
     rem Look for cl.exe in the expected ARM64 cross-compile location
+    rem and nmake.exe in the host x64 tools location
     for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -property installationPath`) do (
         for /f "delims=" %%j in ('dir /b "%%i\VC\Tools\MSVC"') do (
             set "CL_PATH=%%i\VC\Tools\MSVC\%%j\bin\Hostx64\arm64\cl.exe"
-            set "NMAKE_PATH=%%i\VC\Tools\MSVC\%%j\bin\Hostx64\arm64\nmake.exe"
+            set "NMAKE_PATH=%%i\VC\Tools\MSVC\%%j\bin\Hostx64\x64\nmake.exe"
             if exist "!CL_PATH!" set "FOUND_CL=!CL_PATH!"
             if exist "!NMAKE_PATH!" set "FOUND_NMAKE=!NMAKE_PATH!"
         )
@@ -210,12 +214,18 @@ if /I "%ARCH%" EQU "arm64" (
     echo   cl.exe: "!FOUND_CL!"
     echo   nmake: "!FOUND_NMAKE!"
     
-    if not exist "!FOUND_CL!" (
+    if "!FOUND_CL!"=="" (
         echo ERROR: Could not find cl.exe for ARM64 cross-compilation
+        echo VSWHERE path: %VSWHERE%
+        echo VS Install path: %VS_INSTALL_PATH%
+        echo MSVC Version: %MSVC_VERSION%
         goto Error
     )
-    if not exist "!FOUND_NMAKE!" (
+    if "!FOUND_NMAKE!"=="" (
         echo ERROR: Could not find nmake.exe for ARM64 cross-compilation
+        echo VSWHERE path: %VSWHERE%
+        echo VS Install path: %VS_INSTALL_PATH%
+        echo MSVC Version: %MSVC_VERSION%
         goto Error
     )
     
