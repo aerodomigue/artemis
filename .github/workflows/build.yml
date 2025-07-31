@@ -74,10 +74,11 @@ jobs:
     - name: Setup Qt for ARM64
       uses: jurplel/install-qt-action@v3
       with:
-        version: ${{ env.QT_VERSION }}
+        version: ${{ env.QT_VERSION }}  # Try 6.8.3 again with different approach
         host: 'windows'
         target: 'desktop'
         arch: 'win64_msvc2022_arm64'
+        archives: 'qtbase qtdeclarative qttools qtsvg qtimageformats'  # Specify explicit archives
     
     - name: Build
       run: |
