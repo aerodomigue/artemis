@@ -62,6 +62,15 @@ jobs:
       with:
         submodules: 'recursive'
     
+    - name: Setup Qt Desktop (required for ARM64)
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_64'
+        modules: 'qtmultimedia'
+        
     - name: Setup Qt for ARM64
       uses: jurplel/install-qt-action@v3
       with:
@@ -70,10 +79,23 @@ jobs:
         target: 'desktop'
         arch: 'win64_msvc2022_arm64'
         modules: 'qtmultimedia'
-        extra: '--archives qtbase qtmultimedia'
       continue-on-error: false
       
     - name: Fallback Qt Setup for ARM64 (if main setup fails)
+      if: failure()
+      run: echo "Main Qt ARM64 setup failed, trying fallback approach..."
+      
+    - name: Fallback Qt Desktop Setup (6.7.3)
+      if: failure()
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.7.3'
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_64'
+        modules: 'qtmultimedia'
+        
+    - name: Fallback Qt ARM64 Setup (6.7.3)
       if: failure()
       uses: jurplel/install-qt-action@v3
       with:
