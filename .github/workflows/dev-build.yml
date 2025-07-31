@@ -336,25 +336,14 @@ jobs:
         arch: 'win64_msvc2022_64'
         modules: 'qtmultimedia'
         
-    - name: Debug available Qt architectures
-      run: |
-        echo "Checking available Qt architectures for version ${{ env.QT_VERSION }}..."
-        python -m pip install aqtinstall
-        python -m aqt list-qt windows desktop --arch ${{ env.QT_VERSION }} || echo "Failed to list architectures"
-        
-        echo "Let's also check what's available from different mirrors:"
-        python -m aqt list-qt windows desktop --arch ${{ env.QT_VERSION }} --base https://mirrors.ocf.berkeley.edu/qt/ || echo "OCF mirror failed"
-        
     - name: Setup Qt for ARM64
       uses: jurplel/install-qt-action@v3
       with:
         version: ${{ env.QT_VERSION }}  # Use Qt 6.8.3 LTS which has ARM64 support
         host: 'windows'
         target: 'desktop'
-        arch: 'win64_msvc2022_arm64'  # Try ARM64 architecture
+        arch: 'win64_msvc2022_arm64_cross_compiled'  # Correct ARM64 architecture name
         set-env: false  # Don't let this override our Qt6_DIR - we'll set it manually
-        # Let's try adding some additional options
-        extra: '--external 7z --base https://mirrors.ocf.berkeley.edu/qt/ --timeout 7200'
     
     - name: Install WiX Toolset
       run: |
@@ -426,10 +415,10 @@ jobs:
         }
         
         $possibleArm64Paths = @(
+          "D:\a\artemis\Qt\6.8.3\win64_msvc2022_arm64_cross_compiled",
+          "D:\a\artemis\Qt\6.8.3\msvc2022_arm64_cross_compiled",
           "D:\a\artemis\Qt\6.8.3\win64_msvc2022_arm64",
-          "D:\a\artemis\Qt\6.8.3\msvc2022_arm64",
-          "D:\a\artemis\Qt\6.6.3\win64_msvc2022_arm64",
-          "D:\a\artemis\Qt\6.6.3\msvc2022_arm64"
+          "D:\a\artemis\Qt\6.8.3\msvc2022_arm64"
         )
         
         $arm64QtPath = $null
