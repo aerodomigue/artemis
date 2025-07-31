@@ -113,32 +113,37 @@ if /I "%VC_ARCH%" NEQ "%PROCESSOR_ARCHITECTURE%" (
     set VC_ARCH=%PROCESSOR_ARCHITECTURE%_%VC_ARCH%
 )
 
-rem Find Visual Studio and run vcvarsall.bat
+rem Find Visual Studio and set up environment variables directly
 set VSWHERE="%SOURCE_ROOT%\scripts\vswhere.exe"
 for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -property installationPath`) do (
-    rem Use a simplified environment call to avoid "input line too long" errors
-    set VCVARS_PATH=%%i\VC\Auxiliary\Build\vcvarsall.bat
+    set VS_INSTALL_PATH=%%i
+    for /f "delims=" %%j in ('dir /b "%%i\VC\Tools\MSVC"') do set MSVC_VERSION=%%j
 )
 
-rem Call vcvarsall with minimal environment to avoid command line length issues
+rem Set up environment variables for the target architecture without calling vcvarsall
 echo Setting up MSVC environment for %VC_ARCH%
-call "%VCVARS_PATH%" %VC_ARCH% >nul 2>&1
-if !ERRORLEVEL! NEQ 0 (
-    echo Warning: vcvarsall.bat failed, trying alternative approach
-    rem Try to set up minimal MSVC environment manually
-    for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -property installationPath`) do (
-        set MSVC_PATH=%%i\VC\Tools\MSVC
-        for /f "delims=" %%j in ('dir /b "%%i\VC\Tools\MSVC"') do set MSVC_VERSION=%%j
-        set "INCLUDE=%%i\VC\Tools\MSVC\!MSVC_VERSION!\include;%%i\VC\Tools\MSVC\!MSVC_VERSION!\atlmfc\include"
-        if /I "%VC_ARCH%" EQU "AMD64_ARM64" (
-            set "PATH=%%i\VC\Tools\MSVC\!MSVC_VERSION!\bin\Hostx64\arm64;%%i\VC\Tools\MSVC\!MSVC_VERSION!\bin\Hostx64\x64;!PATH!"
-            set "LIB=%%i\VC\Tools\MSVC\!MSVC_VERSION!\lib\arm64;%%i\VC\Tools\MSVC\!MSVC_VERSION!\atlmfc\lib\arm64"
-        ) else (
-            set "PATH=%%i\VC\Tools\MSVC\!MSVC_VERSION!\bin\Hostx64\x64;!PATH!"
-            set "LIB=%%i\VC\Tools\MSVC\!MSVC_VERSION!\lib\x64;%%i\VC\Tools\MSVC\!MSVC_VERSION!\atlmfc\lib\x64"
-        )
-    )
+set MSVC_TOOLS_PATH=%VS_INSTALL_PATH%\VC\Tools\MSVC\%MSVC_VERSION%
+
+rem Set include paths
+set "INCLUDE=%MSVC_TOOLS_PATH%\include;%VS_INSTALL_PATH%\VC\Tools\MSVC\%MSVC_VERSION%\atlmfc\include"
+
+rem Set library and binary paths based on architecture
+if /I "%VC_ARCH%" EQU "AMD64_ARM64" (
+    rem Cross-compiling from x64 to ARM64
+    set "LIB=%MSVC_TOOLS_PATH%\lib\arm64;%MSVC_TOOLS_PATH%\atlmfc\lib\arm64"
+    set LIBPATH=%LIB%
+) else (
+    rem Native x64 compilation
+    set "LIB=%MSVC_TOOLS_PATH%\lib\x64;%MSVC_TOOLS_PATH%\atlmfc\lib\x64"
+    set LIBPATH=%LIB%
 )
+
+echo MSVC Environment Setup:
+echo   VS Install Path: %VS_INSTALL_PATH%
+echo   MSVC Version: %MSVC_VERSION%
+echo   Target Arch: %VC_ARCH%
+echo   INCLUDE: %INCLUDE%
+echo   LIB: %LIB%
 
 rem Find VC redistributable DLLs
 for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -find VC\Redist\MSVC\*\%ARCH%\Microsoft.VC*.CRT`) do set VC_REDIST_DLL_PATH=%%i
@@ -180,12 +185,80 @@ popd
 
 echo Compiling Artemis in %BUILD_CONFIG% configuration
 pushd %BUILD_FOLDER%
-if exist "%SOURCE_ROOT%\scripts\jom.exe" (
-    %SOURCE_ROOT%\scripts\jom.exe %BUILD_CONFIG%
+
+rem For ARM64 builds, we need to be very explicit about tool paths to avoid PATH issues
+if /I "%ARCH%" EQU "arm64" (
+    echo Using explicit tool paths for ARM64 build to avoid PATH issues
+    
+    rem Find the exact paths to the tools we need
+    set FOUND_CL=
+    set FOUND_NMAKE=
+    set FOUND_QMAKE=%QT_PATH%\qmake.bat
+    
+    rem Look for cl.exe in the expected ARM64 cross-compile location
+    for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -property installationPath`) do (
+        for /f "delims=" %%j in ('dir /b "%%i\VC\Tools\MSVC"') do (
+            set CL_PATH=%%i\VC\Tools\MSVC\%%j\bin\Hostx64\arm64\cl.exe
+            set NMAKE_PATH=%%i\VC\Tools\MSVC\%%j\bin\Hostx64\arm64\nmake.exe
+            if exist "!CL_PATH!" set FOUND_CL=!CL_PATH!
+            if exist "!NMAKE_PATH!" set FOUND_NMAKE=!NMAKE_PATH!
+        )
+    )
+    
+    echo ARM64 Tools Found:
+    echo   qmake: %FOUND_QMAKE%
+    echo   cl.exe: !FOUND_CL!
+    echo   nmake: !FOUND_NMAKE!
+    
+    if not exist "!FOUND_CL!" (
+        echo ERROR: Could not find cl.exe for ARM64 cross-compilation
+        goto Error
+    )
+    if not exist "!FOUND_NMAKE!" (
+        echo ERROR: Could not find nmake.exe for ARM64 cross-compilation
+        goto Error
+    )
+    
+    rem Use the exact tool paths instead of relying on PATH
+    echo Running nmake with explicit path for ARM64...
+    "!FOUND_NMAKE!" %BUILD_CONFIG% > nmake.log 2>&1
+    if !ERRORLEVEL! NEQ 0 (
+        echo ERROR: nmake failed for ARM64! Check nmake.log for details.
+        echo nmake.log contents:
+        type nmake.log
+        goto Error
+    )
+    echo nmake completed successfully for ARM64
+    
 ) else (
-    nmake %BUILD_CONFIG%
+    rem For x64 builds, use the simpler approach
+    if exist "%SOURCE_ROOT%\scripts\jom.exe" (
+        %SOURCE_ROOT%\scripts\jom.exe %BUILD_CONFIG%
+    ) else (
+        rem Capture nmake output to a log file for debugging
+        nmake %BUILD_CONFIG% > nmake.log 2>&1
+        if !ERRORLEVEL! NEQ 0 (
+            echo ERROR: nmake failed! Check nmake.log for details.
+            type nmake.log
+            goto Error
+        )
+    )
 )
-if !ERRORLEVEL! NEQ 0 goto Error
+
+rem Verify the build actually produced something
+echo Verifying build output...
+if exist "app\%BUILD_CONFIG%\Artemis.exe" (
+    echo SUCCESS: Artemis.exe was built successfully
+) else (
+    echo ERROR: Artemis.exe was not found after build!
+    echo Contents of app directory:
+    dir app /s
+    echo Contents of current directory:
+    dir
+    echo nmake.log contents (if exists):
+    if exist nmake.log type nmake.log
+    goto Error
+)
 
 rem Debug: Check what was actually built
 echo Checking build output:
