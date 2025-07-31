@@ -81,8 +81,8 @@ if not x%QT_PATH:_arm64=%==x%QT_PATH% (
     if not x%QT_PATH:_cross_compiled=%==x%QT_PATH% (
         set ARCH=arm64
 
-        rem Replace the _cross_compiled suffix with _64 to get the x64 bin path
-        set HOSTBIN_PATH=%QT_PATH:_arm64_cross_compiled=_64%
+        rem Replace the arm64_cross_compiled suffix with _64 to get the x64 bin path
+        set HOSTBIN_PATH=%QT_PATH:arm64_cross_compiled=64%
         echo HOSTBIN_PATH=!HOSTBIN_PATH!
 
         if exist %QT_PATH%\windeployqt.exe (
@@ -93,16 +93,17 @@ if not x%QT_PATH:_arm64=%==x%QT_PATH% (
             set WINDEPLOYQT_CMD=!HOSTBIN_PATH!\windeployqt.exe --qtpaths %QT_PATH%\qtpaths.bat
         )
     ) else (
-    if not x%QT_PATH:_64=%==x%QT_PATH% (
-        set ARCH=x64
-        set WINDEPLOYQT_CMD=windeployqt.exe
-    ) else (
-        if not x%QT_PATH:msvc=%==x%QT_PATH% (
-            set ARCH=x86
+        if not x%QT_PATH:_64=%==x%QT_PATH% (
+            set ARCH=x64
             set WINDEPLOYQT_CMD=windeployqt.exe
         ) else (
-            echo Unable to determine Qt architecture
-            goto Error
+            if not x%QT_PATH:msvc=%==x%QT_PATH% (
+                set ARCH=x86
+                set WINDEPLOYQT_CMD=windeployqt.exe
+            ) else (
+                echo Unable to determine Qt architecture
+                goto Error
+            )
         )
     )
 )
