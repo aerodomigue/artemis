@@ -403,9 +403,26 @@ jobs:
           echo "Found ARM64 Qt at: $arm64QtPath"
           $env:Qt6_DIR = $arm64QtPath
           
-          # IMPORTANT: Clear the PATH of any other Qt installations first
-          $pathParts = $env:PATH -split ';' | Where-Object { $_ -notlike '*Qt*' -and $_ -notlike '*msvc2022*' }
-          $env:PATH = ($pathParts + "$arm64QtPath\bin") -join ';'
+          # CRITICAL: Reset PATH to minimal essentials to avoid "input line too long" errors
+          $essentialPaths = @(
+            "$env:SystemRoot\system32",
+            "$env:SystemRoot", 
+            "$env:SystemRoot\System32\Wbem",
+            "$env:SystemRoot\System32\WindowsPowerShell\v1.0",
+            "C:\Program Files\dotnet",
+            "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin",
+            "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\bin\Roslyn",
+            "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\bin",
+            "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.42.34433\bin\Hostx64\x64",
+            "$arm64QtPath\bin"
+          )
+          $env:PATH = $essentialPaths -join ';'
+          
+          # Also clean up other environment variables that can cause bloat
+          $env:INCLUDE = ""
+          $env:LIB = ""
+          $env:LIBPATH = ""
+          
         } else {
           echo "ARM64 Qt not found at expected path: $arm64QtPath"
           echo "Available Qt installations:"
@@ -415,7 +432,8 @@ jobs:
         
         # Debug Qt installation
         echo "Qt6_DIR: $env:Qt6_DIR"
-        echo "Clean PATH length: $($env:PATH.Length) characters"
+        echo "Minimal PATH length: $($env:PATH.Length) characters"
+        echo "PATH content: $env:PATH"
         
         # Check that we're using the correct qmake
         echo "Which qmake:"

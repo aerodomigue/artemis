@@ -116,9 +116,29 @@ if /I "%VC_ARCH%" NEQ "%PROCESSOR_ARCHITECTURE%" (
 rem Find Visual Studio and run vcvarsall.bat
 set VSWHERE="%SOURCE_ROOT%\scripts\vswhere.exe"
 for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -property installationPath`) do (
-    call "%%i\VC\Auxiliary\Build\vcvarsall.bat" %VC_ARCH%
+    rem Use a simplified environment call to avoid "input line too long" errors
+    set VCVARS_PATH=%%i\VC\Auxiliary\Build\vcvarsall.bat
 )
-if !ERRORLEVEL! NEQ 0 goto Error
+
+rem Call vcvarsall with minimal environment to avoid command line length issues
+echo Setting up MSVC environment for %VC_ARCH%
+call "%VCVARS_PATH%" %VC_ARCH% >nul 2>&1
+if !ERRORLEVEL! NEQ 0 (
+    echo Warning: vcvarsall.bat failed, trying alternative approach
+    rem Try to set up minimal MSVC environment manually
+    for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -property installationPath`) do (
+        set MSVC_PATH=%%i\VC\Tools\MSVC
+        for /f "delims=" %%j in ('dir /b "%%i\VC\Tools\MSVC"') do set MSVC_VERSION=%%j
+        set "INCLUDE=%%i\VC\Tools\MSVC\!MSVC_VERSION!\include;%%i\VC\Tools\MSVC\!MSVC_VERSION!\atlmfc\include"
+        if /I "%VC_ARCH%" EQU "AMD64_ARM64" (
+            set "PATH=%%i\VC\Tools\MSVC\!MSVC_VERSION!\bin\Hostx64\arm64;%%i\VC\Tools\MSVC\!MSVC_VERSION!\bin\Hostx64\x64;!PATH!"
+            set "LIB=%%i\VC\Tools\MSVC\!MSVC_VERSION!\lib\arm64;%%i\VC\Tools\MSVC\!MSVC_VERSION!\atlmfc\lib\arm64"
+        ) else (
+            set "PATH=%%i\VC\Tools\MSVC\!MSVC_VERSION!\bin\Hostx64\x64;!PATH!"
+            set "LIB=%%i\VC\Tools\MSVC\!MSVC_VERSION!\lib\x64;%%i\VC\Tools\MSVC\!MSVC_VERSION!\atlmfc\lib\x64"
+        )
+    )
+)
 
 rem Find VC redistributable DLLs
 for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -find VC\Redist\MSVC\*\%ARCH%\Microsoft.VC*.CRT`) do set VC_REDIST_DLL_PATH=%%i
