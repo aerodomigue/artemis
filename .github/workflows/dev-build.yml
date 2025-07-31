@@ -386,13 +386,32 @@ jobs:
         # Add Qt to PATH for the build script
         $env:PATH = "$env:Qt6_DIR\bin;$env:PATH"
         
+        # Debug Qt installation
+        echo "Qt6_DIR: $env:Qt6_DIR"
+        echo "PATH: $env:PATH"
+        echo "Qt path contents:"
+        Get-ChildItem "$env:Qt6_DIR" -ErrorAction SilentlyContinue | Select-Object Name
+        echo "Qt bin contents:"
+        Get-ChildItem "$env:Qt6_DIR\bin" -ErrorAction SilentlyContinue | Select-Object Name
+        
+        # Check qmake detection
+        echo "Which qmake:"
+        where qmake* 2>$null || echo "No qmake found"
+        
         # Run our Artemis build script that handles everything
+        echo "Running build script..."
         cmd /c "scripts\build-artemis-arch.bat release"
         
         if ($LASTEXITCODE -ne 0) {
           echo "Build failed with exit code $LASTEXITCODE"
+          echo "Checking for any build directories that were created:"
+          Get-ChildItem -Path "build" -ErrorAction SilentlyContinue | Select-Object Name
           exit $LASTEXITCODE
         }
+        
+        # Debug what was actually created
+        echo "Build completed successfully. Checking output directories:"
+        Get-ChildItem -Path "build" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
     
     - name: Rename artifacts for ARM64 development build
       env:
