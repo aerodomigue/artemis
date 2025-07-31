@@ -122,9 +122,9 @@ for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -property installationPath`
 
 rem For ARM64, don't call vcvarsall.bat manually - let Qt handle it
 rem For other architectures, set up the environment
+set "VCVARSALL=%VS_INSTALL_PATH%\VC\Auxiliary\Build\vcvarsall.bat"
 if /I "%ARCH%" NEQ "arm64" (
     echo Setting up MSVC environment using vcvarsall for %VC_ARCH%
-    set "VCVARSALL=%VS_INSTALL_PATH%\VC\Auxiliary\Build\vcvarsall.bat"
     if exist "%VCVARSALL%" (
         call "%VCVARSALL%" %VC_ARCH%
         if !ERRORLEVEL! NEQ 0 (
@@ -144,9 +144,9 @@ echo   VS Install Path: %VS_INSTALL_PATH%
 echo   MSVC Version: %MSVC_VERSION%
 echo   Target Arch: %VC_ARCH%
 if /I "%ARCH%" NEQ "arm64" (
-    echo   VCVARSALL: %VCVARSALL%
-    echo   INCLUDE: %INCLUDE%
-    echo   LIB: %LIB%
+    echo   VCVARSALL: "%VCVARSALL%"
+    echo   INCLUDE: "%INCLUDE%"
+    echo   LIB: "%LIB%"
 ) else (
     echo   Environment: Qt will manage ARM64 cross-compilation environment
 )
