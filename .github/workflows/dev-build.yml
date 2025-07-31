@@ -336,21 +336,13 @@ jobs:
         arch: 'win64_msvc2022_64'
         modules: 'qtmultimedia'
         
-    - name: Check available Qt ARM64 packages
-      run: |
-        echo "Checking available Qt 6.8.3 architectures..."
-        python -m aqt list-qt windows desktop --arch 6.8.3 || echo "Failed to list architectures"
-        echo "Checking available Qt 6.8.3 packages for ARM64..."
-        python -m aqt list-qt windows desktop 6.8.3 --arch win64_msvc2022_arm64 || echo "Failed to list ARM64 packages"
-        
     - name: Setup Qt for ARM64
       uses: jurplel/install-qt-action@v3
       with:
-        version: ${{ env.QT_VERSION }}  # Try 6.8.3 again with different approach
+        version: ${{ env.QT_VERSION }}  # Use correct ARM64 architecture name
         host: 'windows'
         target: 'desktop'
-        arch: 'win64_msvc2022_arm64'
-        archives: 'qtbase qtdeclarative qttools qtsvg qtimageformats'  # Specify explicit archives
+        arch: 'win64_msvc2022_arm64_cross_compiled'  # Correct architecture name from aqt list output
     
     - name: Install WiX Toolset
       run: |
