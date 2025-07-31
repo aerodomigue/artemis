@@ -469,14 +469,25 @@ jobs:
             "C:\Windows\System32\WindowsPowerShell\v1.0\"
           )
           
-          # Add MSVC paths if they exist
-          $msvcPaths = $env:PATH -split ';' | Where-Object { $_ -like "*Microsoft Visual Studio*" -or $_ -like "*MSVC*" -or $_ -like "*VC\Tools*" }
+          # Add ALL MSVC-related paths to ensure build tools are available
+          $msvcPaths = $env:PATH -split ';' | Where-Object { 
+            $_ -like "*Microsoft Visual Studio*" -or 
+            $_ -like "*MSVC*" -or 
+            $_ -like "*VC\Tools*" -or
+            $_ -like "*VC\Auxiliary*" -or
+            $_ -like "*MSBuild*" -or
+            $_ -like "*Common7*"
+          }
           
-          # Create minimal PATH with Qt ARM64 at the front
+          echo "Found MSVC paths:"
+          $msvcPaths | ForEach-Object { echo "  $_" }
+          
+          # Create minimal PATH with Qt ARM64 at the front, then essential Windows, then ALL MSVC paths
           $minimalPath = @($arm64QtPath + "\bin") + $essentialPaths + $msvcPaths -join ';'
           $env:PATH = $minimalPath
           
-          echo "Reduced PATH from $($originalPath.Length) to $($env:PATH.Length) characters to avoid command line length limits"
+          echo "Reduced PATH from $($originalPath.Length) to $($env:PATH.Length) characters"
+          echo "Preserved $($msvcPaths.Count) MSVC-related paths"
           
         } else {
           echo "ARM64 Qt not found at any path!"
@@ -524,21 +535,74 @@ jobs:
         # Test MSVC environment
         echo "Testing MSVC environment:"
         echo "Checking for cl.exe:"
-        where cl.exe 2>$null || echo "cl.exe not found in PATH"
-        if (where cl.exe 2>$null) {
+        $clPath = where.exe cl.exe 2>$null
+        if ($clPath) {
+          echo "cl.exe found at: $clPath"
           echo "Testing cl.exe:"
           cl.exe 2>&1 | Select-String "Microsoft|Version" | Select-Object -First 2
+        } else {
+          echo "ERROR: cl.exe not found in PATH"
+          echo "Current PATH directories with MSVC:"
+          $env:PATH -split ';' | Where-Object { $_ -like "*Visual Studio*" -or $_ -like "*MSVC*" -or $_ -like "*VC\Tools*" } | ForEach-Object { echo "  $_" }
+          exit 1
         }
+        
         echo "Checking for nmake.exe:"
-        where nmake.exe 2>$null || echo "nmake.exe not found in PATH"
+        $nmakePath = where.exe nmake.exe 2>$null
+        if ($nmakePath) {
+          echo "nmake.exe found at: $nmakePath"
+          echo "Testing nmake:"
+          nmake.exe /? 2>&1 | Select-Object -First 3
+        } else {
+          echo "ERROR: nmake.exe not found in PATH"
+          echo "This is required for compilation!"
+          exit 1
+        }
+        
         echo "Checking for msbuild.exe:"
-        where msbuild.exe 2>$null || echo "msbuild.exe not found in PATH"
+        $msbuildPath = where.exe msbuild.exe 2>$null
+        if ($msbuildPath) {
+          echo "msbuild.exe found at: $msbuildPath"
+        } else {
+          echo "WARNING: msbuild.exe not found in PATH"
+        }
         
         # Run our Artemis build script that handles everything
         echo "Running build script..."
         
         # Enable verbose output for troubleshooting
         $env:VERBOSE = "1"
+        
+        # Show final environment before build
+        echo "Final environment before build:"
+        echo "Qt6_DIR: $env:Qt6_DIR"
+        echo "PATH length: $($env:PATH.Length) characters"
+        echo "INCLUDE: $($env:INCLUDE -ne $null)"
+        echo "LIB: $($env:LIB -ne $null)"
+        echo "LIBPATH: $($env:LIBPATH -ne $null)"
+        
+        # Test that we can find the essential build tools
+        echo "Final verification of build tools:"
+        $qtBin = "$env:Qt6_DIR\bin\qmake.bat"
+        $clBin = where.exe cl.exe 2>$null
+        $nmakeBin = where.exe nmake.exe 2>$null
+        
+        echo "qmake.bat: $(if (Test-Path $qtBin) { 'FOUND' } else { 'MISSING' })"
+        echo "cl.exe: $(if ($clBin) { 'FOUND' } else { 'MISSING' })"
+        echo "nmake.exe: $(if ($nmakeBin) { 'FOUND' } else { 'MISSING' })"
+        
+        if (-not (Test-Path $qtBin)) {
+          echo "ERROR: qmake.bat not found"
+          exit 1
+        }
+        if (-not $clBin) {
+          echo "ERROR: cl.exe not found - cannot compile"
+          exit 1
+        }
+        if (-not $nmakeBin) {
+          echo "ERROR: nmake.exe not found - cannot build"
+          exit 1
+        }
         
         # Run the build script and capture detailed output
         echo "Executing: cmd /c 'scripts\build-artemis-arch.bat release'"
