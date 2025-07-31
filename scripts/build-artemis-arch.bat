@@ -116,26 +116,26 @@ if /I "%VC_ARCH%" NEQ "%PROCESSOR_ARCHITECTURE%" (
 rem Find Visual Studio and set up environment variables directly
 set VSWHERE="%SOURCE_ROOT%\scripts\vswhere.exe"
 for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -property installationPath`) do (
-    set VS_INSTALL_PATH=%%i
-    for /f "delims=" %%j in ('dir /b "%%i\VC\Tools\MSVC"') do set MSVC_VERSION=%%j
+    set "VS_INSTALL_PATH=%%i"
+    for /f "delims=" %%j in ('dir /b "%%i\VC\Tools\MSVC"') do set "MSVC_VERSION=%%j"
 )
 
 rem Set up environment variables for the target architecture without calling vcvarsall
 echo Setting up MSVC environment for %VC_ARCH%
-set MSVC_TOOLS_PATH=%VS_INSTALL_PATH%\VC\Tools\MSVC\%MSVC_VERSION%
+set "MSVC_TOOLS_PATH=%VS_INSTALL_PATH%\VC\Tools\MSVC\%MSVC_VERSION%"
 
 rem Set include paths
-set "INCLUDE=%MSVC_TOOLS_PATH%\include;%VS_INSTALL_PATH%\VC\Tools\MSVC\%MSVC_VERSION%\atlmfc\include"
+set "INCLUDE=%MSVC_TOOLS_PATH%\include;%MSVC_TOOLS_PATH%\atlmfc\include"
 
 rem Set library and binary paths based on architecture
 if /I "%VC_ARCH%" EQU "AMD64_ARM64" (
     rem Cross-compiling from x64 to ARM64
     set "LIB=%MSVC_TOOLS_PATH%\lib\arm64;%MSVC_TOOLS_PATH%\atlmfc\lib\arm64"
-    set LIBPATH=%LIB%
+    set "LIBPATH=%MSVC_TOOLS_PATH%\lib\arm64;%MSVC_TOOLS_PATH%\atlmfc\lib\arm64"
 ) else (
     rem Native x64 compilation
     set "LIB=%MSVC_TOOLS_PATH%\lib\x64;%MSVC_TOOLS_PATH%\atlmfc\lib\x64"
-    set LIBPATH=%LIB%
+    set "LIBPATH=%MSVC_TOOLS_PATH%\lib\x64;%MSVC_TOOLS_PATH%\atlmfc\lib\x64"
 )
 
 echo MSVC Environment Setup:
@@ -191,24 +191,24 @@ if /I "%ARCH%" EQU "arm64" (
     echo Using explicit tool paths for ARM64 build to avoid PATH issues
     
     rem Find the exact paths to the tools we need
-    set FOUND_CL=
-    set FOUND_NMAKE=
-    set FOUND_QMAKE=%QT_PATH%\qmake.bat
+    set "FOUND_CL="
+    set "FOUND_NMAKE="
+    set "FOUND_QMAKE=%QT_PATH%\qmake.bat"
     
     rem Look for cl.exe in the expected ARM64 cross-compile location
     for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -property installationPath`) do (
         for /f "delims=" %%j in ('dir /b "%%i\VC\Tools\MSVC"') do (
-            set CL_PATH=%%i\VC\Tools\MSVC\%%j\bin\Hostx64\arm64\cl.exe
-            set NMAKE_PATH=%%i\VC\Tools\MSVC\%%j\bin\Hostx64\arm64\nmake.exe
-            if exist "!CL_PATH!" set FOUND_CL=!CL_PATH!
-            if exist "!NMAKE_PATH!" set FOUND_NMAKE=!NMAKE_PATH!
+            set "CL_PATH=%%i\VC\Tools\MSVC\%%j\bin\Hostx64\arm64\cl.exe"
+            set "NMAKE_PATH=%%i\VC\Tools\MSVC\%%j\bin\Hostx64\arm64\nmake.exe"
+            if exist "!CL_PATH!" set "FOUND_CL=!CL_PATH!"
+            if exist "!NMAKE_PATH!" set "FOUND_NMAKE=!NMAKE_PATH!"
         )
     )
     
     echo ARM64 Tools Found:
-    echo   qmake: %FOUND_QMAKE%
-    echo   cl.exe: !FOUND_CL!
-    echo   nmake: !FOUND_NMAKE!
+    echo   qmake: "%FOUND_QMAKE%"
+    echo   cl.exe: "!FOUND_CL!"
+    echo   nmake: "!FOUND_NMAKE!"
     
     if not exist "!FOUND_CL!" (
         echo ERROR: Could not find cl.exe for ARM64 cross-compilation
