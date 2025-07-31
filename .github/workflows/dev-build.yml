@@ -336,14 +336,25 @@ jobs:
         arch: 'win64_msvc2022_64'
         modules: 'qtmultimedia'
         
+    - name: Debug available Qt architectures
+      run: |
+        echo "Checking available Qt architectures for version ${{ env.QT_VERSION }}..."
+        python -m pip install aqtinstall
+        python -m aqt list-qt windows desktop --arch ${{ env.QT_VERSION }} || echo "Failed to list architectures"
+        
+        echo "Let's also check what's available from different mirrors:"
+        python -m aqt list-qt windows desktop --arch ${{ env.QT_VERSION }} --base https://mirrors.ocf.berkeley.edu/qt/ || echo "OCF mirror failed"
+        
     - name: Setup Qt for ARM64
       uses: jurplel/install-qt-action@v3
       with:
-        version: ${{ env.QT_VERSION }}  
+        version: ${{ env.QT_VERSION }}  # Use Qt 6.8.3 LTS which has ARM64 support
         host: 'windows'
         target: 'desktop'
-        arch: 'win64_msvc2022_arm64'  # Correct architecture name for Qt 6.8+ ARM64
+        arch: 'win64_msvc2022_arm64'  # Try ARM64 architecture
         set-env: false  # Don't let this override our Qt6_DIR - we'll set it manually
+        # Let's try adding some additional options
+        extra: '--external 7z --base https://mirrors.ocf.berkeley.edu/qt/ --timeout 7200'
     
     - name: Install WiX Toolset
       run: |
@@ -399,7 +410,15 @@ jobs:
         
         # Look for ARM64 Qt installation - try all possible names
         echo "Debugging Qt installation paths:"
+        echo "Checking for Qt 6.8.3:"
         Get-ChildItem "D:\a\artemis\Qt\6.8.3" -ErrorAction SilentlyContinue | ForEach-Object { 
+          echo "  Found: $($_.Name)"
+          if ($_.Name -like "*arm64*") {
+            echo "    ^ This looks like ARM64!"
+          }
+        }
+        echo "Checking for Qt 6.6.3:"
+        Get-ChildItem "D:\a\artemis\Qt\6.6.3" -ErrorAction SilentlyContinue | ForEach-Object { 
           echo "  Found: $($_.Name)"
           if ($_.Name -like "*arm64*") {
             echo "    ^ This looks like ARM64!"
@@ -408,7 +427,9 @@ jobs:
         
         $possibleArm64Paths = @(
           "D:\a\artemis\Qt\6.8.3\win64_msvc2022_arm64",
-          "D:\a\artemis\Qt\6.8.3\msvc2022_arm64"
+          "D:\a\artemis\Qt\6.8.3\msvc2022_arm64",
+          "D:\a\artemis\Qt\6.6.3\win64_msvc2022_arm64",
+          "D:\a\artemis\Qt\6.6.3\msvc2022_arm64"
         )
         
         $arm64QtPath = $null
@@ -426,7 +447,18 @@ jobs:
         # If none of the expected paths work, try to find any directory with arm64 in the name
         if (-not $arm64QtPath) {
           echo "Trying to find any ARM64 directory:"
-          $arm64Dirs = Get-ChildItem "D:\a\artemis\Qt\6.8.3" -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "*arm64*" }
+          $arm64Dirs = @()
+          
+          # Check Qt 6.8.3 first
+          if (Test-Path "D:\a\artemis\Qt\6.8.3") {
+            $arm64Dirs += Get-ChildItem "D:\a\artemis\Qt\6.8.3" -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "*arm64*" }
+          }
+          
+          # Then check Qt 6.6.3
+          if (Test-Path "D:\a\artemis\Qt\6.6.3") {
+            $arm64Dirs += Get-ChildItem "D:\a\artemis\Qt\6.6.3" -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "*arm64*" }
+          }
+          
           if ($arm64Dirs) {
             $arm64QtPath = $arm64Dirs[0].FullName
             echo "Found ARM64 Qt directory by pattern: $arm64QtPath"
@@ -442,8 +474,10 @@ jobs:
           
         } else {
           echo "ARM64 Qt not found at any path!"
-          echo "Available Qt installations:"
+          echo "Available Qt 6.8.3 installations:"
           Get-ChildItem "D:\a\artemis\Qt\6.8.3" -ErrorAction SilentlyContinue | Select-Object Name
+          echo "Available Qt 6.7.2 installations:"
+          Get-ChildItem "D:\a\artemis\Qt\6.7.2" -ErrorAction SilentlyContinue | Select-Object Name
           echo "Searched paths:"
           foreach ($path in $possibleArm64Paths) {
             echo "  $path - $(if (Test-Path $path) { 'EXISTS' } else { 'NOT FOUND' })"
