@@ -70,6 +70,18 @@ jobs:
         target: 'desktop'
         arch: 'win64_msvc2022_arm64'
         modules: 'qtmultimedia'
+        extra: '--archives qtbase qtmultimedia'
+      continue-on-error: false
+      
+    - name: Fallback Qt Setup for ARM64 (if main setup fails)
+      if: failure()
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.7.3'  # Known working version for ARM64
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_arm64'
+        modules: 'qtmultimedia'
     
     - name: Setup MSVC for ARM64
       uses: ilammy/msvc-dev-cmd@v1
