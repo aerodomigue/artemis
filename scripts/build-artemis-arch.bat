@@ -186,9 +186,15 @@ echo DEBUG: qmake completed successfully, current directory: %CD%
 rem Verify the generated Makefile has the correct architecture
 if exist "Makefile" (
     echo Checking Makefile for architecture settings:
-    findstr /C:"arm64" Makefile || echo "Warning: arm64 not found in Makefile"
-    findstr /C:"ARCH" Makefile || echo "Warning: ARCH not found in Makefile"
+    findstr /C:"arm64" Makefile
+    if !ERRORLEVEL! NEQ 0 echo Warning: arm64 not found in Makefile
+    findstr /C:"ARCH" Makefile
+    if !ERRORLEVEL! NEQ 0 echo Warning: ARCH not found in Makefile
+) else (
+    echo WARNING: No Makefile found after qmake
 )
+
+echo DEBUG: Makefile check complete
 
 echo DEBUG: About to popd from %CD%
 popd
@@ -284,7 +290,7 @@ if exist "app\%BUILD_CONFIG%\Artemis.exe" (
 rem Debug: Check what was actually built
 echo Checking build output:
 dir "app\%BUILD_CONFIG%\*.exe" 2>nul
-if !ERRORLEVEL! NEQ 0 echo No exe files found in app\%BUILD_CONFIG%
+if !ERRORLEVEL! NEQ 0 echo No exe files found in app/%BUILD_CONFIG%
 if exist "app\%BUILD_CONFIG%\Artemis.exe" (
     echo Artemis.exe found, checking architecture...
     file "app\%BUILD_CONFIG%\Artemis.exe" 2>nul
