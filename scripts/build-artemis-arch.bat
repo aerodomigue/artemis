@@ -179,15 +179,19 @@ if /I "%ARCH%" EQU "arm64" (
 ) else (
     %QMAKE_CMD% %SOURCE_ROOT%\artemis.pro
 )
+echo DEBUG: qmake command completed with exit code: !ERRORLEVEL!
 if !ERRORLEVEL! NEQ 0 goto Error
 
 echo DEBUG: qmake completed successfully, current directory: %CD%
 
+echo DEBUG: About to check Makefile
 rem Verify the generated Makefile has the correct architecture
 if exist "Makefile" (
     echo Checking Makefile for architecture settings:
+    echo DEBUG: Running first findstr command
     findstr /C:"arm64" Makefile
     if !ERRORLEVEL! NEQ 0 echo Warning: arm64 not found in Makefile
+    echo DEBUG: Running second findstr command
     findstr /C:"ARCH" Makefile
     if !ERRORLEVEL! NEQ 0 echo Warning: ARCH not found in Makefile
 ) else (
@@ -274,15 +278,16 @@ if /I "%ARCH%" EQU "arm64" (
 
 rem Verify the build actually produced something
 echo Verifying build output...
+echo DEBUG: Checking if Artemis.exe exists at app\%BUILD_CONFIG%\Artemis.exe
 if exist "app\%BUILD_CONFIG%\Artemis.exe" (
     echo SUCCESS: Artemis.exe was built successfully
 ) else (
     echo ERROR: Artemis.exe was not found after build!
     echo Contents of app directory:
-    dir app /s
+    dir app /s 2>nul
     echo Contents of current directory:
-    dir
-    echo nmake.log contents (if exists):
+    dir 2>nul
+    echo nmake.log contents if exists:
     if exist nmake.log type nmake.log
     goto Error
 )
