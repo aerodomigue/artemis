@@ -7,7 +7,16 @@ set BUILD_CONFIG=%1
 
 rem Convert to lower case for windeployqt
 if /I "%BUILD_CONFIG%"=="debug" (
-    set BUILD_CONFIG=debug
+      rem Look for cl.exe in the expected ARM64 cross-compile location
+    rem and nmake.exe in the host x64 tools location (nmake is always x64)
+    for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -property installationPath`) do (
+        for /f "delims=" %%j in ('dir /b "%%i\VC\Tools\MSVC"') do (
+            set "CL_PATH=%%i\VC\Tools\MSVC\%%j\bin\Hostx64\arm64\cl.exe"
+            set "NMAKE_PATH=%%i\VC\Tools\MSVC\%%j\bin\Hostx64\x64\nmake.exe"
+            if exist "!CL_PATH!" set "FOUND_CL=!CL_PATH!"
+            if exist "!NMAKE_PATH!" set "FOUND_NMAKE=!NMAKE_PATH!"
+        )
+    )D_CONFIG=debug
     set WIX_MUMS=10
 ) else (
     if /I "%BUILD_CONFIG%"=="release" (
@@ -200,18 +209,15 @@ if exist "Makefile" (
 
 echo DEBUG: Makefile check complete
 
-echo DEBUG: About to popd from %CD%
-popd
-echo DEBUG: After popd, current directory: %CD%
-
+echo DEBUG: About to start compilation
 echo Compiling Artemis in %BUILD_CONFIG% configuration
-pushd %BUILD_FOLDER%
-echo DEBUG: Current directory after pushd: %CD%
+echo DEBUG: Current directory: %CD%
 echo DEBUG: Architecture: %ARCH%
 echo DEBUG: About to enter ARM64 build section
 
 rem For ARM64 builds, we need to be very explicit about tool paths to avoid PATH issues
 if /I "%ARCH%" EQU "arm64" (
+    echo DEBUG: Entering ARM64 build section
     echo Using explicit tool paths for ARM64 build to avoid PATH issues
     
     rem Find the exact paths to the tools we need
@@ -219,8 +225,10 @@ if /I "%ARCH%" EQU "arm64" (
     set "FOUND_NMAKE="
     set "FOUND_QMAKE=%QT_PATH%\qmake.bat"
     
+    echo DEBUG: Looking for ARM64 tools...
+    
     rem Look for cl.exe in the expected ARM64 cross-compile location
-    rem and nmake.exe in the host x64 tools location
+    rem and nmake.exe in the host x64 tools location (nmake is always x64)
     for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -property installationPath`) do (
         for /f "delims=" %%j in ('dir /b "%%i\VC\Tools\MSVC"') do (
             set "CL_PATH=%%i\VC\Tools\MSVC\%%j\bin\Hostx64\arm64\cl.exe"
@@ -230,7 +238,7 @@ if /I "%ARCH%" EQU "arm64" (
         )
     )
     
-    echo ARM64 Tools Found:
+    echo DEBUG: ARM64 Tools Found:
     echo   qmake: "%FOUND_QMAKE%"
     echo   cl.exe: "!FOUND_CL!"
     echo   nmake: "!FOUND_NMAKE!"
@@ -251,8 +259,12 @@ if /I "%ARCH%" EQU "arm64" (
     )
     
     rem Use the exact tool paths instead of relying on PATH
+    echo DEBUG: About to run nmake with explicit path for ARM64...
+    echo DEBUG: nmake command: "!FOUND_NMAKE!" %BUILD_CONFIG%
+    echo DEBUG: Working directory: %CD%
     echo Running nmake with explicit path for ARM64...
     "!FOUND_NMAKE!" %BUILD_CONFIG% > nmake.log 2>&1
+    echo DEBUG: nmake completed with exit code: !ERRORLEVEL!
     if !ERRORLEVEL! NEQ 0 (
         echo ERROR: nmake failed for ARM64! Check nmake.log for details.
         echo nmake.log contents:
@@ -262,12 +274,16 @@ if /I "%ARCH%" EQU "arm64" (
     echo nmake completed successfully for ARM64
     
 ) else (
+    echo DEBUG: Entering x64/x86 build section
     rem For x64 builds, use the simpler approach
     if exist "%SOURCE_ROOT%\scripts\jom.exe" (
+        echo DEBUG: Using jom.exe for build
         %SOURCE_ROOT%\scripts\jom.exe %BUILD_CONFIG%
     ) else (
+        echo DEBUG: Using nmake for build
         rem Capture nmake output to a log file for debugging
         nmake %BUILD_CONFIG% > nmake.log 2>&1
+        echo DEBUG: nmake completed with exit code: !ERRORLEVEL!
         if !ERRORLEVEL! NEQ 0 (
             echo ERROR: nmake failed! Check nmake.log for details.
             type nmake.log
@@ -295,16 +311,16 @@ if exist "app\%BUILD_CONFIG%\Artemis.exe" (
 rem Debug: Check what was actually built
 echo Checking build output:
 dir "app\%BUILD_CONFIG%\*.exe" 2>nul
-if !ERRORLEVEL! NEQ 0 echo No exe files found in app/%BUILD_CONFIG%
+if !ERRORLEVEL! NEQ 0 echo No exe files found in app\%BUILD_CONFIG%
 if exist "app\%BUILD_CONFIG%\Artemis.exe" (
     echo Artemis.exe found, checking architecture...
     file "app\%BUILD_CONFIG%\Artemis.exe" 2>nul
     if !ERRORLEVEL! NEQ 0 echo file command not available
-    dumpbin /headers "app\%BUILD_CONFIG%\Artemis.exe" | findstr "machine" 2>nul
+    dumpbin /headers "app\%BUILD_CONFIG%\Artemis.exe" 2>nul | findstr "machine" 2>nul
     if !ERRORLEVEL! NEQ 0 echo dumpbin not available
 ) else (
     echo ERROR: Artemis.exe was not built!
-    dir app\* /s 2>nul
+    dir "app\*" /s 2>nul
     if !ERRORLEVEL! NEQ 0 echo No files in app directory
 )
 popd
