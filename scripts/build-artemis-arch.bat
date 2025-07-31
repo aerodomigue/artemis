@@ -156,8 +156,26 @@ mkdir %SYMBOLS_FOLDER%
 
 echo Configuring the project
 pushd %BUILD_FOLDER%
-%QMAKE_CMD% %SOURCE_ROOT%\artemis.pro
+echo Running qmake command: %QMAKE_CMD% %SOURCE_ROOT%\artemis.pro
+echo Current directory: %CD%
+echo Target architecture: %ARCH%
+echo Qt path: %QT_PATH%
+
+rem For ARM64 builds, we need to specify the target platform explicitly
+if /I "%ARCH%" EQU "arm64" (
+    echo Configuring for ARM64 cross-compilation
+    %QMAKE_CMD% %SOURCE_ROOT%\artemis.pro "CONFIG+=arm64"
+) else (
+    %QMAKE_CMD% %SOURCE_ROOT%\artemis.pro
+)
 if !ERRORLEVEL! NEQ 0 goto Error
+
+rem Verify the generated Makefile has the correct architecture
+if exist "Makefile" (
+    echo Checking Makefile for architecture settings:
+    findstr /C:"arm64" Makefile || echo "Warning: arm64 not found in Makefile"
+    findstr /C:"ARCH" Makefile || echo "Warning: ARCH not found in Makefile"
+)
 popd
 
 echo Compiling Artemis in %BUILD_CONFIG% configuration
@@ -168,6 +186,18 @@ if exist "%SOURCE_ROOT%\scripts\jom.exe" (
     nmake %BUILD_CONFIG%
 )
 if !ERRORLEVEL! NEQ 0 goto Error
+
+rem Debug: Check what was actually built
+echo Checking build output:
+dir app\%BUILD_CONFIG%\*.exe 2>nul || echo "No exe files found in app\%BUILD_CONFIG%"
+if exist "app\%BUILD_CONFIG%\Artemis.exe" (
+    echo Artemis.exe found, checking architecture...
+    file app\%BUILD_CONFIG%\Artemis.exe 2>nul || echo "file command not available"
+    dumpbin /headers app\%BUILD_CONFIG%\Artemis.exe | findstr "machine" 2>nul || echo "dumpbin not available"
+) else (
+    echo ERROR: Artemis.exe was not built!
+    dir app\* /s 2>nul || echo "No files in app directory"
+)
 popd
 
 echo Saving PDBs

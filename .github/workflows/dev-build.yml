@@ -339,11 +339,11 @@ jobs:
     - name: Setup Qt for ARM64
       uses: jurplel/install-qt-action@v3
       with:
-        version: ${{ env.QT_VERSION }}  # Use correct ARM64 architecture name
+        version: ${{ env.QT_VERSION }}  
         host: 'windows'
         target: 'desktop'
-        arch: 'win64_msvc2022_arm64_cross_compiled'  # Correct architecture name from aqt list output
-        set-env: true  # Ensure this sets Qt6_DIR to ARM64 installation
+        arch: 'win64_msvc2022_arm64'  # Correct architecture name for Qt 6.8+ ARM64
+        set-env: false  # Don't let this override our Qt6_DIR - we'll set it manually
     
     - name: Install WiX Toolset
       run: |
@@ -397,43 +397,69 @@ jobs:
         echo "All Qt installations:"
         Get-ChildItem "D:\a\artemis\Qt\6.8.3" -ErrorAction SilentlyContinue | Select-Object Name
         
-        # Look for ARM64 Qt installation
-        $arm64QtPath = "D:\a\artemis\Qt\6.8.3\msvc2022_arm64"
-        if (Test-Path $arm64QtPath) {
-          echo "Found ARM64 Qt at: $arm64QtPath"
+        # Look for ARM64 Qt installation - try all possible names
+        echo "Debugging Qt installation paths:"
+        Get-ChildItem "D:\a\artemis\Qt\6.8.3" -ErrorAction SilentlyContinue | ForEach-Object { 
+          echo "  Found: $($_.Name)"
+          if ($_.Name -like "*arm64*") {
+            echo "    ^ This looks like ARM64!"
+          }
+        }
+        
+        $possibleArm64Paths = @(
+          "D:\a\artemis\Qt\6.8.3\win64_msvc2022_arm64",
+          "D:\a\artemis\Qt\6.8.3\msvc2022_arm64"
+        )
+        
+        $arm64QtPath = $null
+        foreach ($path in $possibleArm64Paths) {
+          echo "Checking path: $path"
+          if (Test-Path $path) {
+            $arm64QtPath = $path
+            echo "Found ARM64 Qt at: $arm64QtPath"
+            break
+          } else {
+            echo "  Not found"
+          }
+        }
+        
+        # If none of the expected paths work, try to find any directory with arm64 in the name
+        if (-not $arm64QtPath) {
+          echo "Trying to find any ARM64 directory:"
+          $arm64Dirs = Get-ChildItem "D:\a\artemis\Qt\6.8.3" -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "*arm64*" }
+          if ($arm64Dirs) {
+            $arm64QtPath = $arm64Dirs[0].FullName
+            echo "Found ARM64 Qt directory by pattern: $arm64QtPath"
+          }
+        }
+        
+        if ($arm64QtPath) {
           $env:Qt6_DIR = $arm64QtPath
           
-          # CRITICAL: Reset PATH to minimal essentials to avoid "input line too long" errors
-          $essentialPaths = @(
-            "$env:SystemRoot\system32",
-            "$env:SystemRoot", 
-            "$env:SystemRoot\System32\Wbem",
-            "$env:SystemRoot\System32\WindowsPowerShell\v1.0",
-            "C:\Program Files\dotnet",
-            "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin",
-            "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\bin\Roslyn",
-            "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\bin",
-            "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.42.34433\bin\Hostx64\x64",
-            "$arm64QtPath\bin"
-          )
-          $env:PATH = $essentialPaths -join ';'
-          
-          # Also clean up other environment variables that can cause bloat
-          $env:INCLUDE = ""
-          $env:LIB = ""
-          $env:LIBPATH = ""
+          # Add ARM64 Qt to PATH but keep essential Windows and MSVC paths
+          # DON'T clear INCLUDE, LIB, LIBPATH - these are needed for compilation!
+          $env:PATH = "$arm64QtPath\bin;$env:PATH"
           
         } else {
-          echo "ARM64 Qt not found at expected path: $arm64QtPath"
+          echo "ARM64 Qt not found at any path!"
           echo "Available Qt installations:"
-          Get-ChildItem "D:\a\artemis\Qt\6.8.3" | Select-Object Name
+          Get-ChildItem "D:\a\artemis\Qt\6.8.3" -ErrorAction SilentlyContinue | Select-Object Name
+          echo "Searched paths:"
+          foreach ($path in $possibleArm64Paths) {
+            echo "  $path - $(if (Test-Path $path) { 'EXISTS' } else { 'NOT FOUND' })"
+          }
           exit 1
         }
         
-        # Debug Qt installation
+        # Debug environment before build
         echo "Qt6_DIR: $env:Qt6_DIR"
-        echo "Minimal PATH length: $($env:PATH.Length) characters"
-        echo "PATH content: $env:PATH"
+        echo "PATH length: $($env:PATH.Length) characters"
+        echo "INCLUDE set: $($env:INCLUDE -ne $null)"
+        echo "LIB set: $($env:LIB -ne $null)"
+        echo "LIBPATH set: $($env:LIBPATH -ne $null)"
+        echo "VSCMD_ARG_TGT_ARCH: $env:VSCMD_ARG_TGT_ARCH"
+        echo "VSCMD_ARG_HOST_ARCH: $env:VSCMD_ARG_HOST_ARCH"
+        echo "Platform: $env:Platform"
         
         # Check that we're using the correct qmake
         echo "Which qmake:"
@@ -447,20 +473,60 @@ jobs:
           exit 1
         }
         
+        # Test qmake functionality
+        echo "Testing qmake:"
+        & "$env:Qt6_DIR\bin\qmake.bat" -version
+        if ($LASTEXITCODE -ne 0) {
+          echo "ERROR: qmake test failed"
+          exit 1
+        }
+        
+        # Test MSVC environment
+        echo "Testing MSVC environment:"
+        echo "Checking for cl.exe:"
+        where cl.exe 2>$null || echo "cl.exe not found in PATH"
+        if (where cl.exe 2>$null) {
+          echo "Testing cl.exe:"
+          cl.exe 2>&1 | Select-String "Microsoft|Version" | Select-Object -First 2
+        }
+        echo "Checking for nmake.exe:"
+        where nmake.exe 2>$null || echo "nmake.exe not found in PATH"
+        echo "Checking for msbuild.exe:"
+        where msbuild.exe 2>$null || echo "msbuild.exe not found in PATH"
+        
         # Run our Artemis build script that handles everything
         echo "Running build script..."
+        
+        # Enable verbose output for troubleshooting
+        $env:VERBOSE = "1"
+        
+        # Run the build script and capture detailed output
+        echo "Executing: cmd /c 'scripts\build-artemis-arch.bat release'"
         cmd /c "scripts\build-artemis-arch.bat release"
         
-        if ($LASTEXITCODE -ne 0) {
-          echo "Build failed with exit code $LASTEXITCODE"
+        $buildExitCode = $LASTEXITCODE
+        echo "Build script exited with code: $buildExitCode"
+        
+        if ($buildExitCode -ne 0) {
+          echo "Build failed with exit code $buildExitCode"
           echo "Checking for any build directories that were created:"
           Get-ChildItem -Path "build" -ErrorAction SilentlyContinue | Select-Object Name
-          exit $LASTEXITCODE
+          
+          # Check if there are any log files that might give us more info
+          echo "Looking for build logs:"
+          Get-ChildItem -Path "build" -Recurse -Filter "*.log" -ErrorAction SilentlyContinue | Select-Object FullName
+          
+          exit $buildExitCode
         }
         
         # Debug what was actually created
         echo "Build completed successfully. Checking output directories:"
         Get-ChildItem -Path "build" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
+        
+        # Specifically check for the expected build artifacts
+        echo "Looking for ARM64 build artifacts:"
+        Get-ChildItem -Path "build\build-arm64-release" -ErrorAction SilentlyContinue | Select-Object Name
+        Get-ChildItem -Path "build\installer-arm64-release" -ErrorAction SilentlyContinue | Select-Object Name
     
     - name: Rename artifacts for ARM64 development build
       env:
