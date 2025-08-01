@@ -203,8 +203,8 @@ echo DEBUG: Forcing entry into compilation section after qmake
 echo DEBUG: Forcing entry into compilation section after qmake
 echo Compiling Artemis in %BUILD_CONFIG% configuration
 echo DEBUG: Current directory: %CD%
-echo DEBUG: Architecture: %ARCH%
-echo DEBUG: About to enter ARM64 build section
+echo DEBUG: Forcing entry into compilation section after qmake
+echo DEBUG: ARCH value before ARM64 conditional: %ARCH%
 
 rem For ARM64 builds, we need to be very explicit about tool paths to avoid PATH issues
 if /I "%ARCH%" EQU "arm64" (
