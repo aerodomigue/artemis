@@ -210,9 +210,8 @@ echo DEBUG: About to enter ARM64 build section
 rem For ARM64 builds, we need to be very explicit about tool paths to avoid PATH issues
 if /I "%ARCH%" EQU "arm64" (
     echo DEBUG: Entering ARM64 build section
-    echo Using explicit tool paths for ARM64 build to avoid PATH issues
     
-    rem Find the exact paths to the tools we need
+echo DEBUG: Forcing entry into compilation section after qmake
     set "FOUND_CL="
     set "FOUND_NMAKE="
     set "FOUND_QMAKE=%QT_PATH%\qmake.bat"
@@ -262,11 +261,13 @@ if /I "%ARCH%" EQU "arm64" (
         echo nmake.log contents:
         type nmake.log
         goto Error
+    echo DEBUG: About to run nmake for ARM64...
     )
     echo nmake completed successfully for ARM64
     
 ) else (
     echo DEBUG: Entering x64/x86 build section
+    echo DEBUG: nmake completed for ARM64 with exit code: !ERRORLEVEL!
     rem For x64 builds, use the simpler approach
     if exist "%SOURCE_ROOT%\scripts\jom.exe" (
         echo DEBUG: Using jom.exe for build
