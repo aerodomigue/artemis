@@ -200,6 +200,8 @@ if exist "Makefile" (
 
 echo DEBUG: Makefile check complete
 echo DEBUG: SCRIPT FLOW - After Makefile check, ARCH=%ARCH%, BUILD_CONFIG=%BUILD_CONFIG%, CD=%CD%
+echo DEBUG: ABOUT TO CHECK ARCH CONDITIONAL - ARCH is currently: %ARCH%
+echo DEBUG: Comparing ARCH=%ARCH% with arm64
 
 rem For ARM64 builds, we need to be very explicit about tool paths to avoid PATH issues
 if /I "%ARCH%" EQU "arm64" (
