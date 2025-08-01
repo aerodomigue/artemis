@@ -199,9 +199,8 @@ if exist "Makefile" (
 )
 
 echo DEBUG: Makefile check complete
-
 echo DEBUG: Forcing entry into compilation section after qmake
-pause
+echo DEBUG: Forcing entry into compilation section after qmake
 echo Compiling Artemis in %BUILD_CONFIG% configuration
 echo DEBUG: Current directory: %CD%
 echo DEBUG: Architecture: %ARCH%
