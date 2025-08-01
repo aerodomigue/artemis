@@ -200,7 +200,7 @@ if exist "Makefile" (
 
 echo DEBUG: Makefile check complete
 
-echo DEBUG: About to start compilation
+echo DEBUG: Reached compilation section after qmake
 echo Compiling Artemis in %BUILD_CONFIG% configuration
 echo DEBUG: Current directory: %CD%
 echo DEBUG: Architecture: %ARCH%
