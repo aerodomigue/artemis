@@ -7,16 +7,7 @@ set BUILD_CONFIG=%1
 
 rem Convert to lower case for windeployqt
 if /I "%BUILD_CONFIG%"=="debug" (
-      rem Look for cl.exe in the expected ARM64 cross-compile location
-    rem and nmake.exe in the host x64 tools location (nmake is always x64)
-    for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -property installationPath`) do (
-        for /f "delims=" %%j in ('dir /b "%%i\VC\Tools\MSVC"') do (
-            set "CL_PATH=%%i\VC\Tools\MSVC\%%j\bin\Hostx64\arm64\cl.exe"
-            set "NMAKE_PATH=%%i\VC\Tools\MSVC\%%j\bin\Hostx64\x64\nmake.exe"
-            if exist "!CL_PATH!" set "FOUND_CL=!CL_PATH!"
-            if exist "!NMAKE_PATH!" set "FOUND_NMAKE=!NMAKE_PATH!"
-        )
-    )D_CONFIG=debug
+    set BUILD_CONFIG=debug
     set WIX_MUMS=10
 ) else (
     if /I "%BUILD_CONFIG%"=="release" (
