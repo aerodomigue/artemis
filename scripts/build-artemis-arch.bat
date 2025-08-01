@@ -199,6 +199,7 @@ if exist "Makefile" (
 )
 
 echo DEBUG: Makefile check complete
+echo DEBUG: SCRIPT FLOW - After Makefile check, ARCH=%ARCH%, BUILD_CONFIG=%BUILD_CONFIG%, CD=%CD%
 echo DEBUG: Forcing entry into compilation section after qmake
 echo DEBUG: Forcing entry into compilation section after qmake
 echo Compiling Artemis in %BUILD_CONFIG% configuration
@@ -406,3 +407,4 @@ exit /b 0
 :Error
 echo Build failed!
 exit /b !ERRORLEVEL!
+echo DEBUG: SCRIPT FLOW - End of script reached without entering ARM64 build section
