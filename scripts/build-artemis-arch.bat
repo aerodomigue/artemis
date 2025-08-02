@@ -182,11 +182,21 @@ rem For ARM64 builds, we need to specify the target platform explicitly
 if /I "%ARCH%" EQU "arm64" (
     echo Configuring for ARM64 cross-compilation
     %QMAKE_CMD% %SOURCE_ROOT%\artemis.pro "CONFIG+=arm64"
+    set QMAKE_EXIT_CODE=!ERRORLEVEL!
+    echo DEBUG: ARM64 qmake returned with exit code: !QMAKE_EXIT_CODE!
 ) else (
     %QMAKE_CMD% %SOURCE_ROOT%\artemis.pro
+    set QMAKE_EXIT_CODE=!ERRORLEVEL!
+    echo DEBUG: Non-ARM64 qmake returned with exit code: !QMAKE_EXIT_CODE!
 )
-echo DEBUG: qmake command completed with exit code: !ERRORLEVEL!
-if !ERRORLEVEL! NEQ 0 goto Error
+echo DEBUG: CRITICAL - After qmake command, stored exit code: !QMAKE_EXIT_CODE!
+echo DEBUG: CRITICAL - Current ERRORLEVEL: !ERRORLEVEL!
+echo DEBUG: qmake command completed with exit code: !QMAKE_EXIT_CODE!
+if !QMAKE_EXIT_CODE! NEQ 0 (
+    echo DEBUG: CRITICAL - qmake failed with exit code !QMAKE_EXIT_CODE!, going to Error label
+    goto Error
+)
+echo DEBUG: CRITICAL - qmake succeeded, continuing...
 
 echo DEBUG: CRITICAL - After qmake error check, still executing
 echo DEBUG: CRITICAL - Current variables: ARCH=%ARCH%, BUILD_CONFIG=%BUILD_CONFIG%
