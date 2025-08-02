@@ -1,6 +1,10 @@
 @echo off
 setlocal enableDelayedExpansion
 
+echo DEBUG: SCRIPT START - build-artemis-arch.bat called with parameters: %*
+echo DEBUG: SCRIPT START - Current time: %date% %time%
+echo DEBUG: SCRIPT START - Current directory: %cd%
+
 rem Run from Qt command prompt with working directory set to root of repo
 
 set BUILD_CONFIG=%1
@@ -167,6 +171,8 @@ mkdir %SYMBOLS_FOLDER%
 
 echo Configuring the project
 pushd %BUILD_FOLDER%
+echo DEBUG: CRITICAL - Successfully changed to build directory: %CD%
+echo DEBUG: CRITICAL - BUILD_FOLDER was: %BUILD_FOLDER%
 echo Running qmake command: %QMAKE_CMD% %SOURCE_ROOT%\artemis.pro
 echo Current directory: %CD%
 echo Target architecture: %ARCH%
@@ -182,8 +188,14 @@ if /I "%ARCH%" EQU "arm64" (
 echo DEBUG: qmake command completed with exit code: !ERRORLEVEL!
 if !ERRORLEVEL! NEQ 0 goto Error
 
+echo DEBUG: CRITICAL - After qmake error check, still executing
+echo DEBUG: CRITICAL - Current variables: ARCH=%ARCH%, BUILD_CONFIG=%BUILD_CONFIG%
+echo DEBUG: CRITICAL - Current directory: %CD%
+echo DEBUG: CRITICAL - About to continue to next section...
+
 echo DEBUG: qmake completed successfully, current directory: %CD%
 
+echo DEBUG: CRITICAL - Before Makefile check section
 echo DEBUG: About to check Makefile
 rem Verify the generated Makefile has the correct architecture
 if exist "Makefile" (
@@ -199,6 +211,8 @@ if exist "Makefile" (
 )
 
 echo DEBUG: Makefile check complete
+echo DEBUG: CRITICAL - After Makefile check section completed
+echo DEBUG: CRITICAL - Script still running, about to check ARCH variable
 echo DEBUG: SCRIPT FLOW - After Makefile check, ARCH=%ARCH%, BUILD_CONFIG=%BUILD_CONFIG%, CD=%CD%
 echo DEBUG: ABOUT TO CHECK ARCH CONDITIONAL - ARCH is currently: %ARCH%
 echo DEBUG: Comparing ARCH=%ARCH% with arm64
