@@ -181,19 +181,11 @@ echo Qt path: %QT_PATH%
 rem For ARM64 builds, we need to specify the target platform explicitly
 if /I "%ARCH%" EQU "arm64" (
     echo Configuring for ARM64 cross-compilation
-    %QMAKE_CMD% %SOURCE_ROOT%\artemis.pro "CONFIG+=arm64"
-    echo DEBUG: ARM64 qmake returned with exit code: !ERRORLEVEL!
-    if !ERRORLEVEL! NEQ 0 (
-        echo DEBUG: CRITICAL - ARM64 qmake failed with exit code !ERRORLEVEL!, going to Error label
-        goto Error
-    )
+    call %QMAKE_CMD% %SOURCE_ROOT%\artemis.pro "CONFIG+=arm64"
+    call :CheckQmakeResult
 ) else (
-    %QMAKE_CMD% %SOURCE_ROOT%\artemis.pro
-    echo DEBUG: Non-ARM64 qmake returned with exit code: !ERRORLEVEL!
-    if !ERRORLEVEL! NEQ 0 (
-        echo DEBUG: CRITICAL - Non-ARM64 qmake failed with exit code !ERRORLEVEL!, going to Error label
-        goto Error
-    )
+    call %QMAKE_CMD% %SOURCE_ROOT%\artemis.pro
+    call :CheckQmakeResult
 )
 echo DEBUG: CRITICAL - qmake succeeded, continuing...
 
@@ -426,4 +418,14 @@ exit /b 0
 :Error
 echo Build failed!
 exit /b !ERRORLEVEL!
+
+:CheckQmakeResult
+echo DEBUG: qmake returned with exit code: %ERRORLEVEL%
+if %ERRORLEVEL% NEQ 0 (
+    echo DEBUG: CRITICAL - qmake failed with exit code %ERRORLEVEL%, going to Error label
+    goto Error
+)
+echo DEBUG: qmake succeeded with exit code: %ERRORLEVEL%
+goto :eof
+
 echo DEBUG: SCRIPT FLOW - End of script reached without entering ARM64 build section
