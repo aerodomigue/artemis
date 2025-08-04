@@ -119,8 +119,8 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
     // KeyComboToggleServerCommands removed - now handled through QuickMenu
 
     m_SpecialKeyCombos[KeyComboToggleQuickMenu].keyCombo = KeyComboToggleQuickMenu;
-    m_SpecialKeyCombos[KeyComboToggleQuickMenu].keyCode = SDLK_TAB;
-    m_SpecialKeyCombos[KeyComboToggleQuickMenu].scanCode = SDL_SCANCODE_TAB;
+    m_SpecialKeyCombos[KeyComboToggleQuickMenu].keyCode = SDLK_BACKSLASH;
+    m_SpecialKeyCombos[KeyComboToggleQuickMenu].scanCode = SDL_SCANCODE_BACKSLASH;
     m_SpecialKeyCombos[KeyComboToggleQuickMenu].enabled = true;
 
     m_OldIgnoreDevices = SDL_GetHint(SDL_HINT_GAMECONTROLLER_IGNORE_DEVICES);

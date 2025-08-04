@@ -54,7 +54,7 @@ Artemis Qt is specifically optimized for handheld gaming devices like the Steam 
 
 ### Quick Menu Toggle
 
-**Keyboard:** `Ctrl + Alt + Shift + Tab`
+**Keyboard:** `Ctrl + Alt + Shift + \`
 
 **Gamepad:** `Select + L1 + R1 + Y`
 
@@ -63,7 +63,7 @@ Artemis Qt is specifically optimized for handheld gaming devices like the Steam 
 ### Other Shortcuts
 
 **Keyboard Shortcuts** (All require `Ctrl + Alt + Shift` prefix):
-- `Tab` - **Toggle Quick Menu** (NEW!)
+- `\` - **Toggle Quick Menu** (NEW!)
 - `Q` - Quit stream
 - `E` - Quit stream and exit application
 - `S` - Toggle performance stats overlay
@@ -244,7 +244,7 @@ Legend: ✅ Available, 🚧 In Development, 📋 Planned
 - **🔄 Smart Fallback System** - Automatically uses legacy app IDs when UUIDs aren't available
 - **🔐 OTP Pairing** - Enhanced security with One-Time Password authentication
 - **🚀 Automated Development Builds** - Get the latest features with automatic changelogs for all platforms
-- **🎮 Enhanced Quick Menu** - Improved `Ctrl+Alt+Shift+Tab` shortcut and `Select+L1+R1+Y` gamepad combo
+- **🎮 Enhanced Quick Menu** - Improved `Ctrl+Alt+Shift+\` shortcut and `Select+L1+R1+Y` gamepad combo
 - **📋 Better Error Handling** - Improved logging and error messages for troubleshooting
 
 ### What's Coming Next

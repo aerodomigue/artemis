@@ -29,7 +29,7 @@ on:
   workflow_dispatch:  # Allow manual triggering
 
 env:
-  QT_VERSION: '6.8.1'
+  QT_VERSION: '6.8.3'
 
 jobs:
   setup-version:
@@ -75,27 +75,35 @@ jobs:
             FIRST_PARENT=$(git rev-parse HEAD^1)
             echo "Comparing changes against first parent: $FIRST_PARENT"
             
-            # Get all changed files in this merge, excluding documentation/config files
-            CHANGED_FILES=$(git diff --name-only $FIRST_PARENT HEAD | grep -v -E "(\.md$|\.yml$|\.yaml$|^\.github/|test.*\.txt$|README.*\.txt$|CHANGELOG.*\.txt$)" | wc -l)
+            # Get all changed files in this merge, excluding documentation/config files but allowing workflow changes
+            CHANGED_FILES=$(git diff --name-only $FIRST_PARENT HEAD | grep -v -E "(\.md$|test.*\.txt$|README.*\.txt$|CHANGELOG.*\.txt$)" | grep -v -E "(\.yml$|\.yaml$)" | wc -l)
+            WORKFLOW_FILES=$(git diff --name-only $FIRST_PARENT HEAD | grep -E "^\.github/workflows/.*\.(yml|yaml)$" | wc -l)
+            TOTAL_MEANINGFUL=$((CHANGED_FILES + WORKFLOW_FILES))
             echo "Meaningful files changed in merge: $CHANGED_FILES"
+            echo "Workflow files changed: $WORKFLOW_FILES"
+            echo "Total meaningful changes: $TOTAL_MEANINGFUL"
             
-            if [ "$CHANGED_FILES" -eq 0 ]; then
+            if [ "$TOTAL_MEANINGFUL" -eq 0 ]; then
               echo "should_build=false" >> $GITHUB_OUTPUT
               echo "Skipping build - merge contains no meaningful code changes"
               exit 0
             else
               echo "should_build=true" >> $GITHUB_OUTPUT
-              echo "Build will proceed - merge contains $CHANGED_FILES meaningful changes"
+              echo "Build will proceed - merge contains $TOTAL_MEANINGFUL meaningful changes (code: $CHANGED_FILES, workflows: $WORKFLOW_FILES)"
               exit 0
             fi
           else
             echo "Regular commit (not a merge) - checking for meaningful changes"
             
             # For regular commits, check against previous commit
-            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -v -E "(\.md$|\.yml$|\.yaml$|^\.github/|test.*\.txt$|README.*\.txt$|CHANGELOG.*\.txt$)" | wc -l)
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -v -E "(\.md$|test.*\.txt$|README.*\.txt$|CHANGELOG.*\.txt$)" | grep -v -E "(\.yml$|\.yaml$)" | wc -l)
+            WORKFLOW_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E "^\.github/workflows/.*\.(yml|yaml)$" | wc -l)
+            TOTAL_MEANINGFUL=$((CHANGED_FILES + WORKFLOW_FILES))
             echo "Meaningful files changed: $CHANGED_FILES"
+            echo "Workflow files changed: $WORKFLOW_FILES" 
+            echo "Total meaningful changes: $TOTAL_MEANINGFUL"
             
-            if [ "$CHANGED_FILES" -eq 0 ]; then
+            if [ "$TOTAL_MEANINGFUL" -eq 0 ]; then
               echo "should_build=false" >> $GITHUB_OUTPUT
               echo "Skipping build - no meaningful code changes detected"
               exit 0
@@ -103,7 +111,7 @@ jobs:
           fi
           
           echo "should_build=true" >> $GITHUB_OUTPUT
-          echo "Build will proceed - meaningful changes detected"
+          echo "Build will proceed - meaningful changes detected (including code and/or workflow changes)"
       
       - name: Generate semantic version
         id: version
@@ -319,14 +327,23 @@ jobs:
         echo "Using numeric version: ${{ needs.setup-version.outputs.numeric_version }}"
         echo "Is prerelease: ${{ needs.setup-version.outputs.is_prerelease }}"
     
-    - name: Setup Qt for ARM64
+    - name: Setup Qt Desktop (required for ARM64)
       uses: jurplel/install-qt-action@v3
       with:
         version: ${{ env.QT_VERSION }}
         host: 'windows'
         target: 'desktop'
-        arch: 'win64_msvc2022_arm64'
+        arch: 'win64_msvc2022_64'
         modules: 'qtmultimedia'
+        
+    - name: Setup Qt for ARM64
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}  # Use Qt 6.8.3 LTS which has ARM64 support
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_arm64_cross_compiled'  # Correct ARM64 architecture name
+        set-env: false  # Don't let this override our Qt6_DIR - we'll set it manually
     
     - name: Install WiX Toolset
       run: |
@@ -343,6 +360,15 @@ jobs:
       uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: amd64_arm64  # Cross-compile from x64 host to ARM64 target
+        
+    - name: Verify MSVC ARM64 Setup
+      run: |
+        echo "MSVC Environment Variables:"
+        echo "VSCMD_ARG_TGT_ARCH: $env:VSCMD_ARG_TGT_ARCH"
+        echo "VSCMD_ARG_HOST_ARCH: $env:VSCMD_ARG_HOST_ARCH"
+        echo "Platform: $env:Platform"
+        echo "LIB: $($env:LIB -split ';' | Select-Object -First 3)"
+        echo "INCLUDE: $($env:INCLUDE -split ';' | Select-Object -First 3)"
     
     - name: Update version file for development build
       env:
@@ -367,15 +393,81 @@ jobs:
       env:
         SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
-        # Add Qt to PATH for the build script
-        $env:PATH = "$env:Qt6_DIR\bin;$env:PATH"
+        # Find and set up Qt ARM64 environment
+        echo "Setting up Qt ARM64 environment..."
+        $qtArm64Path = "D:\a\artemis\Qt\6.8.3\msvc2022_arm64"
         
-        # Run our Artemis build script that handles everything
+        if (-not (Test-Path $qtArm64Path)) {
+          echo "ERROR: Qt ARM64 not found at expected path: $qtArm64Path"
+          echo "Available Qt installations:"
+          Get-ChildItem "D:\a\artemis\Qt\6.8.3" -ErrorAction SilentlyContinue | Select-Object Name
+          exit 1
+        }
+        
+        # Set Qt environment
+        $env:Qt6_DIR = $qtArm64Path
+        $env:PATH = "$qtArm64Path\bin;$env:PATH"
+        
+        echo "Qt ARM64 setup complete:"
+        echo "  Qt6_DIR: $env:Qt6_DIR"
+        echo "  qmake available: $(Test-Path "$qtArm64Path\bin\qmake.bat")"
+        
+        # Verify MSVC ARM64 cross-compilation tools
+        echo "Verifying MSVC ARM64 tools..."
+        $clPath = where.exe cl.exe 2>$null | Select-String "arm64" | Select-Object -First 1
+        $nmakePath = where.exe nmake.exe 2>$null | Select-String "arm64" | Select-Object -First 1
+        
+        if (-not $clPath) {
+          echo "WARNING: ARM64 cl.exe not found in PATH, build script will use explicit paths"
+        } else {
+          echo "Found ARM64 cl.exe: $clPath"
+        }
+        
+        if (-not $nmakePath) {
+          echo "WARNING: ARM64 nmake.exe not found in PATH, build script will use explicit paths"
+        } else {
+          echo "Found ARM64 nmake.exe: $nmakePath"
+        }
+        
+        # Run the build script
+        echo "Running build script for ARM64..."
         cmd /c "scripts\build-artemis-arch.bat release"
         
-        if ($LASTEXITCODE -ne 0) {
-          echo "Build failed with exit code $LASTEXITCODE"
-          exit $LASTEXITCODE
+        $buildExitCode = $LASTEXITCODE
+        echo "Build script completed with exit code: $buildExitCode"
+        
+        if ($buildExitCode -ne 0) {
+          echo "ERROR: Build script failed with exit code $buildExitCode"
+          
+          # Check for nmake.log
+          $nmakeLog = Get-ChildItem -Path "build\build-arm64-release" -Filter "nmake.log" -ErrorAction SilentlyContinue
+          if ($nmakeLog) {
+            echo "=== nmake.log contents ==="
+            Get-Content $nmakeLog.FullName
+            echo "=== end nmake.log ==="
+          }
+          
+          # Show what was created
+          echo "=== Build directory contents ==="
+          Get-ChildItem -Path "build" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
+          echo "=== end build directory ==="
+          
+          exit $buildExitCode
+        }
+        
+        # Verify build output
+        echo "Verifying ARM64 build artifacts..."
+        $artemisExe = "build\build-arm64-release\app\release\Artemis.exe"
+        if (Test-Path $artemisExe) {
+          echo "SUCCESS: Artemis.exe found at $artemisExe"
+          $fileInfo = Get-Item $artemisExe
+          echo "  Size: $($fileInfo.Length) bytes"
+          echo "  Created: $($fileInfo.CreationTime)"
+        } else {
+          echo "ERROR: Artemis.exe not found at expected location: $artemisExe"
+          echo "Contents of build\build-arm64-release\app:"
+          Get-ChildItem -Path "build\build-arm64-release\app" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
+          exit 1
         }
     
     - name: Rename artifacts for ARM64 development build
