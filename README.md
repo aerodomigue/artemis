@@ -14,6 +14,20 @@ Artemis Qt is built upon the excellent foundation of [**Moonlight Qt**](https://
 [![Build Status](https://github.com/wjbeckett/artemis/workflows/Build%20Artemis%20Qt/badge.svg)](https://github.com/wjbeckett/artemis/actions)
 [![Downloads](https://img.shields.io/github/downloads/wjbeckett/artemis/total)](https://github.com/wjbeckett/artemis/releases)
 
+## 💖 Support the Project
+
+If you find Artemis Qt useful and want to support continued development, you can:
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/wjbeckett)
+
+Your support helps cover development time, testing on multiple platforms, and keeping the project maintained. Every contribution, no matter how small, is greatly appreciated! 🙏
+
+**Other ways to support:**
+- ⭐ **Star the repository** to show your appreciation
+- 🐛 **Report bugs** and help improve the experience for everyone
+- 🔄 **Share Artemis** with other gamers and streamers
+- 💻 **Contribute code** or documentation improvements
+
 ## ✨ Artemis Features
 
 Artemis Qt includes all the features of Moonlight Qt, plus these enhanced capabilities:
@@ -90,7 +104,7 @@ All downloads are available in [Releases](https://github.com/wjbeckett/artemis/r
 
 **Windows:**
 - **x64 (Intel/AMD)** - Full support with MSI installer and portable ZIP
-- **ARM64** - Native support for Windows on ARM devices (Surface Pro X, etc.)
+- **ARM64** - ✨ **NEW!** Native support for Windows on ARM devices (Surface Pro X, Copilot+ PCs, etc.)
 
 **macOS:**
 - **Universal Binary** - Native support for both Intel and Apple Silicon Macs
@@ -114,28 +128,16 @@ xattr -cr /path/to/Artemis.app
 2. Click **"Allow Anyway"** when prompted about Artemis
 3. Try launching the app again
 
-This is normal for development builds and doesn't indicate actual damage to the application. 
+This is normal for development builds and doesn't indicate actual damage to the application.  
 
 > **🔥 Latest Development Features:**
-> - Permissino viewing from the client
+> - **🖥️ Windows ARM64 Support** - Native builds for Windows on ARM devices
+> - **🎮 Enhanced Quick Menu** - New keyboard (`Ctrl+Alt+Shift+\`) and gamepad shortcuts (`Select+L1+R1+Y`)
+> - Permission viewing from the client
 > - Complete Artemis rebranding with official icons and art:// protocol support
 > - UUID-based app launching for modern Apollo/Sunshine servers
 > - Enhanced error handling and logging
 > - Improved compatibility with latest server versions
-
-## 💖 Support the Project
-
-If you find Artemis Qt useful and want to support continued development, you can:
-
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/wjbeckett)
-
-Your support helps cover development time, testing on multiple platforms, and keeping the project maintained. Every contribution, no matter how small, is greatly appreciated! 🙏
-
-**Other ways to support:**
-- ⭐ **Star the repository** to show your appreciation
-- 🐛 **Report bugs** and help improve the experience for everyone
-- 🔄 **Share Artemis** with other gamers and streamers
-- 💻 **Contribute code** or documentation improvements
 
 ## 🎮 Moonlight Features (Inherited)
  - Hardware accelerated video decoding on Windows, Mac, and Linux
@@ -238,13 +240,14 @@ Legend: ✅ Available, 🚧 In Development, 📋 Planned
 ## 🆕 What's New
 
 ### Recent Improvements
-- **🔍 Permission Viewing** - View server-side permissions for clients
+- **�️ Windows ARM64 Support** - ✨ **NEW!** Native ARM64 builds for Windows on ARM devices (Surface Pro X, Copilot+ PCs)
+- **🎮 Enhanced Quick Menu** - Improved keyboard shortcut (`Ctrl+Alt+Shift+\`) and gamepad combo (`Select+L1+R1+Y`)
+- **�🔍 Permission Viewing** - View server-side permissions for clients
 - **Complete Visual Rebranding** - Official Artemis icons and branding from Apollo developer, art:// protocol support
 - **UUID-Based App Launching** - Modern app identification system that works seamlessly with Apollo/Sunshine servers
 - **🔄 Smart Fallback System** - Automatically uses legacy app IDs when UUIDs aren't available
 - **🔐 OTP Pairing** - Enhanced security with One-Time Password authentication
 - **🚀 Automated Development Builds** - Get the latest features with automatic changelogs for all platforms
-- **🎮 Enhanced Quick Menu** - Improved `Ctrl+Alt+Shift+\` shortcut and `Select+L1+R1+Y` gamepad combo
 - **📋 Better Error Handling** - Improved logging and error messages for troubleshooting
 
 ### What's Coming Next

@@ -94,7 +94,14 @@ bool FFmpegVideoDecoder::isAlwaysFullScreen()
 
 bool FFmpegVideoDecoder::isHdrSupported()
 {
-    return m_FrontendRenderer->getRendererAttributes() & RENDERER_ATTRIBUTE_HDR_SUPPORT;
+    bool hdrSupported = m_FrontendRenderer->getRendererAttributes() & RENDERER_ATTRIBUTE_HDR_SUPPORT;
+    
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "FFmpeg Decoder HDR Check: Renderer attributes=0x%x, HDR support=%s",
+                m_FrontendRenderer->getRendererAttributes(),
+                hdrSupported ? "YES" : "NO");
+    
+    return hdrSupported;
 }
 
 void FFmpegVideoDecoder::setHdrMode(bool enabled)

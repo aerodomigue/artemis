@@ -158,6 +158,17 @@ void SystemProperties::querySdlVideoInfoInternal()
 
     Session::getDecoderInfo(testWindow, hasHardwareAcceleration, rendererAlwaysFullScreen, supportsHdr, maximumResolution);
 
+    // Allow environment variable override for HDR support (for testing)
+    if (qgetenv("FORCE_HDR_SUPPORT") == "1") {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Forcing HDR support via FORCE_HDR_SUPPORT environment variable");
+        supportsHdr = true;
+    }
+
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "SystemProperties: Final HDR support status: %s", 
+                supportsHdr ? "ENABLED" : "DISABLED");
+
     SDL_DestroyWindow(testWindow);
 
     SDL_QuitSubSystem(SDL_INIT_VIDEO);
