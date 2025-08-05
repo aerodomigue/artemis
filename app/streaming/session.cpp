@@ -403,11 +403,16 @@ void Session::getDecoderInfo(SDL_Window* window,
 {
     IVideoDecoder* decoder;
 
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "HDR Detection: Starting decoder capability detection");
+
     // Since AV1 support on the host side is in its infancy, let's not consider
     // _only_ a working AV1 decoder to be acceptable and still show the warning
     // dialog indicating lack of hardware decoding support.
 
     // Try an HEVC Main10 decoder first to see if we have HDR support
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "HDR Detection: Trying HEVC Main10 hardware decoder...");
     if (chooseDecoder(StreamingPreferences::VDS_FORCE_HARDWARE,
                       window, VIDEO_FORMAT_H265_MAIN10, 1920, 1080, 60,
                       false, false, true, decoder)) {
@@ -415,12 +420,22 @@ void Session::getDecoderInfo(SDL_Window* window,
         isFullScreenOnly = decoder->isAlwaysFullScreen();
         isHdrSupported = decoder->isHdrSupported();
         maxResolution = decoder->getDecoderMaxResolution();
+        
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "HDR Detection: HEVC Main10 hardware decoder created successfully - HDR: %s, HW: %s",
+                    isHdrSupported ? "YES" : "NO",
+                    isHardwareAccelerated ? "YES" : "NO");
+        
         delete decoder;
-
         return;
     }
+    
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "HDR Detection: HEVC Main10 hardware decoder failed");
 
     // Try an AV1 Main10 decoder next to see if we have HDR support
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "HDR Detection: Trying AV1 Main10 hardware decoder...");
     if (chooseDecoder(StreamingPreferences::VDS_FORCE_HARDWARE,
                       window, VIDEO_FORMAT_AV1_MAIN10, 1920, 1080, 60,
                       false, false, true, decoder)) {
@@ -428,24 +443,43 @@ void Session::getDecoderInfo(SDL_Window* window,
         // but we will still continue probing to get other attributes for HEVC or H.264
         // decoders. See the AV1 comment at the top of the function for more info.
         isHdrSupported = decoder->isHdrSupported();
+        
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "HDR Detection: AV1 Main10 hardware decoder created - HDR: %s",
+                    isHdrSupported ? "YES" : "NO");
+        
         delete decoder;
     }
     else {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "HDR Detection: AV1 Main10 hardware decoder failed, trying software decoders...");
+        
         // If we found no hardware decoders with HDR, check for a renderer
         // that supports HDR rendering with software decoded frames.
         if (chooseDecoder(StreamingPreferences::VDS_FORCE_SOFTWARE,
                           window, VIDEO_FORMAT_H265_MAIN10, 1920, 1080, 60,
-                          false, false, true, decoder) ||
-            chooseDecoder(StreamingPreferences::VDS_FORCE_SOFTWARE,
-                          window, VIDEO_FORMAT_AV1_MAIN10, 1920, 1080, 60,
                           false, false, true, decoder)) {
             isHdrSupported = decoder->isHdrSupported();
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "HDR Detection: HEVC Main10 software decoder created - HDR: %s",
+                        isHdrSupported ? "YES" : "NO");
+            delete decoder;
+        }
+        else if (chooseDecoder(StreamingPreferences::VDS_FORCE_SOFTWARE,
+                              window, VIDEO_FORMAT_AV1_MAIN10, 1920, 1080, 60,
+                              false, false, true, decoder)) {
+            isHdrSupported = decoder->isHdrSupported();
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "HDR Detection: AV1 Main10 software decoder created - HDR: %s",
+                        isHdrSupported ? "YES" : "NO");
             delete decoder;
         }
         else {
             // We weren't compiled with an HDR-capable renderer or we don't
             // have the required GPU driver support for any HDR renderers.
             isHdrSupported = false;
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "HDR Detection: No HDR-capable decoders found - HDR will be disabled");
         }
     }
 
@@ -492,6 +526,19 @@ void Session::getDecoderInfo(SDL_Window* window,
                  "Failed to find ANY working H.264 or HEVC decoder!");
 }
 
+int Session::getActualFpsForDecoderTest() const
+{
+    int fps = m_StreamConfig.fps;
+    
+    // If fractional refresh rate is enabled, the fps might be multiplied by 1000 for Apollo
+    if (m_Preferences->enableFractionalRefreshRate && fps > 1000) {
+        // Convert back from Apollo's internal representation (fps * 1000) to actual fps
+        fps = fps / 1000;
+    }
+    
+    return fps;
+}
+
 Session::DecoderAvailability
 Session::getDecoderAvailability(SDL_Window* window,
                                 StreamingPreferences::VideoDecoderSelection vds,
@@ -521,12 +568,15 @@ bool Session::populateDecoderProperties(SDL_Window* window)
 {
     IVideoDecoder* decoder;
 
+    // Use actual fps for decoder testing (handles Apollo's fps * 1000 representation)
+    int testFps = getActualFpsForDecoderTest();
+
     if (!chooseDecoder(m_Preferences->videoDecoderSelection,
                        window,
                        m_SupportedVideoFormats.first(),
                        m_StreamConfig.width,
                        m_StreamConfig.height,
-                       m_StreamConfig.fps,
+                       testFps,
                        false, false, true, decoder)) {
         return false;
     }
@@ -789,7 +839,7 @@ bool Session::initialize()
                                                  (m_Preferences->enableHdr ? VIDEO_FORMAT_H265_MAIN10 : VIDEO_FORMAT_H265),
                                              m_StreamConfig.width,
                                              m_StreamConfig.height,
-                                             m_StreamConfig.fps);
+                                             getActualFpsForDecoderTest());
         if (hevcDA == DecoderAvailability::None && m_Preferences->enableHdr) {
             // Remove all 10-bit HEVC profiles
             m_SupportedVideoFormats.removeByMask(VIDEO_FORMAT_MASK_H265 & VIDEO_FORMAT_MASK_10BIT);
@@ -800,7 +850,7 @@ bool Session::initialize()
                                                 m_Preferences->enableYUV444 ? VIDEO_FORMAT_AV1_HIGH10_444 : VIDEO_FORMAT_AV1_MAIN10,
                                                 m_StreamConfig.width,
                                                 m_StreamConfig.height,
-                                                m_StreamConfig.fps);
+                                                getActualFpsForDecoderTest());
             if (av1DA == DecoderAvailability::None) {
                 // Remove all 10-bit AV1 profiles
                 m_SupportedVideoFormats.removeByMask(VIDEO_FORMAT_MASK_AV1 & VIDEO_FORMAT_MASK_10BIT);
@@ -813,7 +863,7 @@ bool Session::initialize()
                                                 m_Preferences->enableYUV444 ? VIDEO_FORMAT_H265_REXT8_444 : VIDEO_FORMAT_H265,
                                                 m_StreamConfig.width,
                                                 m_StreamConfig.height,
-                                                m_StreamConfig.fps);
+                                                getActualFpsForDecoderTest());
             }
         }
 
@@ -835,7 +885,7 @@ bool Session::initialize()
                                         (m_Preferences->enableHdr ? VIDEO_FORMAT_AV1_MAIN10 : VIDEO_FORMAT_AV1_MAIN8),
                                    m_StreamConfig.width,
                                    m_StreamConfig.height,
-                                   m_StreamConfig.fps) != DecoderAvailability::Hardware) {
+                                   getActualFpsForDecoderTest()) != DecoderAvailability::Hardware) {
             // Deprioritize AV1 unless we can't hardware decode HEVC and have HDR enabled.
             // We want to keep AV1 at the top of the list for HDR with software decoding
             // because dav1d is higher performance than FFmpeg's HEVC software decoder.
@@ -1061,7 +1111,7 @@ bool Session::validateLaunch(SDL_Window* testWindow)
                                         VIDEO_FORMAT_AV1_MAIN8,
                                         m_StreamConfig.width,
                                         m_StreamConfig.height,
-                                        m_StreamConfig.fps) != DecoderAvailability::Hardware) {
+                                        getActualFpsForDecoderTest()) != DecoderAvailability::Hardware) {
             emitLaunchWarning(tr("Using software decoding due to your selection to force AV1 without GPU support. This may cause poor streaming performance."));
         }
     }
@@ -1085,7 +1135,7 @@ bool Session::validateLaunch(SDL_Window* testWindow)
                                         VIDEO_FORMAT_H265,
                                         m_StreamConfig.width,
                                         m_StreamConfig.height,
-                                        m_StreamConfig.fps) != DecoderAvailability::Hardware) {
+                                        getActualFpsForDecoderTest()) != DecoderAvailability::Hardware) {
             emitLaunchWarning(tr("Using software decoding due to your selection to force HEVC without GPU support. This may cause poor streaming performance."));
         }
     }
@@ -1097,7 +1147,7 @@ bool Session::validateLaunch(SDL_Window* testWindow)
                                    VIDEO_FORMAT_H264,
                                    m_StreamConfig.width,
                                    m_StreamConfig.height,
-                                   m_StreamConfig.fps) != DecoderAvailability::Hardware) {
+                                   getActualFpsForDecoderTest()) != DecoderAvailability::Hardware) {
 
         if (m_Preferences->videoCodecConfig == StreamingPreferences::VCC_FORCE_H264) {
             emitLaunchWarning(tr("Using software decoding due to your selection to force H.264 without GPU support. This may cause poor streaming performance."));
@@ -1109,7 +1159,7 @@ bool Session::validateLaunch(SDL_Window* testWindow)
                                            VIDEO_FORMAT_H265,
                                            m_StreamConfig.width,
                                            m_StreamConfig.height,
-                                           m_StreamConfig.fps) == DecoderAvailability::Hardware) {
+                                           getActualFpsForDecoderTest()) == DecoderAvailability::Hardware) {
                 emitLaunchWarning(tr("Your host PC and client PC don't support the same video codecs. This may cause poor streaming performance."));
             }
             else {
@@ -1141,7 +1191,7 @@ bool Session::validateLaunch(SDL_Window* testWindow)
                                                  VIDEO_FORMAT_AV1_MAIN10,
                                                  m_StreamConfig.width,
                                                  m_StreamConfig.height,
-                                                 m_StreamConfig.fps);
+                                                 getActualFpsForDecoderTest());
                 if (da == DecoderAvailability::None) {
                     emitLaunchWarning(tr("This PC's GPU doesn't support AV1 Main10 decoding for HDR streaming."));
                     m_SupportedVideoFormats.removeByMask(VIDEO_FORMAT_AV1_MAIN10);
@@ -1159,7 +1209,7 @@ bool Session::validateLaunch(SDL_Window* testWindow)
                                                  VIDEO_FORMAT_H265_MAIN10,
                                                  m_StreamConfig.width,
                                                  m_StreamConfig.height,
-                                                 m_StreamConfig.fps);
+                                                 getActualFpsForDecoderTest());
                 if (da == DecoderAvailability::None) {
                     emitLaunchWarning(tr("This PC's GPU doesn't support HEVC Main10 decoding for HDR streaming."));
                     m_SupportedVideoFormats.removeByMask(VIDEO_FORMAT_H265_MAIN10);
@@ -1201,7 +1251,7 @@ bool Session::validateLaunch(SDL_Window* testWindow)
                                               m_SupportedVideoFormats.front(),
                                               m_StreamConfig.width,
                                               m_StreamConfig.height,
-                                              m_StreamConfig.fps) != DecoderAvailability::Hardware) {
+                                              getActualFpsForDecoderTest()) != DecoderAvailability::Hardware) {
                     if (m_Preferences->videoDecoderSelection == StreamingPreferences::VDS_FORCE_HARDWARE) {
                         m_SupportedVideoFormats.removeFirst();
                     }
@@ -1281,7 +1331,7 @@ bool Session::validateLaunch(SDL_Window* testWindow)
                                    m_SupportedVideoFormats.front(),
                                    m_StreamConfig.width,
                                    m_StreamConfig.height,
-                                   m_StreamConfig.fps) != DecoderAvailability::Hardware) {
+                                   getActualFpsForDecoderTest()) != DecoderAvailability::Hardware) {
         if (m_Preferences->videoCodecConfig == StreamingPreferences::VCC_AUTO) {
             emit displayLaunchError(tr("Your selection to force hardware decoding cannot be satisfied due to missing hardware decoding support on this PC's GPU."));
         }
@@ -1479,7 +1529,7 @@ void Session::updateOptimalWindowDisplayMode()
     for (int i = 0; i < SDL_GetNumDisplayModes(displayIndex); i++) {
         if (SDL_GetDisplayMode(displayIndex, i, &mode) == 0) {
             if (mode.w == desktopMode.w && mode.h == desktopMode.h &&
-                    mode.refresh_rate % m_StreamConfig.fps == 0) {
+                    mode.refresh_rate % getActualFpsForDecoderTest() == 0) {
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                             "Found display mode with desktop resolution: %dx%dx%d",
                             mode.w, mode.h, mode.refresh_rate);
@@ -1502,7 +1552,7 @@ void Session::updateOptimalWindowDisplayMode()
             if (SDL_GetDisplayMode(displayIndex, i, &mode) == 0) {
                 float modeAspectRatio = (float)mode.w / (float)mode.h;
                 if (mode.w >= m_ActiveVideoWidth && mode.h >= m_ActiveVideoHeight &&
-                        mode.refresh_rate % m_StreamConfig.fps == 0) {
+                        mode.refresh_rate % getActualFpsForDecoderTest() == 0) {
                     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                                 "Found display mode with video resolution: %dx%dx%d",
                                 mode.w, mode.h, mode.refresh_rate);
@@ -2334,7 +2384,7 @@ void Session::execInternal()
                 // than the display.
                 int displayHz = StreamUtils::getDisplayRefreshRate(m_Window);
                 bool enableVsync = m_Preferences->enableVsync;
-                if (displayHz + 5 < m_StreamConfig.fps) {
+                if (displayHz + 5 < getActualFpsForDecoderTest()) {
                     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                                 "Disabling V-sync because refresh rate limit exceeded");
                     enableVsync = false;
