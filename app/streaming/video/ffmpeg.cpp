@@ -1,6 +1,7 @@
 #include <Limelight.h>
 #include "ffmpeg.h"
 #include "streaming/session.h"
+#include "backend/systemproperties.h"
 
 #include <h264_stream.h>
 
@@ -389,7 +390,12 @@ bool FFmpegVideoDecoder::createFrontendRenderer(PDECODER_PARAMETERS params, bool
         else
         {
 #ifdef HAVE_LIBPLACEBO_VULKAN
-            if (qgetenv("PREFER_VULKAN") == "1") {
+            // Auto-enable Vulkan for HDR support on capable systems, or if explicitly requested
+            bool preferVulkan = qgetenv("PREFER_VULKAN") == "1" || 
+                               SystemProperties::isSteamDeckOrGamescope() ||
+                               SystemProperties::hasVulkanHdrSupport();
+            
+            if (preferVulkan) {
                 if (m_BackendRenderer->getRendererType() != IFFmpegRenderer::RendererType::Vulkan) {
                     m_FrontendRenderer = new PlVkRenderer(false, m_BackendRenderer);
                     if (initializeRendererInternal(m_FrontendRenderer, params)) {

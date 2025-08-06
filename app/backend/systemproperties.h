@@ -27,11 +27,16 @@ public:
     Q_PROPERTY(QString versionString MEMBER versionString CONSTANT)
     Q_PROPERTY(bool supportsHdr MEMBER supportsHdr CONSTANT)
     Q_PROPERTY(bool usesMaterial3Theme MEMBER usesMaterial3Theme CONSTANT)
+    Q_PROPERTY(bool isSteamDeck MEMBER isSteamDeck CONSTANT)
+    Q_PROPERTY(bool hasVulkanHdr MEMBER hasVulkanHdr CONSTANT)
 
     Q_INVOKABLE void refreshDisplays();
     Q_INVOKABLE QRect getNativeResolution(int displayIndex);
     Q_INVOKABLE QRect getSafeAreaResolution(int displayIndex);
     Q_INVOKABLE int getRefreshRate(int displayIndex);
+    
+    static bool isSteamDeckOrGamescope();
+    static bool hasVulkanHdrSupport();
 
 signals:
     void unmappedGamepadsChanged();
@@ -58,5 +63,7 @@ private:
     QString versionString;
     bool supportsHdr;
     bool usesMaterial3Theme;
+    bool isSteamDeck;
+    bool hasVulkanHdr;
 };
 

@@ -3,6 +3,8 @@
 
 #include <QGuiApplication>
 #include <QLibraryInfo>
+#include <QFile>
+#include <QProcess>
 
 #include "streaming/session.h"
 #include "streaming/streamutils.h"
@@ -67,6 +69,12 @@ SystemProperties::SystemProperties()
 #endif
 
     unmappedGamepads = SdlInputHandler::getUnmappedGamepads();
+
+    // Detect Steam Deck platform for automatic Vulkan renderer selection
+    isSteamDeck = isSteamDeckOrGamescope();
+    
+    // Detect broader Vulkan HDR support for automatic renderer selection
+    hasVulkanHdr = hasVulkanHdrSupport();
 
     // Populate data that requires talking to SDL. We do it all in one shot
     // and cache the results to speed up future queries on this data.
@@ -256,6 +264,154 @@ void SystemProperties::refreshDisplaysInternal()
             }
         }
     }
+}
+
+bool SystemProperties::isSteamDeckOrGamescope()
+{
+    // Check for Gamescope environment (Steam Deck's compositor)
+    if (!qgetenv("GAMESCOPE_WAYLAND_DISPLAY").isEmpty()) {
+        return true;
+    }
+    
+    // Check for explicit Steam Deck environment variable
+    if (!qgetenv("UNDER_STEAM_DECK").isEmpty()) {
+        return true;
+    }
+    
+    // Check for Gamescope session type
+    if (qgetenv("XDG_SESSION_TYPE") == "wayland" && !qgetenv("WAYLAND_DISPLAY").isEmpty()) {
+        QString waylandDisplay = qgetenv("WAYLAND_DISPLAY");
+        if (waylandDisplay.contains("gamescope", Qt::CaseInsensitive)) {
+            return true;
+        }
+    }
+    
+#ifdef Q_OS_LINUX
+    // Check hardware detection - Steam Deck product name
+    QFile productFile("/sys/devices/virtual/dmi/id/product_name");
+    if (productFile.exists() && productFile.open(QIODevice::ReadOnly)) {
+        QString product = productFile.readAll().trimmed();
+        if (product.contains("Steam Deck", Qt::CaseInsensitive)) {
+            productFile.close();
+            return true;
+        }
+        productFile.close();
+    }
+    
+    // Check for Steam Deck CPU model
+    QFile cpuFile("/proc/cpuinfo");
+    if (cpuFile.exists() && cpuFile.open(QIODevice::ReadOnly)) {
+        QString cpuInfo = cpuFile.readAll();
+        cpuFile.close();
+        
+        // Steam Deck uses AMD Custom APU 0932 (Vangogh/Aerith)
+        if (cpuInfo.contains("Custom APU 0932", Qt::CaseInsensitive) ||
+            cpuInfo.contains("Vangogh", Qt::CaseInsensitive) ||
+            cpuInfo.contains("Aerith", Qt::CaseInsensitive)) {
+            return true;
+        }
+    }
+#endif
+    
+    return false;
+}
+
+bool SystemProperties::hasVulkanHdrSupport()
+{
+    // First check if we're in an HDR-capable environment
+    bool hasHdrEnvironment = false;
+    
+    // Check for Gamescope (Steam Deck, other handheld devices)
+    if (!qgetenv("GAMESCOPE_WAYLAND_DISPLAY").isEmpty() || 
+        !qgetenv("WAYLAND_DISPLAY").isEmpty() && 
+        qgetenv("WAYLAND_DISPLAY").contains("gamescope", Qt::CaseInsensitive)) {
+        hasHdrEnvironment = true;
+    }
+    
+    // Check for HDR-capable Wayland compositors
+    if (qgetenv("XDG_SESSION_TYPE") == "wayland") {
+        // Check for KDE Plasma Wayland HDR support (6.1+)
+        QString kdeSession = qgetenv("KDE_SESSION_VERSION");
+        QString plasma = qgetenv("PLASMA_DESKTOP_SESSION");
+        if (!kdeSession.isEmpty() || !plasma.isEmpty()) {
+            hasHdrEnvironment = true; // Assume recent KDE has HDR support
+        }
+        
+        // Check for GNOME/Mutter HDR support
+        QString gnomeSession = qgetenv("GNOME_DESKTOP_SESSION_ID");
+        QString gdmSession = qgetenv("GDMSESSION");
+        if (!gnomeSession.isEmpty() || gdmSession == "gnome" || gdmSession == "gnome-wayland") {
+            hasHdrEnvironment = true; // Recent GNOME versions support HDR
+        }
+        
+        // Check for wlroots-based compositors with HDR
+        QString waylandDisplay = qgetenv("WAYLAND_DISPLAY");
+        QString xdgCurrentDesktop = qgetenv("XDG_CURRENT_DESKTOP");
+        if (xdgCurrentDesktop.contains("sway", Qt::CaseInsensitive) ||
+            xdgCurrentDesktop.contains("hyprland", Qt::CaseInsensitive) ||
+            !qgetenv("SWAYSOCK").isEmpty()) {
+            hasHdrEnvironment = true;
+        }
+    }
+    
+    // If no HDR environment detected, don't prefer Vulkan
+    if (!hasHdrEnvironment) {
+        return false;
+    }
+    
+#ifdef Q_OS_LINUX
+    // Check if Vulkan is available on the system
+    // Try to find vulkan loader library
+    QStringList vulkanPaths = {
+        "/usr/lib/x86_64-linux-gnu/libvulkan.so.1",
+        "/usr/lib64/libvulkan.so.1", 
+        "/usr/lib/libvulkan.so.1",
+        "/lib/x86_64-linux-gnu/libvulkan.so.1",
+        "/lib64/libvulkan.so.1"
+    };
+    
+    bool hasVulkanLibrary = false;
+    for (const QString& path : vulkanPaths) {
+        if (QFile::exists(path)) {
+            hasVulkanLibrary = true;
+            break;
+        }
+    }
+    
+    if (!hasVulkanLibrary) {
+        return false;
+    }
+    
+    // Check for Mesa drivers that support Vulkan HDR
+    QFile gpuFile("/proc/driver/nvidia/version");
+    bool hasNvidia = gpuFile.exists();
+    
+    // For NVIDIA, check if we have recent enough drivers (545.29.06+)
+    if (hasNvidia) {
+        // NVIDIA generally supports Vulkan HDR with recent drivers
+        return true;
+    }
+    
+    // For AMD/Intel, check for Mesa and radv/anv drivers
+    QProcess vulkanInfo;
+    vulkanInfo.start("vulkaninfo", QStringList() << "--summary");
+    vulkanInfo.waitForFinished(3000);
+    
+    if (vulkanInfo.exitCode() == 0) {
+        QString output = vulkanInfo.readAllStandardOutput();
+        
+        // Check for modern GPU drivers that support HDR
+        if (output.contains("radv", Qt::CaseInsensitive) ||        // AMD RADV
+            output.contains("anv", Qt::CaseInsensitive) ||         // Intel ANV 
+            output.contains("nvidia", Qt::CaseInsensitive) ||      // NVIDIA
+            output.contains("adreno", Qt::CaseInsensitive)) {      // Qualcomm Adreno
+            return true;
+        }
+    }
+#endif
+    
+    return false;
+}
 
     SDL_QuitSubSystem(SDL_INIT_VIDEO);
 }
