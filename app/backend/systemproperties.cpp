@@ -323,8 +323,8 @@ bool SystemProperties::hasVulkanHdrSupport()
     
     // Check for Gamescope (Steam Deck, other handheld devices)
     if (!qgetenv("GAMESCOPE_WAYLAND_DISPLAY").isEmpty() || 
-        !qgetenv("WAYLAND_DISPLAY").isEmpty() && 
-        qgetenv("WAYLAND_DISPLAY").contains("gamescope", Qt::CaseInsensitive)) {
+        (!qgetenv("WAYLAND_DISPLAY").isEmpty() && 
+         QString(qgetenv("WAYLAND_DISPLAY")).contains("gamescope", Qt::CaseInsensitive))) {
         hasHdrEnvironment = true;
     }
     
@@ -411,7 +411,4 @@ bool SystemProperties::hasVulkanHdrSupport()
 #endif
     
     return false;
-}
-
-    SDL_QuitSubSystem(SDL_INIT_VIDEO);
 }
