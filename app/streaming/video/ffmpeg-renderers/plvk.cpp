@@ -846,8 +846,46 @@ void PlVkRenderer::renderFrame(AVFrame *frame)
     dst.w = targetFrame.crop.x1 - targetFrame.crop.x0;
     dst.h = targetFrame.crop.y1 - targetFrame.crop.y0;
 
-    // Scale the video to the surface size while preserving the aspect ratio
-    StreamUtils::scaleSourceToDestinationSurface(&src, &dst);
+    // Use libplacebo's "Fit" scaling to prevent aspect ratio squashing (Android Artemis solution)
+    const char* aspectScalingMode = SDL_getenv("ASPECT_SCALING_MODE");
+    bool useFitScaling = aspectScalingMode ? (strcmp(aspectScalingMode, "fit") == 0) : true; // Default to "fit"
+    
+    if (useFitScaling) {
+        // Convert SDL_Rect to libplacebo rectangle format
+        pl_rect2df srcRect = { (float)src.x, (float)src.y, (float)(src.x + src.w), (float)(src.y + src.h) };
+        pl_rect2df dstRect = { (float)dst.x, (float)dst.y, (float)(dst.x + dst.w), (float)(dst.y + dst.h) };
+        
+        // Use libplacebo's aspect-fit scaling (panscan=0.0 for no cropping, pure letterbox/pillarbox)
+        pl_rect2df_aspect_fit(&dstRect, &srcRect, 0.0f);
+        
+        // Convert back to SDL_Rect format
+        dst.x = (int)dstRect.x0;
+        dst.y = (int)dstRect.y0;
+        dst.w = (int)(dstRect.x1 - dstRect.x0);
+        dst.h = (int)(dstRect.y1 - dstRect.y0);
+        
+        // Debug aspect ratio scaling with environment variable
+        const char* aspectRatioDebug = SDL_getenv("ASPECT_RATIO_DEBUG");
+        if (aspectRatioDebug && strcmp(aspectRatioDebug, "1") == 0) {
+            float srcAspect = (float)src.w / src.h;
+            float dstAspect = (float)dst.w / dst.h;
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "PlVkRenderer Aspect Ratio Fix: src=%dx%d (%.3f) -> dst=%dx%d (%.3f) using libplacebo 'fit' scaling",
+                        src.w, src.h, srcAspect, dst.w, dst.h, dstAspect);
+        }
+    } else {
+        // Fall back to old StreamUtils scaling method
+        StreamUtils::scaleSourceToDestinationSurface(&src, &dst);
+        
+        const char* aspectRatioDebug = SDL_getenv("ASPECT_RATIO_DEBUG");
+        if (aspectRatioDebug && strcmp(aspectRatioDebug, "1") == 0) {
+            float srcAspect = (float)src.w / src.h;
+            float dstAspect = (float)dst.w / dst.h;
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "PlVkRenderer Legacy Scaling: src=%dx%d (%.3f) -> dst=%dx%d (%.3f) using StreamUtils",
+                        src.w, src.h, srcAspect, dst.w, dst.h, dstAspect);
+        }
+    }
 
     targetFrame.crop.x0 = dst.x;
     targetFrame.crop.y0 = dst.y;

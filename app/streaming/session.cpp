@@ -404,7 +404,7 @@ void Session::getDecoderInfo(SDL_Window* window,
     IVideoDecoder* decoder;
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "HDR Detection: Starting decoder capability detection");
+                "HDR Detection: Starting comprehensive decoder capability detection");
 
     // Since AV1 support on the host side is in its infancy, let's not consider
     // _only_ a working AV1 decoder to be acceptable and still show the warning
@@ -422,16 +422,17 @@ void Session::getDecoderInfo(SDL_Window* window,
         maxResolution = decoder->getDecoderMaxResolution();
         
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "HDR Detection: HEVC Main10 hardware decoder created successfully - HDR: %s, HW: %s",
+                    "HDR Detection: HEVC Main10 hardware decoder SUCCESS - HDR: %s, HW: %s, Fullscreen: %s",
                     isHdrSupported ? "YES" : "NO",
-                    isHardwareAccelerated ? "YES" : "NO");
+                    isHardwareAccelerated ? "YES" : "NO",
+                    isFullScreenOnly ? "YES" : "NO");
         
         delete decoder;
         return;
     }
     
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "HDR Detection: HEVC Main10 hardware decoder failed");
+    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                "HDR Detection: HEVC Main10 hardware decoder FAILED");
 
     // Try an AV1 Main10 decoder next to see if we have HDR support
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
@@ -445,14 +446,20 @@ void Session::getDecoderInfo(SDL_Window* window,
         isHdrSupported = decoder->isHdrSupported();
         
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "HDR Detection: AV1 Main10 hardware decoder created - HDR: %s",
+                    "HDR Detection: AV1 Main10 hardware decoder SUCCESS - HDR: %s",
                     isHdrSupported ? "YES" : "NO");
         
         delete decoder;
     }
     else {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "HDR Detection: AV1 Main10 hardware decoder FAILED");
+    }
+
+    // If we found no hardware decoders with HDR, try software decoders with HDR-capable renderers
+    if (!isHdrSupported) {
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "HDR Detection: AV1 Main10 hardware decoder failed, trying software decoders...");
+                    "HDR Detection: No hardware HDR decoders found, trying software decoders...");
         
         // If we found no hardware decoders with HDR, check for a renderer
         // that supports HDR rendering with software decoded frames.
@@ -461,7 +468,7 @@ void Session::getDecoderInfo(SDL_Window* window,
                           false, false, true, decoder)) {
             isHdrSupported = decoder->isHdrSupported();
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "HDR Detection: HEVC Main10 software decoder created - HDR: %s",
+                        "HDR Detection: HEVC Main10 software decoder SUCCESS - HDR: %s",
                         isHdrSupported ? "YES" : "NO");
             delete decoder;
         }
@@ -470,7 +477,7 @@ void Session::getDecoderInfo(SDL_Window* window,
                               false, false, true, decoder)) {
             isHdrSupported = decoder->isHdrSupported();
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "HDR Detection: AV1 Main10 software decoder created - HDR: %s",
+                        "HDR Detection: AV1 Main10 software decoder SUCCESS - HDR: %s",
                         isHdrSupported ? "YES" : "NO");
             delete decoder;
         }
@@ -479,7 +486,7 @@ void Session::getDecoderInfo(SDL_Window* window,
             // have the required GPU driver support for any HDR renderers.
             isHdrSupported = false;
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "HDR Detection: No HDR-capable decoders found - HDR will be disabled");
+                        "HDR Detection: No HDR-capable decoders found - HDR will be DISABLED");
         }
     }
 
@@ -1502,10 +1509,22 @@ void Session::updateOptimalWindowDisplayMode()
 {
     SDL_DisplayMode desktopMode, bestMode, mode;
     int displayIndex = SDL_GetWindowDisplayIndex(m_Window);
+    
+    // Check if we should enable aspect ratio debug logging
+    bool aspectRatioDebug = qgetenv("HDR_DEBUG") == "1" || qgetenv("ASPECT_RATIO_DEBUG") == "1";
 
     // Try the current display mode first. On macOS, this will be the normal
     // scaled desktop resolution setting.
     if (SDL_GetDesktopDisplayMode(displayIndex, &desktopMode) == 0) {
+
+        if (aspectRatioDebug) {
+            float videoAspectRatio = (float)m_ActiveVideoWidth / (float)m_ActiveVideoHeight;
+            float desktopAspectRatio = (float)desktopMode.w / (float)desktopMode.h;
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "Aspect Ratio Debug: Video stream=%dx%d (%.3f), Desktop=%dx%d (%.3f)",
+                        m_ActiveVideoWidth, m_ActiveVideoHeight, videoAspectRatio,
+                        desktopMode.w, desktopMode.h, desktopAspectRatio);
+        }
         // If this doesn't fit the selected resolution, use the native
         // resolution of the panel (unscaled).
         if (desktopMode.w < m_ActiveVideoWidth || desktopMode.h < m_ActiveVideoHeight) {
@@ -1543,30 +1562,50 @@ void Session::updateOptimalWindowDisplayMode()
     // If we didn't find a mode that matched the current resolution and
     // had a high enough refresh rate, start looking for lower resolution
     // modes that can meet the required refresh rate and minimum video
-    // resolution. We will also try to pick a display mode that matches
-    // aspect ratio closest to the video stream.
-    if (bestMode.refresh_rate == 0) {
-        float bestModeAspectRatio = 0;
-        float videoAspectRatio = (float)m_ActiveVideoWidth / (float)m_ActiveVideoHeight;
-        for (int i = 0; i < SDL_GetNumDisplayModes(displayIndex); i++) {
-            if (SDL_GetDisplayMode(displayIndex, i, &mode) == 0) {
-                float modeAspectRatio = (float)mode.w / (float)mode.h;
-                if (mode.w >= m_ActiveVideoWidth && mode.h >= m_ActiveVideoHeight &&
-                        mode.refresh_rate % getActualFpsForDecoderTest() == 0) {
-                    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                                "Found display mode with video resolution: %dx%dx%d",
-                                mode.w, mode.h, mode.refresh_rate);
-                    if (mode.refresh_rate >= bestMode.refresh_rate &&
-                            (bestModeAspectRatio == 0 || fabs(videoAspectRatio - modeAspectRatio) <= fabs(videoAspectRatio - bestModeAspectRatio))) {
-                        bestMode = mode;
-                        bestModeAspectRatio = modeAspectRatio;
+        // resolution. We will also try to pick a display mode that matches
+        // aspect ratio closest to the video stream.
+        if (bestMode.refresh_rate == 0) {
+            float bestModeAspectRatio = 0;
+            float videoAspectRatio = (float)m_ActiveVideoWidth / (float)m_ActiveVideoHeight;
+            
+            if (aspectRatioDebug) {
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                            "Aspect Ratio Debug: Looking for display modes matching video aspect ratio %.3f",
+                            videoAspectRatio);
+            }
+            
+            for (int i = 0; i < SDL_GetNumDisplayModes(displayIndex); i++) {
+                if (SDL_GetDisplayMode(displayIndex, i, &mode) == 0) {
+                    float modeAspectRatio = (float)mode.w / (float)mode.h;
+                    if (mode.w >= m_ActiveVideoWidth && mode.h >= m_ActiveVideoHeight &&
+                            mode.refresh_rate % getActualFpsForDecoderTest() == 0) {
+                        
+                        if (aspectRatioDebug) {
+                            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                                        "Aspect Ratio Debug: Considering mode %dx%dx%d (%.3f) - aspect diff=%.3f",
+                                        mode.w, mode.h, mode.refresh_rate, modeAspectRatio,
+                                        fabs(videoAspectRatio - modeAspectRatio));
+                        }
+                        
+                        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                                    "Found display mode with video resolution: %dx%dx%d",
+                                    mode.w, mode.h, mode.refresh_rate);
+                        if (mode.refresh_rate >= bestMode.refresh_rate &&
+                                (bestModeAspectRatio == 0 || fabs(videoAspectRatio - modeAspectRatio) <= fabs(videoAspectRatio - bestModeAspectRatio))) {
+                            bestMode = mode;
+                            bestModeAspectRatio = modeAspectRatio;
+                            
+                            if (aspectRatioDebug) {
+                                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                                            "Aspect Ratio Debug: New best mode %dx%dx%d (%.3f) - diff=%.3f",
+                                            mode.w, mode.h, mode.refresh_rate, modeAspectRatio,
+                                            fabs(videoAspectRatio - modeAspectRatio));
+                            }
+                        }
                     }
                 }
             }
-        }
-    }
-
-    if (bestMode.refresh_rate == 0) {
+        }    if (bestMode.refresh_rate == 0) {
         // We may find no match if the user has moved a 120 FPS
         // stream onto a 60 Hz monitor (since no refresh rate can
         // divide our FPS setting). We'll stick to the default in
