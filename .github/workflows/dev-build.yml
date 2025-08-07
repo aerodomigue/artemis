@@ -910,14 +910,48 @@ jobs:
         runtime-version: '6.6'
         sdk: org.kde.Sdk
         command: artemis-dev
+        add-extensions:
+          org.freedesktop.Platform.GL.default:
+            directory: lib/GL
+            version: "23.08"
+            subdirectory: lib
+            no-autodownload: true
+            autodelete: false
+            add-ld-path: lib
+          org.freedesktop.Platform.VAAPI.Intel:
+            directory: lib/dri/intel-vaapi-driver
+            version: "23.08"
+            subdirectory: lib
+            no-autodownload: true
+            autodelete: false
         finish-args:
           - --share=ipc
           - --socket=x11
           - --socket=wayland
           - --socket=pulseaudio
           - --share=network
-          - --device=all
           - --filesystem=home
+          # GPU and hardware acceleration access
+          - --device=dri
+          - --filesystem=/sys/dev/char:ro
+          - --filesystem=/sys/devices/pci*:ro
+          # GPU driver library access
+          - --filesystem=/usr/lib/dri:ro
+          - --filesystem=/usr/lib/x86_64-linux-gnu/dri:ro
+          - --filesystem=/usr/lib64/dri:ro
+          - --filesystem=/usr/share/drirc.d:ro
+          # NVIDIA driver access
+          - --filesystem=/usr/lib/nvidia:ro
+          - --filesystem=/usr/lib/x86_64-linux-gnu/nvidia:ro
+          - --filesystem=/usr/lib64/nvidia:ro
+          # Mesa/Intel driver access  
+          - --filesystem=/usr/lib/mesa:ro
+          - --filesystem=/usr/lib/x86_64-linux-gnu/mesa:ro
+          # VAAPI/VDPAU libraries
+          - --filesystem=/usr/lib/libva:ro
+          - --filesystem=/usr/lib/x86_64-linux-gnu/libva:ro
+          - --filesystem=/usr/lib/vdpau:ro
+          - --filesystem=/usr/lib/x86_64-linux-gnu/vdpau:ro
         modules:
           - name: opus
             sources:
