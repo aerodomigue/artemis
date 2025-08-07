@@ -464,6 +464,8 @@ Flickable {
                         }
 
                         NavigableDialog {
+                            property bool isRefreshRateMode: false
+                            
                             function isInputValid() {
                                 // If we have text that isn't valid, reject the input.
                                 if (!fpsField.acceptableInput && fpsField.text) {
@@ -479,10 +481,24 @@ Flickable {
                             }
 
                             id: customFpsDialog
+                            title: isRefreshRateMode ? qsTr("Custom Refresh Rate") : qsTr("Custom Frame Rate")
                             standardButtons: Dialog.Ok | Dialog.Cancel
                             onOpened: {
                                 // Force keyboard focus on the textbox so keyboard navigation works
                                 fpsField.forceActiveFocus()
+
+                                // Check if we should default to refresh rate mode
+                                isRefreshRateMode = StreamingPreferences.enableFractionalRefreshRate
+                                refreshRateModeCheckBox.checked = isRefreshRateMode
+                                
+                                // Update field based on mode
+                                if (isRefreshRateMode) {
+                                    fpsField.text = StreamingPreferences.customRefreshRate.toString()
+                                    fpsField.validator = refreshRateValidator
+                                } else {
+                                    fpsField.text = fpsListModel.get(fpsComboBox.currentIndex).video_fps
+                                    fpsField.validator = intValidator
+                                }
 
                                 // standardButton() was added in Qt 5.10, so we must check for it first
                                 if (customFpsDialog.standardButton) {
@@ -505,39 +521,100 @@ Flickable {
                                     return
                                 }
 
-                                var fps = fpsField.text ? fpsField.text : fpsField.placeholderText
+                                if (isRefreshRateMode) {
+                                    var refreshRate = parseFloat(fpsField.text ? fpsField.text : fpsField.placeholderText)
+                                    if (!isNaN(refreshRate)) {
+                                        StreamingPreferences.customRefreshRate = refreshRate
+                                        StreamingPreferences.enableFractionalRefreshRate = true
+                                        StreamingPreferences.fps = Math.round(refreshRate)
+                                        
+                                        // Update the FPS dropdown to reflect the new value
+                                        for (var i = 0; i < fpsListModel.count; i++) {
+                                            if (fpsListModel.get(i).is_custom) {
+                                                fpsListModel.setProperty(i, "video_fps", Math.round(refreshRate).toString())
+                                                fpsListModel.setProperty(i, "text", qsTr("Custom (%1 Hz)").arg(refreshRate.toFixed(2)))
+                                                fpsComboBox.currentIndex = i
+                                                fpsComboBox.updateBitrateForSelection()
+                                                fpsComboBox.recalculateWidth()
+                                                break
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    var fps = parseInt(fpsField.text ? fpsField.text : fpsField.placeholderText)
 
-                                // Find and update the custom entry
-                                for (var i = 0; i < fpsListModel.count; i++) {
-                                    if (fpsListModel.get(i).is_custom) {
-                                        fpsListModel.setProperty(i, "video_fps", fps)
-                                        fpsListModel.setProperty(i, "text", qsTr("Custom (%1 FPS)").arg(fps))
+                                    // Find and update the custom entry
+                                    for (var i = 0; i < fpsListModel.count; i++) {
+                                        if (fpsListModel.get(i).is_custom) {
+                                            fpsListModel.setProperty(i, "video_fps", fps.toString())
+                                            fpsListModel.setProperty(i, "text", qsTr("Custom (%1 FPS)").arg(fps))
 
-                                        // Now update the bitrate using the custom resolution
-                                        fpsComboBox.currentIndex = i
-                                        fpsComboBox.updateBitrateForSelection()
+                                            // Now update the bitrate using the custom resolution
+                                            fpsComboBox.currentIndex = i
+                                            fpsComboBox.updateBitrateForSelection()
 
-                                        // Update the combobox width too
-                                        fpsComboBox.recalculateWidth()
-                                        break
+                                            // Update the combobox width too
+                                            fpsComboBox.recalculateWidth()
+                                            break
+                                        }
                                     }
                                 }
                             }
 
                             ColumnLayout {
+                                anchors.centerIn: parent
+                                width: Math.max(300, customFpsDialog.availableWidth)
+                                spacing: 10
+
+                                CheckBox {
+                                    id: refreshRateModeCheckBox
+                                    width: parent.width
+                                    text: qsTr("Enable Fractional Refresh Rate (allows decimals like 59.94 Hz)")
+                                    font.pointSize: 10
+                                    checked: StreamingPreferences.enableFractionalRefreshRate
+                                    
+                                    onCheckedChanged: {
+                                        customFpsDialog.isRefreshRateMode = checked
+                                        StreamingPreferences.enableFractionalRefreshRate = checked
+                                        
+                                        if (checked) {
+                                            fpsField.text = StreamingPreferences.customRefreshRate.toString()
+                                            fpsField.validator = refreshRateValidator
+                                            fpsField.inputMethodHints = Qt.ImhFormattedNumbersOnly
+                                        } else {
+                                            fpsField.text = fpsListModel.get(fpsComboBox.currentIndex).video_fps
+                                            fpsField.validator = intValidator
+                                            fpsField.inputMethodHints = Qt.ImhDigitsOnly
+                                        }
+                                    }
+                                }
+
                                 Label {
-                                    text: qsTr("Enter a custom frame rate:")
+                                    text: isRefreshRateMode ? qsTr("Enter a custom refresh rate:") : qsTr("Enter a custom frame rate:")
                                     font.bold: true
                                 }
 
                                 RowLayout {
                                     TextField {
                                         id: fpsField
-                                        maximumLength: 4
-                                        inputMethodHints: Qt.ImhDigitsOnly
-                                        placeholderText: fpsListModel.get(fpsComboBox.currentIndex).video_fps
-                                        validator: IntValidator{bottom:10; top:9999}
+                                        maximumLength: isRefreshRateMode ? 6 : 4
+                                        inputMethodHints: isRefreshRateMode ? Qt.ImhFormattedNumbersOnly : Qt.ImhDigitsOnly
+                                        placeholderText: isRefreshRateMode ? "59.94" : fpsListModel.get(fpsComboBox.currentIndex).video_fps
+                                        validator: isRefreshRateMode ? refreshRateValidator : intValidator
                                         focus: true
+
+                                        IntValidator {
+                                            id: intValidator
+                                            bottom: 10
+                                            top: 500
+                                        }
+                                        
+                                        DoubleValidator {
+                                            id: refreshRateValidator
+                                            bottom: 10.0
+                                            top: 500.0
+                                            decimals: 2
+                                        }
 
                                         onTextChanged: {
                                             // standardButton() was added in Qt 5.10, so we must check for it first
@@ -891,65 +968,7 @@ Flickable {
                     ToolTip.delay: 1000
                     ToolTip.timeout: 5000
                     ToolTip.visible: hovered
-                    ToolTip.text: qsTr("Creates a virtual display on the server for streaming. Useful for headless servers or when you want to stream without affecting the main display.")
-                }
-
-                // Fractional Refresh Rate
-                CheckBox {
-                    id: fractionalRefreshRateCheck
-                    width: parent.width
-                    hoverEnabled: true
-                    text: qsTr("Enable Fractional Refresh Rate")
-                    font.pointSize: 12
-                    checked: StreamingPreferences.enableFractionalRefreshRate
-                    onCheckedChanged: {
-                        StreamingPreferences.enableFractionalRefreshRate = checked
-                    }
-
-                    ToolTip.delay: 1000
-                    ToolTip.timeout: 5000
-                    ToolTip.visible: hovered
-                    ToolTip.text: qsTr("Allows setting custom fractional refresh rates like 59.94 Hz for better compatibility with certain displays and content.")
-                }
-
-                Row {
-                    spacing: 10
-                    visible: StreamingPreferences.enableFractionalRefreshRate
-                    width: parent.width
-
-                    Label {
-                        text: qsTr("Custom Refresh Rate:")
-                        font.pointSize: 10
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-
-                    SpinBox {
-                        id: customRefreshRateSpinBox
-                        from: 3000  // 30.00 Hz
-                        to: 24000   // 240.00 Hz
-                        stepSize: 1
-                        value: StreamingPreferences.customRefreshRate * 100
-                        
-                        property int decimals: 2
-                        property real realValue: value / 100.0
-
-                        validator: DoubleValidator {
-                            bottom: Math.min(customRefreshRateSpinBox.from, customRefreshRateSpinBox.to)
-                            top: Math.max(customRefreshRateSpinBox.from, customRefreshRateSpinBox.to)
-                        }
-
-                        textFromValue: function(value, locale) {
-                            return Number(value / 100).toLocaleString(locale, 'f', customRefreshRateSpinBox.decimals) + " Hz"
-                        }
-
-                        valueFromText: function(text, locale) {
-                            return Number.fromLocaleString(locale, text.replace(" Hz", "")) * 100
-                        }
-
-                        onValueChanged: {
-                            StreamingPreferences.customRefreshRate = realValue
-                        }
-                    }
+                    ToolTip.text: qsTr("Creates a virtual display on the Apollo server for streaming. Requires Apollo server - not available with Sunshine/GeForce Experience.")
                 }
 
                 // Resolution Scaling
