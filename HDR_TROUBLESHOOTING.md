@@ -82,7 +82,8 @@ Thank you for the follow-up! The HDR issue should be fixed in the latest builds,
 ## First Steps - Verify You Have the Fixed Version
 
 1. **Check your Artemis version**:
-   - Look for version **0.5.3** or newer (latest fix)
+   - Look for version **0.5.5** or newer (latest fix)
+   - This includes comprehensive HDR/AV1/aspect ratio fixes
    - The initial fix was in 0.5.2, but 0.5.3 has the complete solution
    - If you're using an older version, please download the latest development build
 
@@ -368,10 +369,10 @@ Based on your setup (1200x800 @ 90 FPS, no fractional refresh):
 1. **Try the environment variable fix** (`export FORCE_HDR_SUPPORT=1`)
 2. **Test with 60Hz or 120Hz** instead of 90Hz temporarily  
 3. **Share your log output** showing the HDR detection messages
-4. **Confirm your Artemis version** (should be 0.5.3+ for the complete fix)
+4. **Confirm your Artemis version** (should be 0.5.5+ for the complete fix)
 5. **Let us know if you're using external HDR display** or just Steam Deck screen
 
-**Important**: Even though you're not using fractional refresh rates, 90 FPS might still be causing issues with the decoder testing. The fix we implemented should handle this, but let's verify you have version 0.5.3.
+**Important**: Even though you're not using fractional refresh rates, 90 FPS might still be causing issues with the decoder testing. The fix we implemented should handle this, but let's verify you have version 0.5.5.
 
 ## If None of This Works
 
