@@ -25,6 +25,7 @@ public:
     virtual int getDecoderCapabilities() override;
     virtual bool needsTestFrame() override;
     virtual InitFailureReason getInitFailureReason() override;
+    virtual void setHdrMode(bool enabled) override;
 
     enum PixelShaders {
         GENERIC_YUV_420,
@@ -77,6 +78,7 @@ private:
     int m_LastColorSpace;
     bool m_LastFullRange;
     AVColorTransferCharacteristic m_LastColorTrc;
+    bool m_HdrModeEnabled;
 
     bool m_AllowTearing;
 

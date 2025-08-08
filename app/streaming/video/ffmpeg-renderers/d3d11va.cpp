@@ -94,6 +94,7 @@ D3D11VARenderer::D3D11VARenderer(int decoderSelectionPass)
       m_LastColorSpace(-1),
       m_LastFullRange(false),
       m_LastColorTrc(AVCOL_TRC_UNSPECIFIED),
+      m_HdrModeEnabled(false),
       m_AllowTearing(false),
       m_OverlayLock(0),
       m_HwDeviceContext(nullptr),
@@ -1244,6 +1245,26 @@ IFFmpegRenderer::InitFailureReason D3D11VARenderer::getInitFailureReason()
     else {
         return InitFailureReason::Unknown;
     }
+}
+
+void D3D11VARenderer::setHdrMode(bool enabled)
+{
+    if (m_HdrModeEnabled == enabled) {
+        return; // No change needed
+    }
+    
+    m_HdrModeEnabled = enabled;
+    
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "D3D11VARenderer: HDR mode %s", 
+                enabled ? "ENABLED" : "DISABLED");
+    
+    // Force color transfer characteristic re-evaluation on next frame
+    // This will trigger the HDR colorspace setup in renderFrame()
+    m_LastColorTrc = AVCOL_TRC_UNSPECIFIED;
+    
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "D3D11VARenderer: Reset color transfer characteristic cache to force HDR mode update");
 }
 
 void D3D11VARenderer::lockContext(void *lock_ctx)

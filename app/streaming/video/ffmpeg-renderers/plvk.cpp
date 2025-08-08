@@ -1132,3 +1132,30 @@ AVPixelFormat PlVkRenderer::getPreferredPixelFormat(int videoFormat)
         return AV_PIX_FMT_VULKAN;
     }
 }
+
+void PlVkRenderer::setHdrMode(bool enabled)
+{
+    if (m_HdrModeEnabled == enabled) {
+        return; // No change needed
+    }
+    
+    m_HdrModeEnabled = enabled;
+    
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "PlVkRenderer: HDR mode %s", 
+                enabled ? "ENABLED" : "DISABLED");
+    
+    // Update swapchain colorspace hint if we have valid state
+    if (m_Swapchain != nullptr) {
+        // Force colorspace re-evaluation on next frame by clearing cached colorspace
+        memset(&m_LastColorspace, 0, sizeof(m_LastColorspace));
+        
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "PlVkRenderer: Cleared colorspace cache to force HDR mode update");
+    }
+    
+    // Backend renderer passthrough for chained renderers
+    if (m_Backend) {
+        m_Backend->setHdrMode(enabled);
+    }
+}
