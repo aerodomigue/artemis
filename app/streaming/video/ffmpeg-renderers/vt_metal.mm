@@ -132,6 +132,7 @@ public:
           m_MetalView(nullptr),
           m_LastColorSpace(-1),
           m_LastFullRange(false),
+          m_HdrModeEnabled(false),
           m_LastFrameWidth(-1),
           m_LastFrameHeight(-1),
           m_LastDrawableWidth(-1),
@@ -869,6 +870,25 @@ public:
         // Metal supports HDR output
         return RENDERER_ATTRIBUTE_HDR_SUPPORT;
     }
+    
+    void setHdrMode(bool enabled) override
+    {
+        if (m_HdrModeEnabled == enabled) {
+            return; // No change needed
+        }
+        
+        m_HdrModeEnabled = enabled;
+        
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "VTMetalRenderer: HDR mode %s", 
+                    enabled ? "ENABLED" : "DISABLED");
+        
+        // Force colorspace re-evaluation on next frame
+        m_LastColorSpace = -1;
+        
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "VTMetalRenderer: Reset colorspace cache to force HDR mode update");
+    }
 
     bool isPixelFormatSupported(int videoFormat, AVPixelFormat pixelFormat) override
     {
@@ -935,6 +955,7 @@ private:
     SDL_MetalView m_MetalView;
     int m_LastColorSpace;
     bool m_LastFullRange;
+    bool m_HdrModeEnabled;
     int m_LastFrameWidth;
     int m_LastFrameHeight;
     int m_LastDrawableWidth;

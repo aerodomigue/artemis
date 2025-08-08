@@ -87,6 +87,8 @@ Thank you for the follow-up! The HDR issue should be fixed in the latest builds,
    - The initial fix was in 0.5.2, but 0.5.3 has the complete solution
    - If you're using an older version, please download the latest development build
 
+2. **Flatpak Users**: If you're using the Flatpak version and seeing "No functioning hardware accelerated video decoder was detected", see [FLATPAK_TROUBLESHOOTING.md](FLATPAK_TROUBLESHOOTING.md) for specific solutions.
+
 2. **Download Latest Development Build**:
    - Go to: https://github.com/wjbeckett/artemis/releases
    - Look for the most recent build (should be 0.5.3+)
