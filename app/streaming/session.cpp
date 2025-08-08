@@ -403,16 +403,11 @@ void Session::getDecoderInfo(SDL_Window* window,
 {
     IVideoDecoder* decoder;
 
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "HDR Detection: Starting comprehensive decoder capability detection");
-
     // Since AV1 support on the host side is in its infancy, let's not consider
     // _only_ a working AV1 decoder to be acceptable and still show the warning
     // dialog indicating lack of hardware decoding support.
 
     // Try an HEVC Main10 decoder first to see if we have HDR support
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "HDR Detection: Trying HEVC Main10 hardware decoder...");
     if (chooseDecoder(StreamingPreferences::VDS_FORCE_HARDWARE,
                       window, VIDEO_FORMAT_H265_MAIN10, 1920, 1080, 60,
                       false, false, true, decoder)) {
@@ -420,23 +415,12 @@ void Session::getDecoderInfo(SDL_Window* window,
         isFullScreenOnly = decoder->isAlwaysFullScreen();
         isHdrSupported = decoder->isHdrSupported();
         maxResolution = decoder->getDecoderMaxResolution();
-        
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "HDR Detection: HEVC Main10 hardware decoder SUCCESS - HDR: %s, HW: %s, Fullscreen: %s",
-                    isHdrSupported ? "YES" : "NO",
-                    isHardwareAccelerated ? "YES" : "NO",
-                    isFullScreenOnly ? "YES" : "NO");
-        
         delete decoder;
+
         return;
     }
-    
-    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                "HDR Detection: HEVC Main10 hardware decoder FAILED");
 
     // Try an AV1 Main10 decoder next to see if we have HDR support
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "HDR Detection: Trying AV1 Main10 hardware decoder...");
     if (chooseDecoder(StreamingPreferences::VDS_FORCE_HARDWARE,
                       window, VIDEO_FORMAT_AV1_MAIN10, 1920, 1080, 60,
                       false, false, true, decoder)) {
@@ -444,40 +428,11 @@ void Session::getDecoderInfo(SDL_Window* window,
         // but we will still continue probing to get other attributes for HEVC or H.264
         // decoders. See the AV1 comment at the top of the function for more info.
         isHdrSupported = decoder->isHdrSupported();
-        
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "HDR Detection: AV1 Main10 hardware decoder SUCCESS - HDR: %s",
-                    isHdrSupported ? "YES" : "NO");
-        
         delete decoder;
     }
     else {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "HDR Detection: AV1 Main10 hardware decoder FAILED");
-        
-        // Try AV1 Main8 as fallback to check for general AV1 hardware support
-        // This allows AV1 to work even if 10-bit/HDR is not supported
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "HDR Detection: Trying AV1 Main8 hardware decoder as fallback...");
-        if (chooseDecoder(StreamingPreferences::VDS_FORCE_HARDWARE,
-                          window, VIDEO_FORMAT_AV1_MAIN8, 1920, 1080, 60,
-                          false, false, true, decoder)) {
-            // AV1 hardware decoding works, but only 8-bit (no HDR)
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "HDR Detection: AV1 Main8 hardware decoder SUCCESS - AV1 supported but HDR: NO");
-            
-            delete decoder;
-        }
-        else {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "HDR Detection: AV1 Main8 hardware decoder also FAILED - no AV1 support");
-        }
-
         // If we found no hardware decoders with HDR, check for a renderer
         // that supports HDR rendering with software decoded frames.
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "HDR Detection: No hardware HDR decoders found, trying software decoders...");
-        
         if (chooseDecoder(StreamingPreferences::VDS_FORCE_SOFTWARE,
                           window, VIDEO_FORMAT_H265_MAIN10, 1920, 1080, 60,
                           false, false, true, decoder) ||
@@ -485,17 +440,20 @@ void Session::getDecoderInfo(SDL_Window* window,
                           window, VIDEO_FORMAT_AV1_MAIN10, 1920, 1080, 60,
                           false, false, true, decoder)) {
             isHdrSupported = decoder->isHdrSupported();
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "HDR Detection: Software HDR decoder SUCCESS - HDR: %s",
-                        isHdrSupported ? "YES" : "NO");
             delete decoder;
         }
         else {
             // We weren't compiled with an HDR-capable renderer or we don't
             // have the required GPU driver support for any HDR renderers.
             isHdrSupported = false;
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "HDR Detection: No HDR-capable decoders found - HDR will be DISABLED");
+        }
+
+        // Try AV1 Main8 as fallback to check for general AV1 hardware support
+        // This allows AV1 to work even if 10-bit/HDR is not supported
+        if (chooseDecoder(StreamingPreferences::VDS_FORCE_HARDWARE,
+                          window, VIDEO_FORMAT_AV1_MAIN8, 1920, 1080, 60,
+                          false, false, true, decoder)) {
+            delete decoder;
         }
     }
 
