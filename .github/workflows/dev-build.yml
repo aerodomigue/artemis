@@ -581,7 +581,7 @@ jobs:
         Copy-Item "artifacts-arm64/artemis-windows-arm64-installer-$env:SEMANTIC_VERSION.msi" "build/build-arm64-release/Artemis.msi"
         
         echo "Prepared MSI files for bundle generation"
-        ls -la build/
+        Get-ChildItem -Path "build/" -Recurse | Format-List FullName
     
     - name: Generate Universal Bundle  
       env:
@@ -702,77 +702,34 @@ jobs:
       env:
         VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
-        # Deploy Qt frameworks to the app bundle
-        echo "Deploying Qt frameworks using macdeployqt..."
-        macdeployqt app/Artemis.app -qmldir=app/gui -appstore-compliant || {
-          echo "macdeployqt failed with -appstore-compliant, trying without"
-          macdeployqt app/Artemis.app -qmldir=app/gui
-        }
+        # Install create-dmg if not available
+        if ! command -v create-dmg &> /dev/null; then
+          echo "Installing create-dmg..."
+          brew install create-dmg
+        fi
         
-        # Verify frameworks were bundled
-        echo "Checking bundled frameworks:"
-        ls -la app/Artemis.app/Contents/Frameworks/ || echo "No Frameworks directory found"
-        
-        # Verify the app can find its dependencies
-        echo "Checking app dependencies:"
-        otool -L app/Artemis.app/Contents/MacOS/Artemis | head -20
-        
-        # Test that the app bundle structure is correct
-        echo "App bundle structure:"
-        find app/Artemis.app -name "*.framework" | head -10
-        
-        # Check and fix permissions
-        echo "Setting proper permissions..."
-        chmod -R 755 app/Artemis.app
-        chmod +x app/Artemis.app/Contents/MacOS/Artemis
-        
-        # Check for any signing that might have been applied
-        echo "Checking code signing status:"
-        codesign -dv app/Artemis.app 2>&1 || echo "App is not code signed"
-        
-        # Remove quarantine attributes that might interfere
-        echo "Removing quarantine attributes..."
-        xattr -cr app/Artemis.app || echo "No quarantine attributes to remove"
-        
-        # For development builds, add a simple ad-hoc signature to prevent "damaged" errors
-        echo "Applying ad-hoc code signature for development..."
-        codesign --force --deep --sign - app/Artemis.app || echo "Ad-hoc signing failed, continuing anyway"
-        
-        # Verify the signature was applied
-        echo "Verifying signature:"
-        codesign -dv app/Artemis.app 2>&1 || echo "No signature found"
-        
-        # Create info file with semantic versioning
-        cat > build_info.txt << EOF
-        Artemis Desktop Development Build
-        Version: $VERSION
-        Numeric Version: ${{ needs.setup-version.outputs.numeric_version }}
-        Is Prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
-        Branch: ${{ github.ref_name }}
-        Commit: ${{ github.sha }}
-        Built: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-        
-        Installation Notes:
-        - If macOS says the app is "damaged", run: xattr -cr Artemis.app
-        - Or go to System Preferences > Security & Privacy and allow the app
-        - This is a development build and may trigger Gatekeeper warnings
-        EOF
-        
-        # Package with semantic version including the properly bundled app
-        tar -czf artemis-macos-$VERSION.tar.gz -C app Artemis.app -C .. build_info.txt
+        # Use the DMG generation script to create universal DMG
+        ./scripts/generate-dmg.sh Release
     
     - name: Upload Development Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: artemis-macos-universal-${{ needs.setup-version.outputs.version }}
-        path: artemis-macos-universal-${{ needs.setup-version.outputs.version }}.dmg
+        path: build/installer-Release/Artemis-${{ needs.setup-version.outputs.version }}.dmg
         retention-days: 30
         
     - name: Upload macOS Build Info
       uses: actions/upload-artifact@v4
       with:
         name: artemis-macos-build-info-${{ needs.setup-version.outputs.version }}
-        path: build_info_macos.txt
+        path: build/installer-Release/build_info_macos.txt
+        retention-days: 30
+        
+    - name: Upload macOS Debug Symbols
+      uses: actions/upload-artifact@v4
+      with:
+        name: artemis-macos-debug-symbols-${{ needs.setup-version.outputs.version }}
+        path: build/installer-Release/Artemis-${{ needs.setup-version.outputs.version }}.dsym
         retention-days: 30
 
   build-linux-dev:
@@ -1165,7 +1122,7 @@ jobs:
           gcc-aarch64-linux-gnu \
           g++-aarch64-linux-gnu \
           libc6-dev-arm64-cross \
-          pkg-config-aarch64-linux-gnu
+          pkg-config
         
         # Install ARM64 system libraries
         sudo apt-get install -y \

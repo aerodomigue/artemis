@@ -77,11 +77,27 @@ fi
 
 if [ "$NOTARY_KEYCHAIN_PROFILE" != "" ]; then
   echo Uploading to App Notary service
-  xcrun notarytool submit --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait $INSTALLER_FOLDER/Moonlight\ $VERSION.dmg || fail "Notary submission failed"
+  xcrun notarytool submit --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait $INSTALLER_FOLDER/Artemis\ $VERSION.dmg || fail "Notary submission failed"
 
   echo Stapling notary ticket to DMG
-  xcrun stapler staple -v $INSTALLER_FOLDER/Moonlight\ $VERSION.dmg || fail "Notary ticket stapling failed!"
+  xcrun stapler staple -v $INSTALLER_FOLDER/Artemis\ $VERSION.dmg || fail "Notary ticket stapling failed!"
 fi
 
-mv $INSTALLER_FOLDER/Moonlight\ $VERSION.dmg $INSTALLER_FOLDER/Moonlight-$VERSION.dmg
+mv $INSTALLER_FOLDER/Artemis\ $VERSION.dmg $INSTALLER_FOLDER/Artemis-$VERSION.dmg
+
+# Create build info file
+cat > $INSTALLER_FOLDER/build_info_macos.txt << EOF
+Artemis Desktop macOS Universal Development Build
+Version: $VERSION
+Architecture: Universal (x86_64 + arm64)
+Build Configuration: $BUILD_CONFIG
+Built: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+Installation Notes:
+- This is a universal binary that works on both Intel and Apple Silicon Macs
+- If macOS says the app is "damaged", run: xattr -cr Artemis.app
+- Or go to System Preferences > Security & Privacy and allow the app
+- This is a development build and may trigger Gatekeeper warnings
+EOF
+
 echo Build successful
