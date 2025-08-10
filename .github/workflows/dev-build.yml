@@ -532,6 +532,124 @@ jobs:
         path: build_info_arm64.txt
         retention-days: 30
 
+  build-windows-universal-bundle:
+    name: Windows Universal Bundle
+    needs: [setup-version, build-windows-dev, build-windows-arm64-dev]
+    runs-on: windows-latest
+    if: needs.setup-version.outputs.should_build == 'true'
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+        fetch-depth: 0
+    
+    - name: Download Windows x64 artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: artemis-windows-installer-${{ needs.setup-version.outputs.version }}
+        path: ./artifacts-x64/
+    
+    - name: Download Windows ARM64 artifacts  
+      uses: actions/download-artifact@v4
+      with:
+        name: artemis-windows-arm64-installer-${{ needs.setup-version.outputs.version }}
+        path: ./artifacts-arm64/
+    
+    - name: Setup build environment
+      run: |
+        # Install .NET SDK first (required for WiX v5)
+        choco install dotnet-sdk -y
+        
+        # Install WiX Toolset v5 as a .NET tool (recommended approach for v5)
+        dotnet tool install --global wix --version 5.0.1
+        
+        # Verify installation
+        wix --version
+    
+    - name: Prepare individual MSI files
+      env:
+        SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
+      run: |
+        # Create build directory structure
+        mkdir -p "build/build-x64-release"
+        mkdir -p "build/build-arm64-release"
+        
+        # Copy individual MSI files to expected locations for bundle generation
+        Copy-Item "artifacts-x64/artemis-windows-installer-$env:SEMANTIC_VERSION.msi" "build/build-x64-release/Artemis.msi"
+        Copy-Item "artifacts-arm64/artemis-windows-arm64-installer-$env:SEMANTIC_VERSION.msi" "build/build-arm64-release/Artemis.msi"
+        
+        echo "Prepared MSI files for bundle generation"
+        ls -la build/
+    
+    - name: Generate Universal Bundle  
+      env:
+        SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
+      run: |
+        # Update version file
+        echo $env:SEMANTIC_VERSION > app\version.txt
+        
+        # Set environment variables that the WiX scripts expect
+        $env:BUILD_CONFIG = "release"
+        
+        # Generate the universal installer bundle
+        cmd /c "scripts\generate-artemis-bundle.bat release"
+        
+        if ($LASTEXITCODE -ne 0) {
+          echo "Bundle generation failed with exit code $LASTEXITCODE"
+          exit $LASTEXITCODE
+        }
+    
+    - name: Rename universal bundle
+      env:
+        SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
+      run: |
+        # Find the generated bundle
+        $bundleFile = Get-ChildItem -Path "build\installer-release" -Filter "ArtemisSetup*.exe" | Select-Object -First 1
+        
+        if ($bundleFile) {
+          # Rename universal bundle
+          $newBundleName = "artemis-windows-universal-installer-$env:SEMANTIC_VERSION.exe"
+          Move-Item $bundleFile.FullName $newBundleName
+          echo "Created universal installer: $newBundleName"
+        } else {
+          echo "ERROR: Universal bundle not found"
+          Get-ChildItem -Path "build\installer-release" -Recurse
+          exit 1
+        }
+        
+        # Create info file
+        @"
+        Artemis Desktop Universal Windows Installer
+        Version: $env:SEMANTIC_VERSION
+        Numeric Version: ${{ needs.setup-version.outputs.numeric_version }}
+        Is Prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
+        Branch: ${{ github.ref_name }}
+        Commit: ${{ github.sha }}
+        Built: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')
+        
+        This universal installer includes:
+        - Automatic architecture detection (x64 vs ARM64)
+        - Visual C++ 2022 Redistributable for both architectures
+        - Single installer for all Windows platforms
+        "@ | Out-File -FilePath "build_info_universal.txt" -Encoding utf8
+    
+    - name: Upload Universal Installer
+      uses: actions/upload-artifact@v4
+      with:
+        name: artemis-windows-universal-installer-${{ needs.setup-version.outputs.version }}
+        path: artemis-windows-universal-installer-${{ needs.setup-version.outputs.version }}.exe
+        retention-days: 30
+        if-no-files-found: warn
+    
+    - name: Upload Universal Build Info
+      uses: actions/upload-artifact@v4
+      with:
+        name: artemis-windows-universal-build-info-${{ needs.setup-version.outputs.version }}
+        path: build_info_universal.txt
+        retention-days: 30
+
   build-macos-dev:
     name: macOS Development Build
     needs: setup-version
@@ -646,8 +764,15 @@ jobs:
     - name: Upload Development Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: artemis-macos-${{ needs.setup-version.outputs.version }}
-        path: artemis-macos-${{ needs.setup-version.outputs.version }}.tar.gz
+        name: artemis-macos-universal-${{ needs.setup-version.outputs.version }}
+        path: artemis-macos-universal-${{ needs.setup-version.outputs.version }}.dmg
+        retention-days: 30
+        
+    - name: Upload macOS Build Info
+      uses: actions/upload-artifact@v4
+      with:
+        name: artemis-macos-build-info-${{ needs.setup-version.outputs.version }}
+        path: build_info_macos.txt
         retention-days: 30
 
   build-linux-dev:
@@ -1012,6 +1137,151 @@ jobs:
         path: artemis-flatpak-${{ needs.setup-version.outputs.version }}.flatpak
         retention-days: 30
 
+  build-raspberry-pi-dev:
+    name: Raspberry Pi ARM64 Development Build
+    needs: setup-version
+    runs-on: ubuntu-22.04
+    if: needs.setup-version.outputs.should_build == 'true'
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+        fetch-depth: 0
+
+    - name: Display version info
+      run: |
+        echo "Using semantic version: ${{ needs.setup-version.outputs.version }}"
+        echo "Using numeric version: ${{ needs.setup-version.outputs.numeric_version }}"
+        echo "Is prerelease: ${{ needs.setup-version.outputs.is_prerelease }}"
+    
+    - name: Setup ARM64 cross-compilation environment
+      run: |
+        sudo apt-get update
+        
+        # Install cross-compilation toolchain
+        sudo apt-get install -y \
+          gcc-aarch64-linux-gnu \
+          g++-aarch64-linux-gnu \
+          libc6-dev-arm64-cross \
+          pkg-config-aarch64-linux-gnu
+        
+        # Install ARM64 system libraries
+        sudo apt-get install -y \
+          libavcodec-dev:arm64 \
+          libavformat-dev:arm64 \
+          libavutil-dev:arm64 \
+          libswscale-dev:arm64 \
+          libswresample-dev:arm64 \
+          libgl1-mesa-dev:arm64 \
+          libegl1-mesa-dev:arm64 \
+          libgles2-mesa-dev:arm64 \
+          libglu1-mesa-dev:arm64 \
+          libibus-1.0-dev:arm64 \
+          libpulse-dev:arm64 \
+          libudev-dev:arm64 \
+          libx11-dev:arm64 \
+          libxcursor-dev:arm64 \
+          libxext-dev:arm64 \
+          libxi-dev:arm64 \
+          libxinerama-dev:arm64 \
+          libxrandr-dev:arm64 \
+          libxss-dev:arm64 \
+          libxt-dev:arm64 \
+          libxv-dev:arm64 \
+          libxxf86vm-dev:arm64 \
+          libxcb-dri3-dev:arm64 \
+          libx11-xcb-dev:arm64 \
+          libxcb-cursor-dev:arm64
+
+    - name: Setup Qt for ARM64 cross-compilation
+      run: |
+        # Download and install Qt for ARM64 cross-compilation
+        # Note: This is a simplified approach - in production you might want
+        # to use a proper cross-compiled Qt build or Docker container
+        
+        # For now, we'll use the host Qt and cross-compile manually
+        sudo apt-get install -y \
+          qt6-base-dev \
+          qt6-multimedia-dev \
+          qt6-declarative-dev \
+          qmake6 \
+          qt6-tools-dev
+    
+    - name: Clean any existing build
+      run: |
+        rm -f .qmake.stash .qmake.cache
+        find . -name "Makefile*" -delete
+        rm -rf moonlight-common-c/Makefile* moonlight-common-c/.qmake.stash
+        rm -rf qmdnsengine/Makefile* qmdnsengine/.qmake.stash 
+        rm -rf h264bitstream/Makefile* h264bitstream/.qmake.stash
+        rm -rf soundio/Makefile* soundio/.qmake.stash
+        rm -rf app/Makefile* app/.qmake.stash
+
+    - name: Cross-compile for Raspberry Pi ARM64
+      env:
+        VERSION: ${{ needs.setup-version.outputs.version }}
+        PKG_CONFIG_PATH: /usr/lib/aarch64-linux-gnu/pkgconfig
+        PKG_CONFIG_LIBDIR: /usr/lib/aarch64-linux-gnu/pkgconfig
+        CC: aarch64-linux-gnu-gcc
+        CXX: aarch64-linux-gnu-g++
+        AR: aarch64-linux-gnu-ar
+        STRIP: aarch64-linux-gnu-strip
+      run: |
+        # Configure for ARM64 cross-compilation
+        qmake6 artemis.pro \
+          CONFIG+=release \
+          CONFIG+=cross_compile \
+          QMAKE_CC=aarch64-linux-gnu-gcc \
+          QMAKE_CXX=aarch64-linux-gnu-g++ \
+          QMAKE_AR=aarch64-linux-gnu-ar \
+          QMAKE_STRIP=aarch64-linux-gnu-strip \
+          QMAKE_LINK=aarch64-linux-gnu-g++
+        
+        # Build for ARM64
+        make -j$(nproc)
+    
+    - name: Package Raspberry Pi Development Build
+      env:
+        VERSION: ${{ needs.setup-version.outputs.version }}
+      run: |
+        # Verify the binary architecture
+        file app/artemis
+        
+        # Create info file
+        cat > build_info_rpi.txt << EOF
+        Artemis Desktop Raspberry Pi ARM64 Development Build
+        Version: $VERSION
+        Numeric Version: ${{ needs.setup-version.outputs.numeric_version }}
+        Is Prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
+        Branch: ${{ github.ref_name }}
+        Commit: ${{ github.sha }}
+        Built: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        Target: Raspberry Pi 4/5 (ARM64)
+        
+        Installation Notes:
+        - Designed for Raspberry Pi 4 or 5 running 64-bit Raspberry Pi OS
+        - May also work on other ARM64 Linux systems
+        - Requires system libraries for multimedia and graphics
+        - Install with: sudo apt install libavcodec58 libavformat58 libsdl2-2.0-0 libqt6core6
+        
+        Performance Notes:
+        - Hardware video decoding supported on compatible systems
+        - Optimized for ARM64 architecture
+        - May require GPU memory split adjustment for best performance
+        EOF
+        
+        # Package with semantic version
+        tar -czf artemis-raspberry-pi-arm64-$VERSION.tar.gz -C app artemis -C .. build_info_rpi.txt
+    
+    - name: Upload Raspberry Pi Development Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: artemis-raspberry-pi-arm64-${{ needs.setup-version.outputs.version }}
+        path: artemis-raspberry-pi-arm64-${{ needs.setup-version.outputs.version }}.tar.gz
+        retention-days: 30
+
   build-steamdeck-dev:
     name: Steam Deck Development Build
     needs: setup-version
@@ -1142,7 +1412,7 @@ jobs:
 
   create-dev-release:
     name: Create Development Release
-    needs: [setup-version, build-windows-dev, build-windows-arm64-dev, build-macos-dev, build-linux-dev, build-appimage-dev, build-flatpak-dev, build-steamdeck-dev]
+    needs: [setup-version, build-windows-dev, build-windows-arm64-dev, build-windows-universal-bundle, build-macos-dev, build-linux-dev, build-appimage-dev, build-flatpak-dev, build-raspberry-pi-dev, build-steamdeck-dev]
     runs-on: ubuntu-latest
     if: (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && needs.setup-version.outputs.should_build == 'true'  # Create releases for develop/main branches when builds ran
     
