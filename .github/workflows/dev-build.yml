@@ -1445,36 +1445,35 @@ jobs:
         Installation Notes:
         - Designed for Raspberry Pi 4 or 5 running 64-bit Raspberry Pi OS
         - May also work on other ARM64 Linux systems
-        # Run DMG generation with error handling
-        DMG_NAME="Artemis-${VERSION}.dmg"
-        if ! ./scripts/generate-dmg.sh Release "$VERSION" "$DMG_NAME"; then
-          echo "DMG generation failed, checking for common issues..."
-          
-          # Check if create-dmg is available
-          create-dmg --help || echo "create-dmg not properly installed"
-          
-          # List what was actually created
-          echo "Contents of build directory:"
-          find build -name "*.dmg" -o -name "*.app" -o -name "Artemis*" | head -20
-          
-          # Try a simpler fallback DMG creation (no --background-size)
-          echo "Attempting fallback DMG creation..."
-          if [ -d "build/build-Release" ]; then
-            cd build/build-Release
-            # Look for the app bundle in the most likely locations
-            if [ -d "app/Artemis.app" ]; then
-              cd ../..
-            elif [ -d "Artemis.app" ]; then
-              cd ../..
-            else
-              exit 1
-            fi
-          else
-            echo "ERROR: build/build-Release directory not found"
-            exit 1
-          fi
-        fi
-        # Ensure DMG output file ends with .dmg and do not use unsupported --background-size option
+        - Requires system libraries for multimedia and graphics
+        - Install with: sudo apt install libavcodec58 libavformat58 libsdl2-2.0-0 libqt6core6
+        
+        Performance Notes:
+        - Hardware video decoding supported on compatible systems
+        - Optimized for ARM64 architecture
+        - May require GPU memory split adjustment for best performance
+        EOF
+        
+        # Package with semantic version
+        tar -czf artemis-raspberry-pi-arm64-$VERSION.tar.gz -C app artemis -C .. build_info_rpi.txt
+    
+    - name: Upload Raspberry Pi Development Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: artemis-raspberry-pi-arm64-${{ needs.setup-version.outputs.version }}
+        path: artemis-raspberry-pi-arm64-${{ needs.setup-version.outputs.version }}.tar.gz
+        retention-days: 30
+
+  build-steamdeck-dev:
+    name: Steam Deck Development Build
+    needs: setup-version
+    runs-on: ubuntu-22.04
+    if: needs.setup-version.outputs.should_build == 'true'
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
         submodules: 'recursive'
         fetch-depth: 0
     
