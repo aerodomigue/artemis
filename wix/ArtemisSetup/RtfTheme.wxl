@@ -49,24 +49,24 @@
   <String Id="SuccessUninstallRestartText" Value="You must restart your computer to complete removal." />
   <String Id="SuccessRestartButton" Value="&amp;Restart" />
   <String Id="SuccessCloseButton" Value="&amp;Close" />
-  <String Id="SuccessLaunchButton">&amp;Launch</String>
+  <String Id="SuccessLaunchButton" Value="&amp;Launch" />
 
-  <String Id="FailureHeader">Installation failed</String>
-  <String Id="FailureInstallHeader">Setup failed to install.</String>
-  <String Id="FailureLayoutHeader">Setup failed to extract all files.</String>
-  <String Id="FailureCacheHeader">Setup failed to cache all packages.</String>
-  <String Id="FailureModifyHeader">Setup failed to modify the installation.</String>
-  <String Id="FailureRepairHeader">Setup failed to repair the installation.</String>
-  <String Id="FailureUninstallHeader">Setup failed to uninstall.</String>
-  <String Id="FailureUnsafeUninstallHeader">Setup failed to force uninstall.</String>
-  <String Id="FailureRestartText">You must restart your computer to complete rollback of the install.</String>
-  <String Id="FailureRestartButton">&amp;Restart</String>
-  <String Id="FailureCloseButton">&amp;Close</String>
-  <String Id="FailureHyperlinkLogText">One or more issues caused the setup to fail. Please fix the issues and then retry setup. For more information see the &lt;A HREF="#"&gt;log file&lt;/A&gt;.</String>
-  <String Id="FailureMessageText">0x[WixBundleLastUsedSource]: [WixBundleProviderKey]</String>
+  <String Id="FailureHeader" Value="Installation failed" />
+  <String Id="FailureInstallHeader" Value="Setup failed to install." />
+  <String Id="FailureLayoutHeader" Value="Setup failed to extract all files." />
+  <String Id="FailureCacheHeader" Value="Setup failed to cache all packages." />
+  <String Id="FailureModifyHeader" Value="Setup failed to modify the installation." />
+  <String Id="FailureRepairHeader" Value="Setup failed to repair the installation." />
+  <String Id="FailureUninstallHeader" Value="Setup failed to uninstall." />
+  <String Id="FailureUnsafeUninstallHeader" Value="Setup failed to force uninstall." />
+  <String Id="FailureRestartText" Value="You must restart your computer to complete rollback of the install." />
+  <String Id="FailureRestartButton" Value="&amp;Restart" />
+  <String Id="FailureCloseButton" Value="&amp;Close" />
+  <String Id="FailureHyperlinkLogText" Value="One or more issues caused the setup to fail. Please fix the issues and then retry setup. For more information see the &lt;A HREF=&quot;#&quot;&gt;log file&lt;/A&gt;." />
+  <String Id="FailureMessageText" Value="0x[WixBundleLastUsedSource]: [WixBundleProviderKey]" />
 
-  <String Id="FilesInUseHeader">Files in use</String>
-  <String Id="FilesInUseMessage">The following applications are using files that need to be updated:</String>
-  <String Id="FilesInUseOkButton">&amp;OK</String>
-  <String Id="FilesInUseCancelButton">&amp;Cancel</String>
+  <String Id="FilesInUseHeader" Value="Files in use" />
+  <String Id="FilesInUseMessage" Value="The following applications are using files that need to be updated:" />
+  <String Id="FilesInUseOkButton" Value="&amp;OK" />
+  <String Id="FilesInUseCancelButton" Value="&amp;Cancel" />
 </WixLocalization>

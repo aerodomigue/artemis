@@ -591,22 +591,16 @@ jobs:
         SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
         NUMERIC_VERSION: ${{ needs.setup-version.outputs.numeric_version }}
       run: |
-        # Convert semantic version to MSBuild/NuGet compatible format
-        # Remove + characters and convert to dots, limit to 4 segments
-        $msbuildVersion = $env:SEMANTIC_VERSION -replace '\+.*$', '' -replace '-', '.'
-        # Ensure we have exactly 4 version segments for MSBuild
-        $versionParts = $msbuildVersion -split '\.'
-        if ($versionParts.Length -lt 4) {
-          while ($versionParts.Length -lt 4) {
-            $versionParts += "0"
-          }
-        } elseif ($versionParts.Length -gt 4) {
-          $versionParts = $versionParts[0..3]
+        # Prefer a purely numeric version for MSBuild/NuGet and WiX
+        $msbuildVersion = $env:NUMERIC_VERSION
+        if ([string]::IsNullOrWhiteSpace($msbuildVersion)) {
+          # Fallback: extract up to 4 numeric segments from semantic version
+          $match = [regex]::Match($env:SEMANTIC_VERSION, '\d+(?:\.\d+){2,3}')
+          if ($match.Success) { $msbuildVersion = $match.Value } else { $msbuildVersion = '0.0.0.0' }
         }
-        $msbuildVersion = $versionParts -join '.'
         
         echo "Original semantic version: $env:SEMANTIC_VERSION"
-        echo "MSBuild compatible version: $msbuildVersion"
+        echo "MSBuild/WiX version: $msbuildVersion"
         
         # Update version file with MSBuild-compatible version
         echo $msbuildVersion > app\version.txt
@@ -615,15 +609,14 @@ jobs:
         $env:BUILD_CONFIG = "release"
         $env:BUILD_ROOT = $PWD
         
-        # Try using dotnet build instead of msbuild for WiX v5
-        # First, restore the project
+        # Restore and build with explicit version properties for WiX v5
         dotnet restore wix\ArtemisSetup\ArtemisSetup.wixproj
         
-        # Build using dotnet build (this should work better with WiX v5 .NET tool)
         $buildCmd = "dotnet build wix\ArtemisSetup\ArtemisSetup.wixproj --configuration Release --no-restore"
         $buildCmd += " -p:INSTALLER_FOLDER=build\installer-release"
         $buildCmd += " -p:BUILD_FOLDER=build\build-release"
         $buildCmd += " -p:BUILD_ROOT=$env:BUILD_ROOT"
+        $buildCmd += " -p:Version=$msbuildVersion -p:WixVersion=$msbuildVersion -p:WixBundleVersion=$msbuildVersion"
         
         Write-Host "Running: $buildCmd"
         cmd /c $buildCmd
@@ -632,8 +625,8 @@ jobs:
           echo "Bundle generation failed with exit code $LASTEXITCODE"
           echo "Trying fallback approach with generate-artemis-bundle.bat script..."
           
-          # Fallback to original script approach
-          cmd /c "scripts\generate-artemis-bundle.bat release"
+          # Fallback to original script approach with version override
+          cmd /c "scripts\generate-artemis-bundle.bat release $msbuildVersion"
           
           if ($LASTEXITCODE -ne 0) {
             echo "Fallback also failed with exit code $LASTEXITCODE"
@@ -756,26 +749,22 @@ jobs:
           make -f Makefile.Release compiler_moc_source_make_all || echo "MOC source generation completed"
           
           # Verify critical MOC files exist, generate manually if needed
-          if [ ! -f release/moc_computermanager.cpp ]; then
-            echo "Manually generating moc_computermanager.cpp"
-            $Qt6_DIR/bin/moc backend/computermanager.h -o release/moc_computermanager.cpp
+          # Generate into the source folder so #include "*.moc" resolves relative to the .cpp file
+          if [ ! -f backend/computermanager.moc ]; then
+            echo "Manually generating backend/computermanager.moc"
+            "$Qt6_DIR/bin/moc" backend/computermanager.cpp -o backend/computermanager.moc
           fi
-          if [ ! -f release/moc_boxartmanager.cpp ]; then
-            echo "Manually generating moc_boxartmanager.cpp"
-            $Qt6_DIR/bin/moc backend/boxartmanager.h -o release/moc_boxartmanager.cpp
-          fi
-          if [ ! -f release/computermanager.moc ]; then
-            echo "Manually generating computermanager.moc"
-            $Qt6_DIR/bin/moc backend/computermanager.cpp -o release/computermanager.moc
-          fi
-          if [ ! -f release/boxartmanager.moc ]; then
-            echo "Manually generating boxartmanager.moc"
-            $Qt6_DIR/bin/moc backend/boxartmanager.cpp -o release/boxartmanager.moc
+          if [ ! -f backend/boxartmanager.moc ]; then
+            echo "Manually generating backend/boxartmanager.moc"
+            "$Qt6_DIR/bin/moc" backend/boxartmanager.cpp -o backend/boxartmanager.moc
           fi
         fi
+        
+        # Build app sub-project to ensure .moc is picked up correctly
+        make -j$(sysctl -n hw.ncpu) release
         cd ..
         
-        # Build the project
+        # Build the rest of the project (other submodules)
         make -j$(sysctl -n hw.ncpu)
     
     - name: Package macOS Development Build
@@ -1197,7 +1186,11 @@ jobs:
       run: |
         sudo apt-get update
         
-        # Install cross-compilation toolchain
+        # Enable ARM64 (aarch64) multiarch to allow installing :arm64 packages
+        sudo dpkg --add-architecture arm64
+        sudo apt-get update
+        
+        # Install cross-compilation toolchain and pkg-config
         sudo apt-get install -y \
           gcc-aarch64-linux-gnu \
           g++-aarch64-linux-gnu \
@@ -1206,7 +1199,7 @@ jobs:
         
         echo "ARM64 cross-compilation toolchain installed successfully"
         echo "Note: Using minimal dependency set for ARM64 cross-compilation"
-
+    
     - name: Setup Qt for ARM64 cross-compilation
       run: |
         # Use the host Qt installation for cross-compilation
@@ -1233,15 +1226,16 @@ jobs:
     - name: Cross-compile for Raspberry Pi ARM64
       env:
         VERSION: ${{ needs.setup-version.outputs.version }}
-        PKG_CONFIG_PATH: /usr/lib/aarch64-linux-gnu/pkgconfig
-        PKG_CONFIG_LIBDIR: /usr/lib/aarch64-linux-gnu/pkgconfig
+        PKG_CONFIG_PATH: /usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+        PKG_CONFIG_LIBDIR: /usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
         PKG_CONFIG_SYSROOT_DIR: /
         CC: aarch64-linux-gnu-gcc
         CXX: aarch64-linux-gnu-g++
         AR: aarch64-linux-gnu-ar
         STRIP: aarch64-linux-gnu-strip
       run: |
-        # Install additional cross-compilation dependencies for ARM64
+        # Install additional ARM64 dev dependencies now that arm64 arch is enabled
+        sudo apt-get update
         sudo apt-get install -y \
           libssl-dev:arm64 \
           libavcodec-dev:arm64 \
@@ -1260,7 +1254,7 @@ jobs:
           'QMAKE_AR=aarch64-linux-gnu-ar cqs' \
           QMAKE_STRIP=aarch64-linux-gnu-strip \
           QMAKE_LINK=aarch64-linux-gnu-g++ \
-          'QMAKE_CXXFLAGS+=-I/usr/include/aarch64-linux-gnu' \
+          'QMAKE_CXXFLAGS+=-I/usr/include/aarch64-linux-gnu -I/usr/include/aarch64-linux-gnu/openssl' \
           'QMAKE_LFLAGS+=-L/usr/lib/aarch64-linux-gnu'
         
         # Build for ARM64
