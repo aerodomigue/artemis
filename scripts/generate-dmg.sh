@@ -64,10 +64,11 @@ if [ "$SIGNING_IDENTITY" != "" ]; then
 fi
 
 echo Creating DMG
+DMG_NAME="Artemis-$VERSION.dmg"
 if [ "$SIGNING_IDENTITY" != "" ]; then
-  create-dmg $BUILD_FOLDER/app/Artemis.app $INSTALLER_FOLDER --identity="$SIGNING_IDENTITY" || fail "create-dmg failed!"
+  create-dmg --volname "Artemis $VERSION" --app-drop-link 600 185 "$INSTALLER_FOLDER/$DMG_NAME" "$BUILD_FOLDER/app/Artemis.app" --identity="$SIGNING_IDENTITY" || fail "create-dmg failed!"
 else
-  create-dmg $BUILD_FOLDER/app/Artemis.app $INSTALLER_FOLDER
+  create-dmg --volname "Artemis $VERSION" --app-drop-link 600 185 "$INSTALLER_FOLDER/$DMG_NAME" "$BUILD_FOLDER/app/Artemis.app"
   case $? in
     0) ;;
     2) ;;
@@ -77,13 +78,11 @@ fi
 
 if [ "$NOTARY_KEYCHAIN_PROFILE" != "" ]; then
   echo Uploading to App Notary service
-  xcrun notarytool submit --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait $INSTALLER_FOLDER/Artemis\ $VERSION.dmg || fail "Notary submission failed"
+  xcrun notarytool submit --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait "$INSTALLER_FOLDER/$DMG_NAME" || fail "Notary submission failed"
 
   echo Stapling notary ticket to DMG
-  xcrun stapler staple -v $INSTALLER_FOLDER/Artemis\ $VERSION.dmg || fail "Notary ticket stapling failed!"
+  xcrun stapler staple -v "$INSTALLER_FOLDER/$DMG_NAME" || fail "Notary ticket stapling failed!"
 fi
-
-mv $INSTALLER_FOLDER/Artemis\ $VERSION.dmg $INSTALLER_FOLDER/Artemis-$VERSION.dmg
 
 # Create build info file
 cat > $INSTALLER_FOLDER/build_info_macos.txt << EOF
