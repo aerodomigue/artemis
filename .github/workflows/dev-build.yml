@@ -811,7 +811,8 @@ jobs:
         echo "$VERSION" > app/version.txt
         
         # Run DMG generation with error handling
-        if ! ./scripts/generate-dmg.sh Release "$VERSION"; then
+        DMG_OUTPUT="Artemis-${VERSION}.dmg"
+        if ! ./scripts/generate-dmg.sh Release "$VERSION" "$DMG_OUTPUT"; then
           echo "DMG generation failed, checking for common issues..."
           
           # Check if create-dmg is available
@@ -821,7 +822,7 @@ jobs:
           echo "Contents of build directory:"
           find build -name "*.dmg" -o -name "*.app" -o -name "Artemis*" | head -20
           
-          # Try a simpler fallback DMG creation
+          # Try a simpler fallback DMG creation with proper .dmg extension
           echo "Attempting fallback DMG creation..."
           
           if [ -d "build/build-Release" ]; then
@@ -829,7 +830,7 @@ jobs:
             # Look for the app bundle in the most likely locations
             if [ -d "app/Artemis.app" ]; then
               echo "Found Artemis.app at app/Artemis.app"
-              # Create a simple DMG manually
+              # Create a simple DMG manually with proper filename
               mkdir -p ../installer-Release
               create-dmg --volname "Artemis-$VERSION" \
                 --icon-size 80 \
@@ -841,7 +842,7 @@ jobs:
               cd ../..
             elif [ -d "Artemis.app" ]; then
               echo "Found Artemis.app at root level"
-              # Create a simple DMG manually
+              # Create a simple DMG manually with proper filename
               mkdir -p ../installer-Release
               create-dmg --volname "Artemis-$VERSION" \
                 --icon-size 80 \
@@ -1393,6 +1394,11 @@ jobs:
           SDL2_TTF_CFLAGS="-I/usr/include/aarch64-linux-gnu/SDL2 -I/usr/include/SDL2"
           SDL2_TTF_LIBS="-lSDL2_ttf"
         fi
+        # Force exclusive use of ARM64 Qt libraries by removing x86_64 paths
+        export QT_SELECT=qt6
+        export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
+        export PKG_CONFIG_SYSROOT_DIR=/
+        
         qmake6 artemis.pro \
           CONFIG+=release \
           CONFIG+=cross_compile \
@@ -1403,9 +1409,9 @@ jobs:
           QMAKE_STRIP=aarch64-linux-gnu-strip \
           QMAKE_LINK=aarch64-linux-gnu-g++ \
           'QMAKE_CXXFLAGS+=-I/usr/include/aarch64-linux-gnu -I/usr/include/aarch64-linux-gnu/openssl -I/usr/include/aarch64-linux-gnu/SDL2' \
-          'QMAKE_LFLAGS+=-L/usr/lib/aarch64-linux-gnu' \
-          QMAKE_LIBDIR_QT=/usr/lib/aarch64-linux-gnu \
-          QMAKE_RPATHDIR=/usr/lib/aarch64-linux-gnu \
+          'QMAKE_LFLAGS+=-L/usr/lib/aarch64-linux-gnu -Wl,-rpath,/usr/lib/aarch64-linux-gnu' \
+          'QMAKE_LIBDIR=/usr/lib/aarch64-linux-gnu' \
+          'LIBS+=-L/usr/lib/aarch64-linux-gnu -lQt6Core -lQt6Gui -lQt6Widgets -lQt6Qml -lQt6Quick -lQt6QuickControls2 -lQt6Svg -lQt6Network -lQt6OpenGL' \
           'CONFIG+=no-pkg-config-openssl' || {
             echo "Main build failed, trying fallback without OpenSSL PKGCONFIG..."
             qmake6 artemis.pro \
@@ -1418,8 +1424,8 @@ jobs:
               'QMAKE_AR=aarch64-linux-gnu-ar cqs' \
               QMAKE_STRIP=aarch64-linux-gnu-strip \
               QMAKE_LINK=aarch64-linux-gnu-g++ \
-              QMAKE_LIBDIR_QT=/usr/lib/aarch64-linux-gnu \
-              QMAKE_RPATHDIR=/usr/lib/aarch64-linux-gnu
+              'QMAKE_LIBDIR=/usr/lib/aarch64-linux-gnu' \
+              'LIBS+=-L/usr/lib/aarch64-linux-gnu -lQt6Core -lQt6Gui -lQt6Widgets -lQt6Qml -lQt6Quick -lQt6QuickControls2 -lQt6Svg -lQt6Network -lQt6OpenGL'
           }
         # If libssl-dev:arm64 is missing, fallback to minimal build without OpenSSL
         
@@ -1466,137 +1472,9 @@ jobs:
         path: artemis-raspberry-pi-arm64-${{ needs.setup-version.outputs.version }}.tar.gz
         retention-days: 30
 
-  build-steamdeck-dev:
-    name: Steam Deck Development Build
-    needs: setup-version
-    runs-on: ubuntu-22.04
-    if: needs.setup-version.outputs.should_build == 'true'
-    
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        submodules: 'recursive'
-        fetch-depth: 0
-    
-    - name: Display version info
-      run: echo "Using development version ${{ needs.setup-version.outputs.version }}"
-    
-    - name: Setup Qt
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: ${{ env.QT_VERSION }}
-        host: 'linux'
-        target: 'desktop'
-        modules: 'qtmultimedia'
-    
-    - name: Install Steam Deck specific dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          libegl1-mesa-dev libgl1-mesa-dev libopus-dev libsdl2-dev \
-          libsdl2-ttf-dev libssl-dev libavcodec-dev libavformat-dev \
-          libswscale-dev libva-dev libvdpau-dev libxkbcommon-dev \
-          wayland-protocols libdrm-dev nasm libgbm-dev \
-          libfreetype6-dev libasound2-dev libdbus-1-dev \
-          libgles2-mesa-dev libglu1-mesa-dev libibus-1.0-dev \
-          libpulse-dev libudev-dev libx11-dev libxcursor-dev \
-          libxext-dev libxi-dev libxinerama-dev libxrandr-dev \
-          libxss-dev libxt-dev libxv-dev libxxf86vm-dev \
-          libxcb-dri3-dev libx11-xcb-dev
-    
-    - name: Build for Steam Deck
-      run: |
-        export PATH="$Qt6_DIR/bin:$PATH"
-        export QMAKE="$Qt6_DIR/bin/qmake6"
-        # Build with Steam Deck optimizations
-        qmake6 artemis.pro CONFIG+=release CONFIG+=steamdeck
-        make -j$(nproc)
-    
-    - name: Package Steam Deck Development Build
-      env:
-        VERSION: ${{ needs.setup-version.outputs.version }}
-      run: |
-        mkdir -p steamdeck-package
-        cp app/artemis steamdeck-package/artemis-dev
-        
-        # Create Steam Deck specific files
-        cat > steamdeck-package/artemis-dev.desktop << EOF
-        [Desktop Entry]
-        Type=Application
-        Name=Artemis Desktop (Dev)
-        Comment=Artemis Desktop Development Build - Optimized for Steam Deck
-        Exec=artemis-dev
-        Icon=artemis-dev
-        Categories=Game;Network;
-        EOF
-        
-        # Create installation script for Steam Deck
-        cat > steamdeck-package/install-steamdeck.sh << 'EOF'
-        #!/bin/bash
-        echo "Installing Artemis Desktop Development Build for Steam Deck..."
-        
-        # Create directories
-        mkdir -p ~/.local/share/applications
-        mkdir -p ~/.local/bin
-        
-        # Copy files
-        cp artemis-dev ~/.local/bin/
-        chmod +x ~/.local/bin/artemis-dev
-        cp artemis-dev.desktop ~/.local/share/applications/
-        
-        echo "Installation complete!"
-        echo "You can now find Artemis Desktop (Dev) in your applications menu."
-        EOF
-        
-        chmod +x steamdeck-package/install-steamdeck.sh
-        
-        # Create build info
-        cat > steamdeck-package/build_info.txt << EOF
-        Artemis Desktop Development Build (Steam Deck)
-        Version: $VERSION
-        Branch: ${{ github.ref_name }}
-        Commit: ${{ github.sha }}
-        Built: $(date)
-        
-        Installation:
-        1. Extract this archive
-        2. Run: ./install-steamdeck.sh
-        3. Find Artemis Desktop (Dev) in your applications
-        EOF
-        
-        # Create README for Steam Deck users
-        cat > steamdeck-package/README-SteamDeck.md << EOF
-        # Artemis Desktop for Steam Deck (Development Build)
-        
-        ## Installation
-        1. Extract this archive to a folder
-        2. Open a terminal in that folder
-        3. Run: \`./install-steamdeck.sh\`
-        4. The app will be available in your applications menu
-        
-        ## Steam Deck Specific Notes
-        - This build is optimized for Steam Deck's controls and display
-        - Use the touchscreen or external mouse/keyboard for initial setup
-        - Game mode streaming works best with the built-in controls
-        
-        ## Troubleshooting
-        - If you have issues, try running from terminal: \`~/.local/bin/artemis-dev\`
-        - Check the build_info.txt for version details
-        EOF
-        
-        tar -czf artemis-steamdeck-$VERSION.tar.gz -C steamdeck-package .
-    
-    - name: Upload Steam Deck Development Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: artemis-steamdeck-${{ needs.setup-version.outputs.version }}
-        path: artemis-steamdeck-${{ needs.setup-version.outputs.version }}.tar.gz
-        retention-days: 30
-
   create-dev-release:
     name: Create Development Release
-    needs: [setup-version, build-windows-dev, build-windows-arm64-dev, build-windows-universal-bundle, build-macos-dev, build-linux-dev, build-appimage-dev, build-flatpak-dev, build-raspberry-pi-dev, build-steamdeck-dev]
+    needs: [setup-version, build-windows-dev, build-windows-arm64-dev, build-windows-universal-bundle, build-macos-dev, build-linux-dev, build-appimage-dev, build-flatpak-dev, build-raspberry-pi-dev]
     runs-on: ubuntu-latest
     if: (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && needs.setup-version.outputs.should_build == 'true'  # Create releases for develop/main branches when builds ran
     
