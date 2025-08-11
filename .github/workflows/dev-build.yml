@@ -832,7 +832,6 @@ jobs:
               # Create a simple DMG manually
               mkdir -p ../installer-Release
               create-dmg --volname "Artemis-$VERSION" \
-                --background-size 512 320 \
                 --icon-size 80 \
                 --icon "app/Artemis.app" 200 190 \
                 --hide-extension "app/Artemis.app" \
@@ -845,7 +844,6 @@ jobs:
               # Create a simple DMG manually
               mkdir -p ../installer-Release
               create-dmg --volname "Artemis-$VERSION" \
-                --background-size 512 320 \
                 --icon-size 80 \
                 --icon "Artemis.app" 200 190 \
                 --hide-extension "Artemis.app" \
@@ -1406,6 +1404,8 @@ jobs:
           QMAKE_LINK=aarch64-linux-gnu-g++ \
           'QMAKE_CXXFLAGS+=-I/usr/include/aarch64-linux-gnu -I/usr/include/aarch64-linux-gnu/openssl -I/usr/include/aarch64-linux-gnu/SDL2' \
           'QMAKE_LFLAGS+=-L/usr/lib/aarch64-linux-gnu' \
+          QMAKE_LIBDIR_QT=/usr/lib/aarch64-linux-gnu \
+          QMAKE_RPATHDIR=/usr/lib/aarch64-linux-gnu \
           'CONFIG+=no-pkg-config-openssl' || {
             echo "Main build failed, trying fallback without OpenSSL PKGCONFIG..."
             qmake6 artemis.pro \
@@ -1417,7 +1417,9 @@ jobs:
               QMAKE_CXX=aarch64-linux-gnu-g++ \
               'QMAKE_AR=aarch64-linux-gnu-ar cqs' \
               QMAKE_STRIP=aarch64-linux-gnu-strip \
-              QMAKE_LINK=aarch64-linux-gnu-g++
+              QMAKE_LINK=aarch64-linux-gnu-g++ \
+              QMAKE_LIBDIR_QT=/usr/lib/aarch64-linux-gnu \
+              QMAKE_RPATHDIR=/usr/lib/aarch64-linux-gnu
           }
         # If libssl-dev:arm64 is missing, fallback to minimal build without OpenSSL
         
