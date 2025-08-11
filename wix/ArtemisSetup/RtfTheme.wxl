@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization Culture="en-us" Language="1033" Codepage="1252" xmlns="http://wixtoolset.org/schemas/v4/wxl">
+  <String Id="Caption">Artemis Game Streaming Setup</String>
+  <String Id="Title">Artemis Game Streaming</String>
+  <String Id="InstallMessage">Thank you for downloading Artemis Game Streaming.</String>
+  <String Id="InstallVersion">Version [WixBundleVersion]</String>
+
+  <String Id="ConfirmCancelMessage">Are you sure you want to cancel?</String>
+
+  <String Id="ExecuteUpgradeRelatedBundleMessage">A previous version of [WixBundleName] is currently installed. Setup will remove the previous version before installing. Do you want to continue?</String>
+
+  <String Id="HelpHeader">Setup Help</String>
+  <String Id="HelpText">Setup help text goes here...</String>
+  <String Id="HelpCancelButton">&amp;Cancel</String>
+
+  <String Id="LoadingHeader">Setup is preparing...</String>
+  <String Id="LoadingMessage">Please wait while Setup prepares the necessary files.</String>
+  <String Id="LoadingCancelButton">&amp;Cancel</String>
+
+  <String Id="OptionsHeader">Setup Options</String>
+  <String Id="OptionsLocationLabel">Install [WixBundleName] to:</String>
+  <String Id="OptionsEulaAcceptCheckbox">I &amp;agree to the license terms and conditions</String>
+  <String Id="OptionsInstallButton">&amp;Install</String>
+  <String Id="OptionsUpgradeButton">&amp;Upgrade</String>
+  <String Id="OptionsUninstallButton">&amp;Uninstall</String>
+  <String Id="OptionsRepairButton">&amp;Repair</String>
+  <String Id="OptionsCancelButton">&amp;Cancel</String>
+
+  <String Id="ProgressHeader">Installing Artemis Game Streaming...</String>
+  <String Id="ProgressLayoutHeader">Extracting files...</String>
+  <String Id="ProgressCacheHeader">Caching packages...</String>
+  <String Id="ProgressInstallHeader">Installing...</String>
+  <String Id="ProgressModifyHeader">Modifying...</String>
+  <String Id="ProgressRepairHeader">Repairing...</String>
+  <String Id="ProgressUninstallHeader">Uninstalling...</String>
+  <String Id="ProgressUnsafeUninstallHeader">Force removing...</String>
+  <String Id="ProgressMessage">Please wait while Setup installs Artemis Game Streaming.</String>
+  <String Id="ProgressCancelButton">&amp;Cancel</String>
+
+  <String Id="SuccessHeader">Installation completed successfully</String>
+  <String Id="SuccessInstallHeader">Installation completed successfully</String>
+  <String Id="SuccessLayoutHeader">Layout completed successfully</String>
+  <String Id="SuccessCacheHeader">Cache completed successfully</String>
+  <String Id="SuccessModifyHeader">Modify completed successfully</String>
+  <String Id="SuccessRepairHeader">Repair completed successfully</String>
+  <String Id="SuccessUninstallHeader">Uninstall completed successfully</String>
+  <String Id="SuccessUnsafeUninstallHeader">Force uninstall completed successfully</String>
+  <String Id="SuccessRestartText">You must restart your computer to complete installation.</String>
+  <String Id="SuccessUninstallRestartText">You must restart your computer to complete removal.</String>
+  <String Id="SuccessRestartButton">&amp;Restart</String>
+  <String Id="SuccessCloseButton">&amp;Close</String>
+  <String Id="SuccessLaunchButton">&amp;Launch</String>
+
+  <String Id="FailureHeader">Installation failed</String>
+  <String Id="FailureInstallHeader">Setup failed to install.</String>
+  <String Id="FailureLayoutHeader">Setup failed to extract all files.</String>
+  <String Id="FailureCacheHeader">Setup failed to cache all packages.</String>
+  <String Id="FailureModifyHeader">Setup failed to modify the installation.</String>
+  <String Id="FailureRepairHeader">Setup failed to repair the installation.</String>
+  <String Id="FailureUninstallHeader">Setup failed to uninstall.</String>
+  <String Id="FailureUnsafeUninstallHeader">Setup failed to force uninstall.</String>
+  <String Id="FailureRestartText">You must restart your computer to complete rollback of the install.</String>
+  <String Id="FailureRestartButton">&amp;Restart</String>
+  <String Id="FailureCloseButton">&amp;Close</String>
+  <String Id="FailureHyperlinkLogText">One or more issues caused the setup to fail. Please fix the issues and then retry setup. For more information see the &lt;A HREF="#"&gt;log file&lt;/A&gt;.</String>
+  <String Id="FailureMessageText">0x[WixBundleLastUsedSource]: [WixBundleProviderKey]</String>
+
+  <String Id="FilesInUseHeader">Files in use</String>
+  <String Id="FilesInUseMessage">The following applications are using files that need to be updated:</String>
+  <String Id="FilesInUseOkButton">&amp;OK</String>
+  <String Id="FilesInUseCancelButton">&amp;Cancel</String>
+</WixLocalization>

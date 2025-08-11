@@ -567,6 +567,9 @@ jobs:
         
         # Verify installation
         wix --version
+        
+        # Also install Visual Studio Build Tools (includes MSBuild) for compatibility
+        choco install visualstudio2022buildtools --package-parameters "--includeRecommended --includeOptional --quiet --wait" -y
     
     - name: Prepare individual MSI files
       env:
@@ -593,12 +596,29 @@ jobs:
         # Set environment variables that the WiX scripts expect
         $env:BUILD_CONFIG = "release"
         
-        # Generate the universal installer bundle
-        cmd /c "scripts\generate-artemis-bundle.bat release"
+        # Try using dotnet build instead of msbuild for WiX v5
+        # First, restore the project
+        dotnet restore wix\ArtemisSetup\ArtemisSetup.wixproj
+        
+        # Build using dotnet build (this should work better with WiX v5 .NET tool)
+        $buildCmd = "dotnet build wix\ArtemisSetup\ArtemisSetup.wixproj --configuration Release --no-restore"
+        $buildCmd += " -p:INSTALLER_FOLDER=build\installer-release"
+        $buildCmd += " -p:BUILD_FOLDER=build\build-release"
+        
+        Write-Host "Running: $buildCmd"
+        cmd /c $buildCmd
         
         if ($LASTEXITCODE -ne 0) {
           echo "Bundle generation failed with exit code $LASTEXITCODE"
-          exit $LASTEXITCODE
+          echo "Trying fallback approach with generate-artemis-bundle.bat script..."
+          
+          # Fallback to original script approach
+          cmd /c "scripts\generate-artemis-bundle.bat release"
+          
+          if ($LASTEXITCODE -ne 0) {
+            echo "Fallback also failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
         }
     
     - name: Rename universal bundle
@@ -685,17 +705,27 @@ jobs:
       run: |
         rm -f .qmake.stash .qmake.cache
         find . -name "Makefile*" -delete
+        find . -name "*.moc" -delete
+        find . -name "moc_*.cpp" -delete
+        find . -name "moc_*.h" -delete
         rm -rf moonlight-common-c/Makefile* moonlight-common-c/.qmake.stash
         rm -rf qmdnsengine/Makefile* qmdnsengine/.qmake.stash 
         rm -rf h264bitstream/Makefile* h264bitstream/.qmake.stash
         rm -rf soundio/Makefile* soundio/.qmake.stash
         rm -rf app/Makefile* app/.qmake.stash
+        rm -rf app/debug app/release
     
     - name: Build
       run: |
         export PATH="$Qt6_DIR/bin:$PATH"
         export QMAKE="$Qt6_DIR/bin/qmake6"
+        
+        # Force a complete clean build to ensure MOC files are generated
+        make clean || true
         qmake6 artemis.pro CONFIG+=release CONFIG+=sdk_no_version_check
+        
+        # Generate MOC files explicitly before building
+        make -j$(sysctl -n hw.ncpu) qmake_all
         make -j$(sysctl -n hw.ncpu)
     
     - name: Package macOS Development Build
@@ -1124,47 +1154,21 @@ jobs:
           libc6-dev-arm64-cross \
           pkg-config
         
-        # Install ARM64 system libraries
-        sudo apt-get install -y \
-          libavcodec-dev:arm64 \
-          libavformat-dev:arm64 \
-          libavutil-dev:arm64 \
-          libswscale-dev:arm64 \
-          libswresample-dev:arm64 \
-          libgl1-mesa-dev:arm64 \
-          libegl1-mesa-dev:arm64 \
-          libgles2-mesa-dev:arm64 \
-          libglu1-mesa-dev:arm64 \
-          libibus-1.0-dev:arm64 \
-          libpulse-dev:arm64 \
-          libudev-dev:arm64 \
-          libx11-dev:arm64 \
-          libxcursor-dev:arm64 \
-          libxext-dev:arm64 \
-          libxi-dev:arm64 \
-          libxinerama-dev:arm64 \
-          libxrandr-dev:arm64 \
-          libxss-dev:arm64 \
-          libxt-dev:arm64 \
-          libxv-dev:arm64 \
-          libxxf86vm-dev:arm64 \
-          libxcb-dri3-dev:arm64 \
-          libx11-xcb-dev:arm64 \
-          libxcb-cursor-dev:arm64
+        echo "ARM64 cross-compilation toolchain installed successfully"
+        echo "Note: Using minimal dependency set for ARM64 cross-compilation"
 
     - name: Setup Qt for ARM64 cross-compilation
       run: |
-        # Download and install Qt for ARM64 cross-compilation
-        # Note: This is a simplified approach - in production you might want
-        # to use a proper cross-compiled Qt build or Docker container
-        
-        # For now, we'll use the host Qt and cross-compile manually
+        # Use the host Qt installation for cross-compilation
+        # This is a minimal approach for ARM64 cross-compilation
         sudo apt-get install -y \
           qt6-base-dev \
           qt6-multimedia-dev \
           qt6-declarative-dev \
           qmake6 \
           qt6-tools-dev
+        
+        echo "Qt setup complete for ARM64 cross-compilation"
     
     - name: Clean any existing build
       run: |
