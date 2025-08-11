@@ -582,18 +582,20 @@ Flickable {
                                             inputMethodHints: Qt.ImhFormattedNumbersOnly
                                             placeholderText: "144.0"
                                             validator: refreshRateValidator
-                                            focus: true                                        IntValidator {
-                                            id: intValidator
-                                            bottom: 10
-                                            top: 500
-                                        }
-                                        
-                                        DoubleValidator {
-                                            id: refreshRateValidator
-                                            bottom: 10.0
-                                            top: 500.0
-                                            decimals: 2
-                                        }
+                                            focus: true
+
+                                            IntValidator {
+                                                id: intValidator
+                                                bottom: 10
+                                                top: 500
+                                            }
+                                            
+                                            DoubleValidator {
+                                                id: refreshRateValidator
+                                                bottom: 10.0
+                                                top: 500.0
+                                                decimals: 2
+                                            }
 
                                         onTextChanged: {
                                             // Automatically enable fractional refresh rate if there's a value
