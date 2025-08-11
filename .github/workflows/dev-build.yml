@@ -826,7 +826,22 @@ jobs:
           
           if [ -d "build/build-Release" ]; then
             cd build/build-Release
-            if [ -d "Artemis.app" ]; then
+            # Look for the app bundle in the most likely locations
+            if [ -d "app/Artemis.app" ]; then
+              echo "Found Artemis.app at app/Artemis.app"
+              # Create a simple DMG manually
+              mkdir -p ../installer-Release
+              create-dmg --volname "Artemis-$VERSION" \
+                --background-size 512 320 \
+                --icon-size 80 \
+                --icon "app/Artemis.app" 200 190 \
+                --hide-extension "app/Artemis.app" \
+                --app-drop-link 400 185 \
+                "../installer-Release/Artemis-$VERSION.dmg" \
+                "app/Artemis.app"
+              cd ../..
+            elif [ -d "Artemis.app" ]; then
+              echo "Found Artemis.app at root level"
               # Create a simple DMG manually
               mkdir -p ../installer-Release
               create-dmg --volname "Artemis-$VERSION" \
@@ -840,6 +855,8 @@ jobs:
               cd ../..
             else
               echo "ERROR: Artemis.app not found in build/build-Release"
+              echo "Available directories in build/build-Release:"
+              find . -name "*.app" -type d | head -10
               exit 1
             fi
           else
@@ -1287,20 +1304,30 @@ jobs:
     
     - name: Setup Qt for ARM64 cross-compilation
       run: |
+        # First, try to update package lists
+        sudo apt-get update
+        
         # Install Qt6 host tools (needed for qmake6, moc, etc.)
         # We need the host Qt6 for build tools, but will use ARM64 system packages for libraries
         sudo apt-get install -y \
           qt6-base-dev \
           qt6-tools-dev \
           qt6-tools-dev-tools \
-          qt6-qmake \
-          qt6-svg-dev \
-          qt6-multimedia-dev \
+          qmake6 \
+          libqt6svg6-dev \
           libqt6core6 \
           libqt6gui6 \
           libqt6widgets6 \
-          libqt6multimedia6 \
-          libqt6svg6
+          libqt6svg6 || {
+            echo "Failed to install some Qt6 packages, trying alternative approach..."
+            
+            # Fallback: install what's available
+            sudo apt-get install -y \
+              qt6-base-dev \
+              qt6-tools-dev \
+              libqt6svg6-dev \
+              qmake6 || echo "Using system Qt6 installation"
+        }
           
         # Verify Qt6 tools are available
         which qmake6 || echo "qmake6 not found in PATH"
