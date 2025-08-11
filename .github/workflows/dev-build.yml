@@ -829,24 +829,22 @@ jobs:
             # Use create-dmg directly with correct argument order
             echo "Found Artemis.app at app/Artemis.app"
             mkdir -p build/installer-Release
-            create-dmg \
-              --volname "Artemis" \
-              --window-pos 200 120 \
-              --window-size 600 300 \
-              --icon-size 100 \
-              --icon "Artemis.app" 175 120 \
-              --app-drop-link 425 120 \
-              "build/installer-Release/Artemis-${VERSION}.dmg" \
-              "app/" || {
-              echo "Direct create-dmg failed, trying minimal approach..."
-              # Even simpler approach - just copy the app and create basic DMG
-              if [ -d "app/Artemis.app" ]; then
-                hdiutil create -srcfolder app/Artemis.app -volname "Artemis" "build/installer-Release/Artemis-${VERSION}.dmg" || exit 1
-              else
-                echo "Error: No Artemis.app found in app/ directory"
-                exit 1
-              fi
-            }
+            # Simple approach using hdiutil which is more reliable
+            if [ -d "app/Artemis.app" ]; then
+              echo "Creating DMG with hdiutil..."
+              hdiutil create -srcfolder app/Artemis.app -volname "Artemis" "build/installer-Release/Artemis-${VERSION}.dmg" || {
+                echo "hdiutil failed, trying create-dmg with minimal options..."
+                create-dmg \
+                  --volname "Artemis" \
+                  --no-internet-enable \
+                  --app-drop-link 350 185 \
+                  "build/installer-Release/Artemis-${VERSION}.dmg" \
+                  "app/" || exit 1
+              }
+            else
+              echo "Error: No Artemis.app found in app/ directory"
+              exit 1
+            fi
             cd build/build-Release
             # Look for the app bundle in the most likely locations
             if [ -d "app/Artemis.app" ]; then
@@ -1354,11 +1352,26 @@ jobs:
         qmake6 -version || echo "qmake6 version check failed"
         # Use the host Qt installation for cross-compilation
         # This is a minimal approach for ARM64 cross-compilation
+        
+        # First ensure we have qmake6 in the system - try multiple approaches
+        if ! which qmake6; then
+          echo "qmake6 not found, installing Qt6 tools..."
+          sudo apt-get install -y qt6-base-dev-tools qt6-base-dev qt6-tools-dev || {
+            echo "Trying alternative Qt6 installation..."
+            sudo apt-get install -y qt6-qmake qt6-base-dev || {
+              echo "Using legacy package names..."
+              sudo apt-get install -y qmake6 qt6-base-dev-tools
+            }
+          }
+        fi
+        
+        # Verify qmake6 is now available
+        which qmake6 && qmake6 -version
+        
         sudo apt-get install -y \
           qt6-base-dev \
           qt6-multimedia-dev \
           qt6-declarative-dev \
-          qmake6 \
           qt6-tools-dev
         
         echo "Qt setup complete for ARM64 cross-compilation"
