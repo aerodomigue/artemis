@@ -764,6 +764,10 @@ jobs:
             echo "Manually generating backend/boxartmanager.moc"
             "$Qt6_DIR/libexec/moc" backend/boxartmanager.cpp -o backend/boxartmanager.moc
           fi
+          if [ ! -f gui/computermodel.moc ]; then
+            echo "Manually generating gui/computermodel.moc"
+            "$Qt6_DIR/libexec/moc" gui/computermodel.cpp -o gui/computermodel.moc
+          fi
         fi
         
         # Clean and rebuild all subprojects with consistent deployment target
@@ -1284,10 +1288,27 @@ jobs:
           libavformat-dev:arm64 \
           libswscale-dev:arm64 \
           libsdl2-dev:arm64 \
+          libsdl2-ttf-dev:arm64 \
           libopus-dev:arm64 || echo "Some ARM64 packages not available, will use minimal build"
         
         # Configure for ARM64 cross-compilation with minimal dependencies
         # Disable PKGCONFIG for OpenSSL as fallback if arm64 packages unavailable
+        # Also ensure SDL2_ttf can be found via pkg-config
+        export PKG_CONFIG_PATH="/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig:$PKG_CONFIG_PATH"
+        export SDL2_CONFIG="$(which sdl2-config || echo '/usr/bin/sdl2-config')"
+        
+        # Test SDL2_ttf availability
+        if pkg-config --exists SDL2_ttf; then
+          echo "SDL2_ttf found via pkg-config"
+          SDL2_TTF_CFLAGS=$(pkg-config --cflags SDL2_ttf)
+          SDL2_TTF_LIBS=$(pkg-config --libs SDL2_ttf)
+          echo "SDL2_ttf CFLAGS: $SDL2_TTF_CFLAGS"
+          echo "SDL2_ttf LIBS: $SDL2_TTF_LIBS"
+        else
+          echo "WARNING: SDL2_ttf not found via pkg-config, using fallback paths"
+          SDL2_TTF_CFLAGS="-I/usr/include/aarch64-linux-gnu/SDL2 -I/usr/include/SDL2"
+          SDL2_TTF_LIBS="-lSDL2_ttf"
+        fi
         qmake6 artemis.pro \
           CONFIG+=release \
           CONFIG+=cross_compile \
@@ -1297,7 +1318,7 @@ jobs:
           'QMAKE_AR=aarch64-linux-gnu-ar cqs' \
           QMAKE_STRIP=aarch64-linux-gnu-strip \
           QMAKE_LINK=aarch64-linux-gnu-g++ \
-          'QMAKE_CXXFLAGS+=-I/usr/include/aarch64-linux-gnu -I/usr/include/aarch64-linux-gnu/openssl' \
+          'QMAKE_CXXFLAGS+=-I/usr/include/aarch64-linux-gnu -I/usr/include/aarch64-linux-gnu/openssl -I/usr/include/aarch64-linux-gnu/SDL2' \
           'QMAKE_LFLAGS+=-L/usr/lib/aarch64-linux-gnu' \
           'CONFIG+=no-pkg-config-openssl' || {
             echo "Main build failed, trying fallback without OpenSSL PKGCONFIG..."
