@@ -752,11 +752,11 @@ jobs:
           # Generate into the source folder so #include "*.moc" resolves relative to the .cpp file
           if [ ! -f backend/computermanager.moc ]; then
             echo "Manually generating backend/computermanager.moc"
-            "$Qt6_DIR/bin/moc" backend/computermanager.cpp -o backend/computermanager.moc
+            "$Qt6_DIR/libexec/moc" backend/computermanager.cpp -o backend/computermanager.moc
           fi
           if [ ! -f backend/boxartmanager.moc ]; then
             echo "Manually generating backend/boxartmanager.moc"
-            "$Qt6_DIR/bin/moc" backend/boxartmanager.cpp -o backend/boxartmanager.moc
+            "$Qt6_DIR/libexec/moc" backend/boxartmanager.cpp -o backend/boxartmanager.moc
           fi
         fi
         
@@ -1188,6 +1188,15 @@ jobs:
         
         # Enable ARM64 (aarch64) multiarch to allow installing :arm64 packages
         sudo dpkg --add-architecture arm64
+        
+        # Add ports.ubuntu.com sources for arm64 to avoid 404s from security.ubuntu.com
+        sudo tee /etc/apt/sources.list.d/arm64-ports.list >/dev/null << 'EOF'
+        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
+        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse
+        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
+        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-backports main restricted universe multiverse
+        EOF
+        
         sudo apt-get update
         
         # Install cross-compilation toolchain and pkg-config
@@ -1198,7 +1207,7 @@ jobs:
           pkg-config
         
         echo "ARM64 cross-compilation toolchain installed successfully"
-        echo "Note: Using minimal dependency set for ARM64 cross-compilation"
+        echo "Note: Using arm64 ports.ubuntu.com sources to resolve 404s"
     
     - name: Setup Qt for ARM64 cross-compilation
       run: |
@@ -1606,12 +1615,4 @@ jobs:
           2. Extract the archive (if applicable)
           3. Run the executable (may require additional setup on some platforms)' || 'No installation files are available for this release. Please check recent releases or feature branches for builds.' }}
           
-          ## 🐛 Found a Bug?
-          Please report issues on our [GitHub Issues](https://github.com/${{ github.repository }}/issues) page.
-        files: |
-          ${{ steps.check-artifacts.outputs.artifacts_exist == 'true' && 'artifacts/*/*' || '' }}
-          ${{ steps.check-artifacts.outputs.artifacts_exist == 'false' && 'reused-artifacts/*' || '' }}
-        prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
-        draft: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ##
