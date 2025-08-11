@@ -589,9 +589,27 @@ jobs:
     - name: Generate Universal Bundle  
       env:
         SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
+        NUMERIC_VERSION: ${{ needs.setup-version.outputs.numeric_version }}
       run: |
-        # Update version file
-        echo $env:SEMANTIC_VERSION > app\version.txt
+        # Convert semantic version to MSBuild/NuGet compatible format
+        # Remove + characters and convert to dots, limit to 4 segments
+        $msbuildVersion = $env:SEMANTIC_VERSION -replace '\+.*$', '' -replace '-', '.'
+        # Ensure we have exactly 4 version segments for MSBuild
+        $versionParts = $msbuildVersion -split '\.'
+        if ($versionParts.Length -lt 4) {
+          while ($versionParts.Length -lt 4) {
+            $versionParts += "0"
+          }
+        } elseif ($versionParts.Length -gt 4) {
+          $versionParts = $versionParts[0..3]
+        }
+        $msbuildVersion = $versionParts -join '.'
+        
+        echo "Original semantic version: $env:SEMANTIC_VERSION"
+        echo "MSBuild compatible version: $msbuildVersion"
+        
+        # Update version file with MSBuild-compatible version
+        echo $msbuildVersion > app\version.txt
         
         # Set environment variables that the WiX scripts expect
         $env:BUILD_CONFIG = "release"
@@ -724,8 +742,15 @@ jobs:
         make clean || true
         qmake6 artemis.pro CONFIG+=release CONFIG+=sdk_no_version_check
         
-        # Generate MOC files explicitly before building
+        # Generate MOC files explicitly and ensure they're created before building
         make -j$(sysctl -n hw.ncpu) qmake_all
+        
+        # Explicitly generate MOC files for problematic classes
+        cd app && make -f Makefile.Release compiler_moc_header_make_all
+        cd app && make -f Makefile.Release compiler_moc_source_make_all
+        cd ..
+        
+        # Build the project
         make -j$(sysctl -n hw.ncpu)
     
     - name: Package macOS Development Build
@@ -1196,7 +1221,7 @@ jobs:
           CONFIG+=cross_compile \
           QMAKE_CC=aarch64-linux-gnu-gcc \
           QMAKE_CXX=aarch64-linux-gnu-g++ \
-          QMAKE_AR=aarch64-linux-gnu-ar \
+          'QMAKE_AR=aarch64-linux-gnu-ar cqs' \
           QMAKE_STRIP=aarch64-linux-gnu-strip \
           QMAKE_LINK=aarch64-linux-gnu-g++
         
