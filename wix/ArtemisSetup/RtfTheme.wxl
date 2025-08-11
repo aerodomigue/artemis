@@ -1,54 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
 <WixLocalization Culture="en-us" Language="1033" Codepage="1252" xmlns="http://wixtoolset.org/schemas/v4/wxl">
-  <String Id="Caption">Artemis Game Streaming Setup</String>
-  <String Id="Title">Artemis Game Streaming</String>
-  <String Id="InstallMessage">Thank you for downloading Artemis Game Streaming.</String>
-  <String Id="InstallVersion">Version [WixBundleVersion]</String>
+  <String Id="Caption" Value="Artemis Game Streaming Setup" />
+  <String Id="Title" Value="Artemis Game Streaming" />
+  <String Id="InstallMessage" Value="Thank you for downloading Artemis Game Streaming." />
+  <String Id="InstallVersion" Value="Version [WixBundleVersion]" />
 
-  <String Id="ConfirmCancelMessage">Are you sure you want to cancel?</String>
+  <String Id="ConfirmCancelMessage" Value="Are you sure you want to cancel?" />
 
-  <String Id="ExecuteUpgradeRelatedBundleMessage">A previous version of [WixBundleName] is currently installed. Setup will remove the previous version before installing. Do you want to continue?</String>
+  <String Id="ExecuteUpgradeRelatedBundleMessage" Value="A previous version of [WixBundleName] is currently installed. Setup will remove the previous version before installing. Do you want to continue?" />
 
-  <String Id="HelpHeader">Setup Help</String>
-  <String Id="HelpText">Setup help text goes here...</String>
-  <String Id="HelpCancelButton">&amp;Cancel</String>
+  <String Id="HelpHeader" Value="Setup Help" />
+  <String Id="HelpText" Value="Setup help text goes here..." />
+  <String Id="HelpCancelButton" Value="&amp;Cancel" />
 
-  <String Id="LoadingHeader">Setup is preparing...</String>
-  <String Id="LoadingMessage">Please wait while Setup prepares the necessary files.</String>
-  <String Id="LoadingCancelButton">&amp;Cancel</String>
+  <String Id="LoadingHeader" Value="Setup is preparing..." />
+  <String Id="LoadingMessage" Value="Please wait while Setup prepares the necessary files." />
+  <String Id="LoadingCancelButton" Value="&amp;Cancel" />
 
-  <String Id="OptionsHeader">Setup Options</String>
-  <String Id="OptionsLocationLabel">Install [WixBundleName] to:</String>
-  <String Id="OptionsEulaAcceptCheckbox">I &amp;agree to the license terms and conditions</String>
-  <String Id="OptionsInstallButton">&amp;Install</String>
-  <String Id="OptionsUpgradeButton">&amp;Upgrade</String>
-  <String Id="OptionsUninstallButton">&amp;Uninstall</String>
-  <String Id="OptionsRepairButton">&amp;Repair</String>
-  <String Id="OptionsCancelButton">&amp;Cancel</String>
+  <String Id="OptionsHeader" Value="Setup Options" />
+  <String Id="OptionsLocationLabel" Value="Install [WixBundleName] to:" />
+  <String Id="OptionsEulaAcceptCheckbox" Value="I &amp;agree to the license terms and conditions" />
+  <String Id="OptionsInstallButton" Value="&amp;Install" />
+  <String Id="OptionsUpgradeButton" Value="&amp;Upgrade" />
+  <String Id="OptionsUninstallButton" Value="&amp;Uninstall" />
+  <String Id="OptionsRepairButton" Value="&amp;Repair" />
+  <String Id="OptionsCancelButton" Value="&amp;Cancel" />
 
-  <String Id="ProgressHeader">Installing Artemis Game Streaming...</String>
-  <String Id="ProgressLayoutHeader">Extracting files...</String>
-  <String Id="ProgressCacheHeader">Caching packages...</String>
-  <String Id="ProgressInstallHeader">Installing...</String>
-  <String Id="ProgressModifyHeader">Modifying...</String>
-  <String Id="ProgressRepairHeader">Repairing...</String>
-  <String Id="ProgressUninstallHeader">Uninstalling...</String>
-  <String Id="ProgressUnsafeUninstallHeader">Force removing...</String>
-  <String Id="ProgressMessage">Please wait while Setup installs Artemis Game Streaming.</String>
-  <String Id="ProgressCancelButton">&amp;Cancel</String>
+  <String Id="ProgressHeader" Value="Installing Artemis Game Streaming..." />
+  <String Id="ProgressLayoutHeader" Value="Extracting files..." />
+  <String Id="ProgressCacheHeader" Value="Caching packages..." />
+  <String Id="ProgressInstallHeader" Value="Installing..." />
+  <String Id="ProgressModifyHeader" Value="Modifying..." />
+  <String Id="ProgressRepairHeader" Value="Repairing..." />
+  <String Id="ProgressUninstallHeader" Value="Uninstalling..." />
+  <String Id="ProgressUnsafeUninstallHeader" Value="Force removing..." />
+  <String Id="ProgressMessage" Value="Please wait while Setup installs Artemis Game Streaming." />
+  <String Id="ProgressCancelButton" Value="&amp;Cancel" />
 
-  <String Id="SuccessHeader">Installation completed successfully</String>
-  <String Id="SuccessInstallHeader">Installation completed successfully</String>
-  <String Id="SuccessLayoutHeader">Layout completed successfully</String>
-  <String Id="SuccessCacheHeader">Cache completed successfully</String>
-  <String Id="SuccessModifyHeader">Modify completed successfully</String>
-  <String Id="SuccessRepairHeader">Repair completed successfully</String>
-  <String Id="SuccessUninstallHeader">Uninstall completed successfully</String>
-  <String Id="SuccessUnsafeUninstallHeader">Force uninstall completed successfully</String>
-  <String Id="SuccessRestartText">You must restart your computer to complete installation.</String>
-  <String Id="SuccessUninstallRestartText">You must restart your computer to complete removal.</String>
-  <String Id="SuccessRestartButton">&amp;Restart</String>
-  <String Id="SuccessCloseButton">&amp;Close</String>
+  <String Id="SuccessHeader" Value="Installation completed successfully" />
+  <String Id="SuccessInstallHeader" Value="Installation completed successfully" />
+  <String Id="SuccessLayoutHeader" Value="Layout completed successfully" />
+  <String Id="SuccessCacheHeader" Value="Cache completed successfully" />
+  <String Id="SuccessModifyHeader" Value="Modify completed successfully" />
+  <String Id="SuccessRepairHeader" Value="Repair completed successfully" />
+  <String Id="SuccessUninstallHeader" Value="Uninstall completed successfully" />
+  <String Id="SuccessUnsafeUninstallHeader" Value="Force uninstall completed successfully" />
+  <String Id="SuccessRestartText" Value="You must restart your computer to complete installation." />
+  <String Id="SuccessUninstallRestartText" Value="You must restart your computer to complete removal." />
+  <String Id="SuccessRestartButton" Value="&amp;Restart" />
+  <String Id="SuccessCloseButton" Value="&amp;Close" />
   <String Id="SuccessLaunchButton">&amp;Launch</String>
 
   <String Id="FailureHeader">Installation failed</String>
