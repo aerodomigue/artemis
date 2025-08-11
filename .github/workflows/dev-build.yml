@@ -807,7 +807,46 @@ jobs:
         fi
         
         # Use the DMG generation script to create universal DMG
-        ./scripts/generate-dmg.sh Release
+        # Ensure version is available for DMG naming
+        echo "$VERSION" > app/version.txt
+        
+        # Run DMG generation with error handling
+        if ! ./scripts/generate-dmg.sh Release "$VERSION"; then
+          echo "DMG generation failed, checking for common issues..."
+          
+          # Check if create-dmg is available
+          create-dmg --help || echo "create-dmg not properly installed"
+          
+          # List what was actually created
+          echo "Contents of build directory:"
+          find build -name "*.dmg" -o -name "*.app" -o -name "Artemis*" | head -20
+          
+          # Try a simpler fallback DMG creation
+          echo "Attempting fallback DMG creation..."
+          
+          if [ -d "build/build-Release" ]; then
+            cd build/build-Release
+            if [ -d "Artemis.app" ]; then
+              # Create a simple DMG manually
+              mkdir -p ../installer-Release
+              create-dmg --volname "Artemis-$VERSION" \
+                --background-size 512 320 \
+                --icon-size 80 \
+                --icon "Artemis.app" 200 190 \
+                --hide-extension "Artemis.app" \
+                --app-drop-link 400 185 \
+                "../installer-Release/Artemis-$VERSION.dmg" \
+                "Artemis.app"
+              cd ../..
+            else
+              echo "ERROR: Artemis.app not found in build/build-Release"
+              exit 1
+            fi
+          else
+            echo "ERROR: build/build-Release directory not found"
+            exit 1
+          fi
+        fi
     
     - name: Upload Development Artifacts
       uses: actions/upload-artifact@v4
@@ -1248,6 +1287,24 @@ jobs:
     
     - name: Setup Qt for ARM64 cross-compilation
       run: |
+        # Install Qt6 host tools (needed for qmake6, moc, etc.)
+        # We need the host Qt6 for build tools, but will use ARM64 system packages for libraries
+        sudo apt-get install -y \
+          qt6-base-dev \
+          qt6-tools-dev \
+          qt6-tools-dev-tools \
+          qt6-qmake \
+          qt6-svg-dev \
+          qt6-multimedia-dev \
+          libqt6core6 \
+          libqt6gui6 \
+          libqt6widgets6 \
+          libqt6multimedia6 \
+          libqt6svg6
+          
+        # Verify Qt6 tools are available
+        which qmake6 || echo "qmake6 not found in PATH"
+        qmake6 -version || echo "qmake6 version check failed"
         # Use the host Qt installation for cross-compilation
         # This is a minimal approach for ARM64 cross-compilation
         sudo apt-get install -y \
@@ -1289,6 +1346,8 @@ jobs:
           libswscale-dev:arm64 \
           libsdl2-dev:arm64 \
           libsdl2-ttf-dev:arm64 \
+          qt6-svg-dev:arm64 \
+          libqt6svg6-dev:arm64 \
           libopus-dev:arm64 || echo "Some ARM64 packages not available, will use minimal build"
         
         # Configure for ARM64 cross-compilation with minimal dependencies
