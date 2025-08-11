@@ -709,6 +709,11 @@ jobs:
         host: 'mac'
         target: 'desktop'
         modules: 'qtmultimedia'
+        
+    - name: Set macOS deployment target for compatibility
+      run: |
+        echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV
+        echo "Qt6_DIR=$Qt6_DIR" >> $GITHUB_ENV
     
     - name: Install dependencies
       run: |
@@ -732,10 +737,11 @@ jobs:
       run: |
         export PATH="$Qt6_DIR/bin:$PATH"
         export QMAKE="$Qt6_DIR/bin/qmake6"
+        export MACOSX_DEPLOYMENT_TARGET=14.0
         
         # Force a complete clean build to ensure MOC files are generated
         make clean || true
-        qmake6 artemis.pro CONFIG+=release CONFIG+=sdk_no_version_check
+        qmake6 artemis.pro CONFIG+=release CONFIG+=sdk_no_version_check QMAKE_MACOSX_DEPLOYMENT_TARGET=14.0
         
         # Generate MOC files explicitly and ensure they're created before building
         make -j$(sysctl -n hw.ncpu) qmake_all
@@ -760,11 +766,30 @@ jobs:
           fi
         fi
         
+        # Clean and rebuild all subprojects with consistent deployment target
+        cd ..
+        make clean || true
+        
+        # Build each subproject individually with deployment target
+        for subdir in moonlight-common-c qmdnsengine h264bitstream soundio; do
+          if [ -d "$subdir" ]; then
+            echo "Building $subdir with deployment target..."
+            cd "$subdir"
+            make clean || true
+            qmake6 *.pro CONFIG+=release QMAKE_MACOSX_DEPLOYMENT_TARGET=14.0
+            make -j$(sysctl -n hw.ncpu)
+            cd ..
+          fi
+        done
+        
         # Build app sub-project to ensure .moc is picked up correctly
+        cd app
+        qmake6 app.pro CONFIG+=release QMAKE_MACOSX_DEPLOYMENT_TARGET=14.0
         make -j$(sysctl -n hw.ncpu) release
         cd ..
         
-        # Build the rest of the project (other submodules)
+        # Final build
+        qmake6 artemis.pro CONFIG+=release CONFIG+=sdk_no_version_check QMAKE_MACOSX_DEPLOYMENT_TARGET=14.0
         make -j$(sysctl -n hw.ncpu)
     
     - name: Package macOS Development Build
@@ -1189,12 +1214,20 @@ jobs:
         # Enable ARM64 (aarch64) multiarch to allow installing :arm64 packages
         sudo dpkg --add-architecture arm64
         
-        # Add ports.ubuntu.com sources for arm64 to avoid 404s from security.ubuntu.com
-        sudo tee /etc/apt/sources.list.d/arm64-ports.list >/dev/null << 'EOF'
-        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
-        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse
-        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
-        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-backports main restricted universe multiverse
+        # Replace default sources to use ports.ubuntu.com for arm64 to avoid 404s
+        sudo cp /etc/apt/sources.list /etc/apt/sources.list.backup
+        sudo tee /etc/apt/sources.list >/dev/null << 'EOF'
+        # Default amd64 sources
+        deb [arch=amd64] http://azure.archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse
+        deb [arch=amd64] http://azure.archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe multiverse
+        deb [arch=amd64] http://azure.archive.ubuntu.com/ubuntu/ jammy-backports main restricted universe multiverse
+        deb [arch=amd64] http://azure.archive.ubuntu.com/ubuntu/ jammy-security main restricted universe multiverse
+        
+        # ARM64 sources from ports.ubuntu.com
+        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ jammy main restricted universe multiverse
+        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ jammy-updates main restricted universe multiverse
+        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ jammy-backports main restricted universe multiverse  
+        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ jammy-security main restricted universe multiverse
         EOF
         
         sudo apt-get update
@@ -1254,6 +1287,7 @@ jobs:
           libopus-dev:arm64 || echo "Some ARM64 packages not available, will use minimal build"
         
         # Configure for ARM64 cross-compilation with minimal dependencies
+        # Disable PKGCONFIG for OpenSSL as fallback if arm64 packages unavailable
         qmake6 artemis.pro \
           CONFIG+=release \
           CONFIG+=cross_compile \
@@ -1264,7 +1298,20 @@ jobs:
           QMAKE_STRIP=aarch64-linux-gnu-strip \
           QMAKE_LINK=aarch64-linux-gnu-g++ \
           'QMAKE_CXXFLAGS+=-I/usr/include/aarch64-linux-gnu -I/usr/include/aarch64-linux-gnu/openssl' \
-          'QMAKE_LFLAGS+=-L/usr/lib/aarch64-linux-gnu'
+          'QMAKE_LFLAGS+=-L/usr/lib/aarch64-linux-gnu' \
+          'CONFIG+=no-pkg-config-openssl' || {
+            echo "Main build failed, trying fallback without OpenSSL PKGCONFIG..."
+            qmake6 artemis.pro \
+              CONFIG+=release \
+              CONFIG+=cross_compile \
+              CONFIG+=minimal_build \
+              CONFIG+=no-openssl \
+              QMAKE_CC=aarch64-linux-gnu-gcc \
+              QMAKE_CXX=aarch64-linux-gnu-g++ \
+              'QMAKE_AR=aarch64-linux-gnu-ar cqs' \
+              QMAKE_STRIP=aarch64-linux-gnu-strip \
+              QMAKE_LINK=aarch64-linux-gnu-g++
+          }
         
         # Build for ARM64
         make -j$(nproc)
