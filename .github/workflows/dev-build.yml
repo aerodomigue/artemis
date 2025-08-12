@@ -451,7 +451,9 @@ jobs:
         }
         
         # Copy to expected location
-        mkdir -p "build\build-x64-release"
+        if (-not (Test-Path "build\build-x64-release")) {
+          New-Item -ItemType Directory -Path "build\build-x64-release" -Force
+        }
         Copy-Item $msiFile.FullName "build\build-x64-release\Artemis.msi"
     
     - name: Build ARM64 MSI
@@ -478,7 +480,9 @@ jobs:
         }
         
         # Copy to expected location
-        mkdir -p "build\build-arm64-release"  
+        if (-not (Test-Path "build\build-arm64-release")) {
+          New-Item -ItemType Directory -Path "build\build-arm64-release" -Force
+        }
         Copy-Item $msiFile.FullName "build\build-arm64-release\Artemis.msi"
     
     - name: Generate Universal Bundle  
@@ -1189,7 +1193,6 @@ jobs:
           qt6-base-dev \
           qt6-tools-dev \
           qt6-tools-dev-tools \
-          qmake6 \
           libqt6svg6-dev \
           libqt6core6 \
           libqt6gui6 \
@@ -1201,13 +1204,38 @@ jobs:
             sudo apt-get install -y \
               qt6-base-dev \
               qt6-tools-dev \
-              libqt6svg6-dev \
-              qmake6 || echo "Using system Qt6 installation"
+              libqt6svg6-dev || echo "Using system Qt6 installation"
         }
           
         # Verify Qt6 tools are available
-        which qmake6 || echo "qmake6 not found in PATH"
-        qmake6 -version || echo "qmake6 version check failed"
+        QMAKE_CMD=""
+        if which qmake6 >/dev/null 2>&1; then
+          QMAKE_CMD="qmake6"
+          echo "Found qmake6: $(which qmake6)"
+          qmake6 -version
+        elif which qmake >/dev/null 2>&1; then
+          QMAKE_CMD="qmake"
+          echo "Found qmake: $(which qmake)"
+          qmake -version
+        else
+          echo "Neither qmake6 nor qmake found, trying to install..."
+          sudo apt-get install -y qt6-base-dev-tools qt6-qmake || {
+            echo "ERROR: Could not install Qt build tools"
+            exit 1
+          }
+          
+          if which qmake6 >/dev/null 2>&1; then
+            QMAKE_CMD="qmake6"
+          elif which qmake >/dev/null 2>&1; then  
+            QMAKE_CMD="qmake"
+          else
+            echo "ERROR: Still no qmake available after installation"
+            exit 1
+          fi
+        fi
+        
+        echo "Using qmake command: $QMAKE_CMD"
+        echo "QMAKE_CMD=$QMAKE_CMD" >> $GITHUB_ENV
         # Use the host Qt installation for cross-compilation
         # This is a minimal approach for ARM64 cross-compilation
         
@@ -1294,7 +1322,7 @@ jobs:
         # Remove any x86_64 library directories from the system to prevent accidental linking
         sudo mv /usr/lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu.backup || true
         
-        qmake6 artemis.pro \
+        $QMAKE_CMD artemis.pro \
           CONFIG+=release \
           CONFIG+=cross_compile \
           CONFIG+=minimal_build \
@@ -1309,7 +1337,7 @@ jobs:
           'LIBS+=-L/usr/lib/aarch64-linux-gnu -lQt6Core -lQt6Gui -lQt6Widgets -lQt6Qml -lQt6Quick -lQt6QuickControls2 -lQt6Svg -lQt6Network -lQt6OpenGL' \
           'CONFIG+=no-pkg-config-openssl' || {
             echo "Main build failed, trying fallback without OpenSSL PKGCONFIG..."
-            qmake6 artemis.pro \
+            $QMAKE_CMD artemis.pro \
               CONFIG+=release \
               CONFIG+=cross_compile \
               CONFIG+=minimal_build \
