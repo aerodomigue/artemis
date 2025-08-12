@@ -1198,43 +1198,50 @@ jobs:
         # First, try to update package lists
         sudo apt-get update
         
-        # Install Qt6 host tools (needed for qmake6, moc, etc.)
+        echo "Installing Qt6 host + arm64 declarative/quick modules"
+        # Install Qt6 host tools (needed for qmake6, moc, etc.) plus declarative & quickcontrols modules
+        # Try arm64 multiarch variants first where available; fall back to native if needed
         sudo apt-get install -y \
           qt6-base-dev \
           qt6-base-dev-tools \
           qt6-tools-dev \
           qt6-tools-dev-tools \
           qt6-qmake \
+          qt6-declarative-dev \
+          qt6-quickcontrols2-dev \
+          qt6-shadertools-dev \
           libqt6svg6-dev || {
-            echo "Failed to install some Qt6 packages, trying alternative approach..."
-            
-            # Fallback: install what's available
-            sudo apt-get install -y \
-              qt6-base-dev \
-              qt6-tools-dev \
-              libqt6svg6-dev || echo "Using system Qt6 installation"
+            echo "Primary Qt package install failed, retrying with minimal set..."
+            sudo apt-get install -y qt6-base-dev qt6-declarative-dev qt6-quickcontrols2-dev || echo "Using partially installed Qt6"
         }
-          
+        
+        # Attempt to add arm64-specific dev packages (ignore failures if not multi-arch enabled for some)
+        sudo apt-get install -y \
+          qt6-base-dev:arm64 \
+          qt6-declarative-dev:arm64 \
+          qt6-quickcontrols2-dev:arm64 \
+          qt6-shadertools-dev:arm64 \
+          libqt6svg6-dev:arm64 || echo "One or more arm64 Qt dev packages unavailable; proceeding"
+        
         # Verify Qt6 tools are available
         QMAKE_CMD=""
         if which qmake6 >/dev/null 2>&1; then
           QMAKE_CMD="qmake6"
           echo "Found qmake6: $(which qmake6)"
-          qmake6 -version
+          qmake6 -version || true
         elif which qmake >/dev/null 2>&1; then
           QMAKE_CMD="qmake"
           echo "Found qmake: $(which qmake)"
-          qmake -version
+          qmake -version || true
         else
-          echo "Neither qmake6 nor qmake found, trying to install..."
+          echo "Neither qmake6 nor qmake found, attempting recovery install..."
           sudo apt-get install -y qt6-base-dev-tools qt6-qmake || {
             echo "ERROR: Could not install Qt build tools"
             exit 1
           }
-          
           if which qmake6 >/dev/null 2>&1; then
             QMAKE_CMD="qmake6"
-          elif which qmake >/dev/null 2>&1; then  
+          elif which qmake >/dev/null 2>&1; then
             QMAKE_CMD="qmake"
           else
             echo "ERROR: Still no qmake available after installation"
@@ -1242,10 +1249,24 @@ jobs:
           fi
         fi
         
+        # Confirm required QML modules (QtQuick + QuickControls2)
+        QML_BASE=$(qmake6 -query QT_INSTALL_QML 2>/dev/null || qmake -query QT_INSTALL_QML 2>/dev/null || echo /usr/lib/qt6/qml)
+        echo "Detected QML install path: $QML_BASE"
+        if [ ! -d "$QML_BASE/QtQuick" ] || [ ! -d "$QML_BASE/QtQuick/Controls" ] && [ ! -d "$QML_BASE/QtQuick/Controls.2" ]; then
+          echo "Qt Quick modules missing in $QML_BASE"
+          echo "Listing QML base contents for debugging:"; ls -1 $QML_BASE | head -50 || true
+          echo "Attempting to reinstall declarative / quick controls packages"
+          sudo apt-get install -y qt6-declarative-dev qt6-quickcontrols2-dev || true
+        fi
+        
+        # Export QML import paths for later steps (binary search uses these at runtime/build time)
+        echo "QML2_IMPORT_PATH=$QML_BASE" >> $GITHUB_ENV
+        echo "QT_QPA_PLATFORM=offscreen" >> $GITHUB_ENV
+        
         echo "Using qmake command: $QMAKE_CMD"
         echo "QMAKE_CMD=$QMAKE_CMD" >> $GITHUB_ENV
         
-        echo "Qt setup complete for ARM64 cross-compilation"
+        echo "Qt setup complete for ARM64 cross-compilation (including QtQuick & QuickControls2)"
     
     - name: Clean any existing build
       run: |
@@ -1570,6 +1591,7 @@ jobs:
         fi
 
     - name: Find and download previous artifacts if builds were skipped
+     
       id: find-previous
       if: steps.check-artifacts.outputs.artifacts_exist == 'false'
       run: |
