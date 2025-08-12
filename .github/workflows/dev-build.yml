@@ -447,24 +447,7 @@ jobs:
           exit 1
         }
         
-        # Copy to expected location for the bundle, but only if it's not already there
-        $bundleBuildDir = "build\build-x64-release"
-        if (-not (Test-Path $bundleBuildDir)) { New-Item -ItemType Directory -Path $bundleBuildDir -Force }
-        $destinationPath = Resolve-Path (Join-Path $bundleBuildDir "Artemis.msi") -ErrorAction SilentlyContinue
-        
-        # Compare resolved paths to avoid self-copy issues
-        $sourcePath = $msiFile.FullName
-        $targetPath = if ($destinationPath) { $destinationPath.Path } else { Join-Path (Get-Item $bundleBuildDir).FullName "Artemis.msi" }
-        
-        echo "Source MSI: $sourcePath"
-        echo "Target MSI: $targetPath"
-        
-        if ($sourcePath -ne $targetPath) {
-          echo "Copying MSI from source to target location"
-          Copy-Item -Path $sourcePath -Destination $targetPath -Force
-        } else {
-          echo "MSI is already at the correct destination, skipping copy"
-        }
+        echo "x64 MSI created successfully: $($msiFile.FullName)"
     
     - name: Build ARM64 MSI
       env:
@@ -486,24 +469,7 @@ jobs:
           exit 1
         }
         
-        # Copy to expected location for the bundle, but only if it's not already there
-        $bundleBuildDir = "build\build-arm64-release"
-        if (-not (Test-Path $bundleBuildDir)) { New-Item -ItemType Directory -Path $bundleBuildDir -Force }
-        $destinationPath = Resolve-Path (Join-Path $bundleBuildDir "Artemis.msi") -ErrorAction SilentlyContinue
-        
-        # Compare resolved paths to avoid self-copy issues
-        $sourcePath = $msiFile.FullName
-        $targetPath = if ($destinationPath) { $destinationPath.Path } else { Join-Path (Get-Item $bundleBuildDir).FullName "Artemis.msi" }
-        
-        echo "Source ARM64 MSI: $sourcePath"
-        echo "Target ARM64 MSI: $targetPath"
-        
-        if ($sourcePath -ne $targetPath) {
-          echo "Copying ARM64 MSI from source to target location"
-          Copy-Item -Path $sourcePath -Destination $targetPath -Force
-        } else {
-          echo "ARM64 MSI is already at the correct destination, skipping copy"
-        }
+        echo "ARM64 MSI created successfully: $($msiFile.FullName)"
     
     - name: Generate Universal Bundle  
       env:
@@ -1204,7 +1170,13 @@ jobs:
           zlib1g-dev:arm64 \
           libopus-dev:arm64 \
           libsdl2-dev:arm64 \
-          libsdl2-ttf-dev:arm64 || echo "Some ARM64 libs failed; will attempt minimal build"
+          libsdl2-ttf-dev:arm64 \
+          libavcodec-dev:arm64 \
+          libavformat-dev:arm64 \
+          libavutil-dev:arm64 \
+          libswscale-dev:arm64 \
+          libswresample-dev:arm64 \
+          libavfilter-dev:arm64 || echo "Some ARM64 libs failed; will attempt minimal build"
         
         echo "ARM64 cross-compilation toolchain installed successfully"
         echo "Note: Using arm64 ports.ubuntu.com sources to resolve 404s"
@@ -1330,11 +1302,15 @@ jobs:
           export OPENSSL_LIBS="-L/usr/lib/aarch64-linux-gnu -lssl -lcrypto"
         fi
         
+        # Configure FFmpeg/libav paths for ARM64 cross-compilation
+        export FFMPEG_INCLUDES="-I/usr/include/aarch64-linux-gnu"
+        export FFMPEG_LIBS="-L/usr/lib/aarch64-linux-gnu -lavcodec -lavformat -lavutil -lswscale -lswresample -lavfilter"
+        
         # Clean any existing build files
         rm -f .qmake.stash .qmake.cache
         find . -name "Makefile*" -delete
         
-        echo "Configuring (with OpenSSL)..."
+        echo "Configuring (with OpenSSL and FFmpeg)..."
         set -e
         $QMAKE_CMD artemis.pro CONFIG+=release \
           QMAKE_CC=aarch64-linux-gnu-gcc \
@@ -1348,9 +1324,9 @@ jobs:
           'QMAKE_LFLAGS+=-L/usr/lib/aarch64-linux-gnu -Wl,-rpath,/usr/lib/aarch64-linux-gnu' \
           'QMAKE_LIBDIR=/usr/lib/aarch64-linux-gnu'
         
-        echo "Building (with OpenSSL)..."
+        echo "Building (with OpenSSL and FFmpeg)..."
         if ! make -j$(nproc); then
-          echo "Initial build failed (likely OpenSSL). Retrying without OpenSSL support..."
+          echo "Initial build failed (likely OpenSSL/FFmpeg). Retrying without OpenSSL support..."
           # Clean generated Makefiles before reconfigure
             find . -name "Makefile*" -delete || true
           $QMAKE_CMD artemis.pro CONFIG+=release CONFIG+=no-openssl \
@@ -1362,7 +1338,7 @@ jobs:
             QMAKE_STRIP=aarch64-linux-gnu-strip \
             'QMAKE_CFLAGS+=-I/usr/include/aarch64-linux-gnu' \
             'QMAKE_CXXFLAGS+=-I/usr/include/aarch64-linux-gnu' \
-            'QMAKE_LFLAGS+=-L/usr/lib/aarch64-linux-gnu -Wl,-rpath,/usr/lib/aarch64-linux-gnu' \
+            'QMAKE_LFLAGS+=-L/usr/lib/aarch64-linux-gnu -Wl,-rpath,/usr/lib/aarch64-linux-gnu -lavcodec -lavformat -lavutil -lswscale' \
             'QMAKE_LIBDIR=/usr/lib/aarch64-linux-gnu'
           make -j$(nproc)
         fi
