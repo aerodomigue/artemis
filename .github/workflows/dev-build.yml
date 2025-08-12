@@ -199,6 +199,18 @@ jobs:
         target: 'desktop'
         arch: 'win64_msvc2022_64'
         modules: 'qtmultimedia'
+      continue-on-error: true
+      id: qt_install_primary
+    
+    - name: Retry Qt Installation (if failed)
+      if: steps.qt_install_primary.outcome == 'failure'
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_64'
+        modules: 'qtmultimedia'
     
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
@@ -279,6 +291,8 @@ jobs:
         target: 'desktop'
         arch: 'win64_msvc2022_64'
         modules: 'qtmultimedia'
+      continue-on-error: true
+      id: qt_install_desktop
         
     - name: Setup Qt for ARM64
       uses: jurplel/install-qt-action@v3
@@ -288,6 +302,28 @@ jobs:
         target: 'desktop'
         arch: 'win64_msvc2022_arm64_cross_compiled'  # Correct ARM64 architecture name
         set-env: false  # Don't let this override our Qt6_DIR - we'll set it manually
+      continue-on-error: true
+      id: qt_install_arm64
+    
+    - name: Retry Qt Desktop Installation (if failed)
+      if: steps.qt_install_desktop.outcome == 'failure'
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_64'
+        modules: 'qtmultimedia'
+    
+    - name: Retry Qt ARM64 Installation (if failed)
+      if: steps.qt_install_arm64.outcome == 'failure'
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_arm64_cross_compiled'
+        set-env: false
     
     - name: Setup MSVC for ARM64
       uses: ilammy/msvc-dev-cmd@v1
@@ -393,8 +429,32 @@ jobs:
         target: 'desktop'
         arch: 'win64_msvc2022_64'
         modules: 'qtmultimedia'
+      continue-on-error: true
+      id: qt_install_universal_desktop
         
     - name: Setup Qt for ARM64
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_arm64_cross_compiled'
+        set-env: false
+      continue-on-error: true
+      id: qt_install_universal_arm64
+    
+    - name: Retry Qt Desktop Installation (if failed)
+      if: steps.qt_install_universal_desktop.outcome == 'failure'
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_64'
+        modules: 'qtmultimedia'
+    
+    - name: Retry Qt ARM64 Installation (if failed)
+      if: steps.qt_install_universal_arm64.outcome == 'failure'
       uses: jurplel/install-qt-action@v3
       with:
         version: ${{ env.QT_VERSION }}
@@ -1214,12 +1274,16 @@ jobs:
             sudo apt-get install -y qt6-base-dev qt6-base-dev-tools || echo "Minimal host Qt install also failed";
         }
 
-        echo "Attempting to install arm64 Qt development packages (may be partially available)"
-        # Some Qt6 -dev packages may not have multiarch arm64 variants pre-built; proceed on best-effort.
+        echo "Installing minimal ARM64 Qt runtime libraries (best-effort)"
+        # Install only runtime libraries for ARM64, not dev packages which may conflict
         sudo apt-get install -y \
-          qt6-base-dev:arm64 \
-          qt6-declarative-dev:arm64 \
-          libqt6svg6-dev:arm64 || echo "One or more arm64 Qt dev packages unavailable; continuing with host tools + limited target libs"
+          libqt6core6:arm64 \
+          libqt6gui6:arm64 \
+          libqt6network6:arm64 \
+          libqt6qml6:arm64 \
+          libqt6quick6:arm64 \
+          libqt6opengl6:arm64 \
+          libqt6svg6:arm64 || echo "Some ARM64 Qt runtime libs unavailable; continuing"
 
         echo "Verifying qmake6 availability"
         QMAKE_CMD=""
@@ -1306,11 +1370,15 @@ jobs:
         export FFMPEG_INCLUDES="-I/usr/include/aarch64-linux-gnu"
         export FFMPEG_LIBS="-L/usr/lib/aarch64-linux-gnu -lavcodec -lavformat -lavutil -lswscale -lswresample -lavfilter"
         
+        # Configure Qt paths for ARM64 cross-compilation
+        export QT_HOST_PATH="/usr"
+        export QT_TARGET_PATH="/usr/lib/aarch64-linux-gnu"
+        
         # Clean any existing build files
         rm -f .qmake.stash .qmake.cache
         find . -name "Makefile*" -delete
         
-        echo "Configuring (with OpenSSL and FFmpeg)..."
+        echo "Configuring (with OpenSSL and FFmpeg for ARM64)..."
         set -e
         $QMAKE_CMD artemis.pro CONFIG+=release \
           QMAKE_CC=aarch64-linux-gnu-gcc \
@@ -1322,9 +1390,12 @@ jobs:
           'QMAKE_CFLAGS+=-I/usr/include/aarch64-linux-gnu -I/usr/include/aarch64-linux-gnu/openssl' \
           'QMAKE_CXXFLAGS+=-I/usr/include/aarch64-linux-gnu -I/usr/include/aarch64-linux-gnu/openssl' \
           'QMAKE_LFLAGS+=-L/usr/lib/aarch64-linux-gnu -Wl,-rpath,/usr/lib/aarch64-linux-gnu' \
-          'QMAKE_LIBDIR=/usr/lib/aarch64-linux-gnu'
+          'QMAKE_LIBDIR=/usr/lib/aarch64-linux-gnu' \
+          'QT_SYSROOT=/usr/lib/aarch64-linux-gnu' \
+          'PKG_CONFIG_SYSROOT_DIR=/' \
+          'PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig'
         
-        echo "Building (with OpenSSL and FFmpeg)..."
+        echo "Building (with OpenSSL and FFmpeg for ARM64)..."
         if ! make -j$(nproc); then
           echo "Initial build failed (likely OpenSSL/FFmpeg). Retrying without OpenSSL support..."
           # Clean generated Makefiles before reconfigure
@@ -1339,7 +1410,10 @@ jobs:
             'QMAKE_CFLAGS+=-I/usr/include/aarch64-linux-gnu' \
             'QMAKE_CXXFLAGS+=-I/usr/include/aarch64-linux-gnu' \
             'QMAKE_LFLAGS+=-L/usr/lib/aarch64-linux-gnu -Wl,-rpath,/usr/lib/aarch64-linux-gnu -lavcodec -lavformat -lavutil -lswscale' \
-            'QMAKE_LIBDIR=/usr/lib/aarch64-linux-gnu'
+            'QMAKE_LIBDIR=/usr/lib/aarch64-linux-gnu' \
+            'QT_SYSROOT=/usr/lib/aarch64-linux-gnu' \
+            'PKG_CONFIG_SYSROOT_DIR=/' \
+            'PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig'
           make -j$(nproc)
         fi
         
