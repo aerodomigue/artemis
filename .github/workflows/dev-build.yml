@@ -450,12 +450,20 @@ jobs:
         # Copy to expected location for the bundle, but only if it's not already there
         $bundleBuildDir = "build\build-x64-release"
         if (-not (Test-Path $bundleBuildDir)) { New-Item -ItemType Directory -Path $bundleBuildDir -Force }
-        $destinationPath = Join-Path $bundleBuildDir "Artemis.msi"
+        $destinationPath = Resolve-Path (Join-Path $bundleBuildDir "Artemis.msi") -ErrorAction SilentlyContinue
         
-        if ($msiFile.FullName -ne $destinationPath) {
-          Copy-Item -Path $msiFile.FullName -Destination $destinationPath -Force
+        # Compare resolved paths to avoid self-copy issues
+        $sourcePath = $msiFile.FullName
+        $targetPath = if ($destinationPath) { $destinationPath.Path } else { Join-Path (Get-Item $bundleBuildDir).FullName "Artemis.msi" }
+        
+        echo "Source MSI: $sourcePath"
+        echo "Target MSI: $targetPath"
+        
+        if ($sourcePath -ne $targetPath) {
+          echo "Copying MSI from source to target location"
+          Copy-Item -Path $sourcePath -Destination $targetPath -Force
         } else {
-          echo "MSI is already at the correct destination: $destinationPath"
+          echo "MSI is already at the correct destination, skipping copy"
         }
     
     - name: Build ARM64 MSI
@@ -481,12 +489,20 @@ jobs:
         # Copy to expected location for the bundle, but only if it's not already there
         $bundleBuildDir = "build\build-arm64-release"
         if (-not (Test-Path $bundleBuildDir)) { New-Item -ItemType Directory -Path $bundleBuildDir -Force }
-        $destinationPath = Join-Path $bundleBuildDir "Artemis.msi"
+        $destinationPath = Resolve-Path (Join-Path $bundleBuildDir "Artemis.msi") -ErrorAction SilentlyContinue
         
-        if ($msiFile.FullName -ne $destinationPath) {
-          Copy-Item -Path $msiFile.FullName -Destination $destinationPath -Force
+        # Compare resolved paths to avoid self-copy issues
+        $sourcePath = $msiFile.FullName
+        $targetPath = if ($destinationPath) { $destinationPath.Path } else { Join-Path (Get-Item $bundleBuildDir).FullName "Artemis.msi" }
+        
+        echo "Source ARM64 MSI: $sourcePath"
+        echo "Target ARM64 MSI: $targetPath"
+        
+        if ($sourcePath -ne $targetPath) {
+          echo "Copying ARM64 MSI from source to target location"
+          Copy-Item -Path $sourcePath -Destination $targetPath -Force
         } else {
-          echo "ARM64 MSI is already at the correct destination: $destinationPath"
+          echo "ARM64 MSI is already at the correct destination, skipping copy"
         }
     
     - name: Generate Universal Bundle  
@@ -1195,76 +1211,93 @@ jobs:
     
     - name: Setup Qt for ARM64 cross-compilation
       run: |
-        # First, try to update package lists
+        # Update package lists (after adding arm64 arch previously)
         sudo apt-get update
-        
-        echo "Installing Qt6 host + arm64 declarative/quick modules"
-        # Install Qt6 host tools (needed for qmake6, moc, etc.) plus declarative & quickcontrols modules
-        # Use correct Jammy package names (e.g., qtdeclarative6-dev)
+
+        echo "Diagnosing available Qt6 packages before installation (amd64)"
+        apt-cache policy qt6-base-dev || true
+        apt-cache policy qt6-declarative-dev || true
+        echo "Searching for qt6 packages (truncated)"; apt-cache search '^qt6-.*-dev' | head -40 || true
+
+        # Ensure universe component is enabled (both arches)
+        if ! grep -q 'universe' /etc/apt/sources.list; then
+          echo "Adding universe repository";
+          sudo add-apt-repository universe -y;
+          sudo apt-get update;
+        fi
+
+        echo "Installing Qt6 host toolchain + declarative modules (correct Jammy package names)"
+        # NOTE: On Ubuntu Jammy, qmake6 is provided by qt6-base-dev-tools; there is no separate qt6-qmake package.
         sudo apt-get install -y \
           qt6-base-dev \
           qt6-base-dev-tools \
           qt6-tools-dev \
           qt6-tools-dev-tools \
-          qt6-qmake \
-          qtdeclarative6-dev \
-          qtshadertools6-dev \
+          qt6-declarative-dev \
+          qt6-declarative-dev-tools \
           libqt6svg6-dev || {
-            echo "Primary Qt package install failed, retrying with minimal set..."
-            sudo apt-get install -y qt6-base-dev qtdeclarative6-dev || echo "Using partially installed Qt6"
+            echo "Primary Qt host installation failed. Dumping apt-cache policy for key packages:";
+            apt-cache policy qt6-base-dev qt6-declarative-dev || true
+            echo "Retrying with minimal subset (qt6-base-dev qt6-base-dev-tools)...";
+            sudo apt-get install -y qt6-base-dev qt6-base-dev-tools || echo "Minimal host Qt install also failed";
         }
-        
-        # Attempt to add arm64-specific dev packages using correct names
+
+        echo "Attempting to install arm64 Qt development packages (may be partially available)"
+        # Some Qt6 -dev packages may not have multiarch arm64 variants pre-built; proceed on best-effort.
         sudo apt-get install -y \
           qt6-base-dev:arm64 \
-          qtdeclarative6-dev:arm64 \
-          qtshadertools6-dev:arm64 \
-          libqt6svg6-dev:arm64 || echo "One or more arm64 Qt dev packages unavailable; proceeding"
-        
-        # Verify Qt6 tools are available
+          qt6-declarative-dev:arm64 \
+          libqt6svg6-dev:arm64 || echo "One or more arm64 Qt dev packages unavailable; continuing with host tools + limited target libs"
+
+        echo "Verifying qmake6 availability"
         QMAKE_CMD=""
-        if which qmake6 >/dev/null 2>&1; then
+        if command -v qmake6 >/dev/null 2>&1; then
           QMAKE_CMD="qmake6"
-          echo "Found qmake6: $(which qmake6)"
-          qmake6 -version || true
-        elif which qmake >/dev/null 2>&1; then
-          QMAKE_CMD="qmake"
-          echo "Found qmake: $(which qmake)"
-          qmake -version || true
         else
-          echo "Neither qmake6 nor qmake found, attempting recovery install..."
-          sudo apt-get install -y qt6-base-dev-tools qt6-qmake || {
-            echo "ERROR: Could not install Qt build tools"
-            exit 1
-          }
-          if which qmake6 >/dev/null 2>&1; then
-            QMAKE_CMD="qmake6"
-          elif which qmake >/dev/null 2>&1; then
-            QMAKE_CMD="qmake"
-          else
-            echo "ERROR: Still no qmake available after installation"
-            exit 1
-          fi
+          # Fallback: locate qmake6 in typical path
+            if [ -x /usr/lib/qt6/bin/qmake6 ]; then
+              QMAKE_CMD="/usr/lib/qt6/bin/qmake6"
+            elif command -v qmake >/dev/null 2>&1; then
+              QMAKE_CMD="qmake"  # as a last resort
+            fi
         fi
-        
-        # Confirm required QML modules (QtQuick + QuickControls2)
-        QML_BASE=$(qmake6 -query QT_INSTALL_QML 2>/dev/null || qmake -query QT_INSTALL_QML 2>/dev/null || echo /usr/lib/qt6/qml)
-        echo "Detected QML install path: $QML_BASE"
-        if [ ! -d "$QML_BASE/QtQuick" ] || [ ! -d "$QML_BASE/QtQuick/Controls" ] && [ ! -d "$QML_BASE/QtQuick/Controls.2" ]; then
-          echo "Qt Quick modules missing in $QML_BASE"
-          echo "Listing QML base contents for debugging:"; ls -1 $QML_BASE | head -50 || true
-          echo "Attempting to reinstall declarative / quick controls packages"
-          sudo apt-get install -y qtdeclarative6-dev || true
+
+        if [ -z "$QMAKE_CMD" ]; then
+          echo "ERROR: qmake6 not found after installation. Listing qt6-base-dev-tools contents for debugging:"
+          dpkg -L qt6-base-dev-tools | head -50 || true
+          echo "Failing build due to missing qmake6";
+          exit 1
         fi
-        
-        # Export QML import paths for later steps (binary search uses these at runtime/build time)
-        echo "QML2_IMPORT_PATH=$QML_BASE" >> $GITHUB_ENV
-        echo "QT_QPA_PLATFORM=offscreen" >> $GITHUB_ENV
-        
+
         echo "Using qmake command: $QMAKE_CMD"
         echo "QMAKE_CMD=$QMAKE_CMD" >> $GITHUB_ENV
-        
-        echo "Qt setup complete for ARM64 cross-compilation (including QtQuick & QuickControls2)"
+
+        # Determine QML install path & verify QtQuick / Controls
+        QML_BASE=$($QMAKE_CMD -query QT_INSTALL_QML 2>/dev/null || echo /usr/lib/qt6/qml)
+        echo "Detected QML install path: $QML_BASE"
+        ls -1 "$QML_BASE" | head -30 || true
+
+        MISSING_QTQUICK=0
+        if [ ! -d "$QML_BASE/QtQuick" ]; then
+          echo "QtQuick base module missing"
+          MISSING_QTQUICK=1
+        fi
+        if [ ! -d "$QML_BASE/QtQuick/Controls" ] && [ ! -d "$QML_BASE/QtQuick/Controls.2" ]; then
+          echo "QtQuick Controls module missing (Controls or Controls.2)"
+          MISSING_QTQUICK=1
+        fi
+
+        if [ $MISSING_QTQUICK -eq 1 ]; then
+          echo "Attempting to (re)install declarative + tools packages to obtain QML modules"
+          sudo apt-get install -y qt6-declarative-dev qt6-declarative-dev-tools || true
+          echo "Listing QtQuick directory after retry:"; ls -R "$QML_BASE/QtQuick" 2>/dev/null | head -80 || true
+        fi
+
+        # Export QML paths for later compile/runtime (even if limited)
+        echo "QML2_IMPORT_PATH=$QML_BASE" >> $GITHUB_ENV
+        echo "QT_QPA_PLATFORM=offscreen" >> $GITHUB_ENV
+
+        echo "Qt setup complete (host + partial arm64). Proceeding to build step."
     
     - name: Clean any existing build
       run: |
@@ -1558,6 +1591,7 @@ jobs:
         [ ! -z "$IMPROVEMENTS" ] && CHANGELOG="${CHANGELOG}### 🔧 Improvements\n${IMPROVEMENTS}\n"
         [ ! -z "$OTHER" ] && CHANGELOG="${CHANGELOG}### 📝 Other Changes\n${OTHER}\n"
         echo -e "$CHANGELOG" > changelog.md
+       
         echo "Generated changelog:"
         cat changelog.md
         {
