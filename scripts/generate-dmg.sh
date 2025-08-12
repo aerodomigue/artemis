@@ -66,9 +66,27 @@ fi
 echo Creating DMG
 DMG_NAME="Artemis-$VERSION.dmg"
 if [ "$SIGNING_IDENTITY" != "" ]; then
-  create-dmg --volname "Artemis $VERSION" --app-drop-link 600 185 "$INSTALLER_FOLDER/$DMG_NAME" "$BUILD_FOLDER/app/Artemis.app" --identity="$SIGNING_IDENTITY" || fail "create-dmg failed!"
+  create-dmg \
+    --volname "Artemis $VERSION" \
+    --window-pos 200 120 \
+    --window-size 800 400 \
+    --icon-size 100 \
+    --icon "Artemis.app" 200 190 \
+    --hide-extension "Artemis.app" \
+    --app-drop-link 600 185 \
+    "$INSTALLER_FOLDER/$DMG_NAME" \
+    "$BUILD_FOLDER/app/Artemis.app" --identity="$SIGNING_IDENTITY" || fail "create-dmg failed!"
 else
-  create-dmg --volname "Artemis $VERSION" --app-drop-link 600 185 "$INSTALLER_FOLDER/$DMG_NAME" "$BUILD_FOLDER/app/Artemis.app"
+  create-dmg \
+    --volname "Artemis $VERSION" \
+    --window-pos 200 120 \
+    --window-size 800 400 \
+    --icon-size 100 \
+    --icon "Artemis.app" 200 190 \
+    --hide-extension "Artemis.app" \
+    --app-drop-link 600 185 \
+    "$INSTALLER_FOLDER/$DMG_NAME" \
+    "$BUILD_FOLDER/app/Artemis.app"
   case $? in
     0) ;;
     2) ;;
