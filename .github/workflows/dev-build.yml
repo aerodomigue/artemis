@@ -1391,9 +1391,17 @@ jobs:
           'QMAKE_CXXFLAGS+=-I/usr/include/aarch64-linux-gnu -I/usr/include/aarch64-linux-gnu/openssl' \
           'QMAKE_LFLAGS+=-L/usr/lib/aarch64-linux-gnu -Wl,-rpath,/usr/lib/aarch64-linux-gnu' \
           'QMAKE_LIBDIR=/usr/lib/aarch64-linux-gnu' \
+          'QMAKE_LIBDIR_QT=/usr/lib/aarch64-linux-gnu' \
           'QT_SYSROOT=/usr/lib/aarch64-linux-gnu' \
           'PKG_CONFIG_SYSROOT_DIR=/' \
           'PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig'
+        
+        # Critical fix: Replace all x86_64 Qt library paths with ARM64 paths in generated Makefiles
+        echo "Fixing generated Makefiles to use ARM64 Qt libraries instead of x86_64..."
+        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/libQt6|/usr/lib/aarch64-linux-gnu/libQt6|g' {} \;
+        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/libGL\.so|/usr/lib/aarch64-linux-gnu/libGL.so|g' {} \;
+        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/libGLX\.so|/usr/lib/aarch64-linux-gnu/libGLX.so|g' {} \;
+        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/libOpenGL\.so|/usr/lib/aarch64-linux-gnu/libOpenGL.so|g' {} \;
         
         echo "Building (with OpenSSL and FFmpeg for ARM64)..."
         if ! make -j$(nproc); then
