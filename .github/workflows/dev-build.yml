@@ -438,25 +438,25 @@ jobs:
         $env:PATH = "$env:Qt6_DIR\bin;$env:PATH"
         cmd /c "scripts\build-artemis-arch.bat release"
         
-        if ($LASTEXITCODE -ne 0) {
-          echo "x64 build failed with exit code $LASTEXITCODE"
-          exit $LASTEXITCODE
-        }
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         
         # Ensure MSI was created
         $msiFile = Get-ChildItem -Path "build\installer-x64-release" -Filter "*.msi" | Select-Object -First 1
         if (-not $msiFile) {
-          echo "ERROR: x64 MSI not found"
+          echo "ERROR: x64 MSI not found in build\installer-x64-release"
           exit 1
         }
         
-        # Copy to expected location for the bundle
+        # Copy to expected location for the bundle, but only if it's not already there
         $bundleBuildDir = "build\build-x64-release"
-        if (-not (Test-Path $bundleBuildDir)) {
-          New-Item -ItemType Directory -Path $bundleBuildDir -Force
-        }
+        if (-not (Test-Path $bundleBuildDir)) { New-Item -ItemType Directory -Path $bundleBuildDir -Force }
         $destinationPath = Join-Path $bundleBuildDir "Artemis.msi"
-        Copy-Item -Path $msiFile.FullName -Destination $destinationPath -Force
+        
+        if ($msiFile.FullName -ne $destinationPath) {
+          Copy-Item -Path $msiFile.FullName -Destination $destinationPath -Force
+        } else {
+          echo "MSI is already at the correct destination: $destinationPath"
+        }
     
     - name: Build ARM64 MSI
       env:
@@ -469,25 +469,25 @@ jobs:
         
         cmd /c "scripts\build-artemis-arch.bat release"
         
-        if ($LASTEXITCODE -ne 0) {
-          echo "ARM64 build failed with exit code $LASTEXITCODE"
-          exit $LASTEXITCODE
-        }
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         
         # Ensure MSI was created
         $msiFile = Get-ChildItem -Path "build\installer-arm64-release" -Filter "*.msi" | Select-Object -First 1
         if (-not $msiFile) {
-          echo "ERROR: ARM64 MSI not found"
+          echo "ERROR: ARM64 MSI not found in build\installer-arm64-release"
           exit 1
         }
         
-        # Copy to expected location for the bundle
+        # Copy to expected location for the bundle, but only if it's not already there
         $bundleBuildDir = "build\build-arm64-release"
-        if (-not (Test-Path $bundleBuildDir)) {
-          New-Item -ItemType Directory -Path $bundleBuildDir -Force
-        }
+        if (-not (Test-Path $bundleBuildDir)) { New-Item -ItemType Directory -Path $bundleBuildDir -Force }
         $destinationPath = Join-Path $bundleBuildDir "Artemis.msi"
-        Copy-Item -Path $msiFile.FullName -Destination $destinationPath -Force
+        
+        if ($msiFile.FullName -ne $destinationPath) {
+          Copy-Item -Path $msiFile.FullName -Destination $destinationPath -Force
+        } else {
+          echo "ARM64 MSI is already at the correct destination: $destinationPath"
+        }
     
     - name: Generate Universal Bundle  
       env:
@@ -1200,27 +1200,25 @@ jobs:
         
         echo "Installing Qt6 host + arm64 declarative/quick modules"
         # Install Qt6 host tools (needed for qmake6, moc, etc.) plus declarative & quickcontrols modules
-        # Try arm64 multiarch variants first where available; fall back to native if needed
+        # Use correct Jammy package names (e.g., qtdeclarative6-dev)
         sudo apt-get install -y \
           qt6-base-dev \
           qt6-base-dev-tools \
           qt6-tools-dev \
           qt6-tools-dev-tools \
           qt6-qmake \
-          qt6-declarative-dev \
-          qt6-quickcontrols2-dev \
-          qt6-shadertools-dev \
+          qtdeclarative6-dev \
+          qtshadertools6-dev \
           libqt6svg6-dev || {
             echo "Primary Qt package install failed, retrying with minimal set..."
-            sudo apt-get install -y qt6-base-dev qt6-declarative-dev qt6-quickcontrols2-dev || echo "Using partially installed Qt6"
+            sudo apt-get install -y qt6-base-dev qtdeclarative6-dev || echo "Using partially installed Qt6"
         }
         
-        # Attempt to add arm64-specific dev packages (ignore failures if not multi-arch enabled for some)
+        # Attempt to add arm64-specific dev packages using correct names
         sudo apt-get install -y \
           qt6-base-dev:arm64 \
-          qt6-declarative-dev:arm64 \
-          qt6-quickcontrols2-dev:arm64 \
-          qt6-shadertools-dev:arm64 \
+          qtdeclarative6-dev:arm64 \
+          qtshadertools6-dev:arm64 \
           libqt6svg6-dev:arm64 || echo "One or more arm64 Qt dev packages unavailable; proceeding"
         
         # Verify Qt6 tools are available
@@ -1256,7 +1254,7 @@ jobs:
           echo "Qt Quick modules missing in $QML_BASE"
           echo "Listing QML base contents for debugging:"; ls -1 $QML_BASE | head -50 || true
           echo "Attempting to reinstall declarative / quick controls packages"
-          sudo apt-get install -y qt6-declarative-dev qt6-quickcontrols2-dev || true
+          sudo apt-get install -y qtdeclarative6-dev || true
         fi
         
         # Export QML import paths for later steps (binary search uses these at runtime/build time)
