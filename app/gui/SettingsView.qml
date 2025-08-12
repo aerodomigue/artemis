@@ -933,7 +933,7 @@ Flickable {
 
                 Label {
                     width: parent.width
-                    text: qsTr("These features work with any GameStream server and don't require Apollo backend.")
+                    text: qsTr("These features require Apollo as the host streaming software.")
                     font.pointSize: 9
                     wrapMode: Text.Wrap
                     color: "#888888"
