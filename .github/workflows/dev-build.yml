@@ -1396,18 +1396,22 @@ jobs:
           'PKG_CONFIG_SYSROOT_DIR=/' \
           'PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig'
         
-        # Critical fix: Replace all x86_64 Qt library paths with ARM64 paths in generated Makefiles
-        echo "Fixing generated Makefiles to use ARM64 Qt libraries instead of x86_64..."
-        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/libQt6|/usr/lib/aarch64-linux-gnu/libQt6|g' {} \;
-        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/libGL\.so|/usr/lib/aarch64-linux-gnu/libGL.so|g' {} \;
-        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/libGLX\.so|/usr/lib/aarch64-linux-gnu/libGLX.so|g' {} \;
-        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/libOpenGL\.so|/usr/lib/aarch64-linux-gnu/libOpenGL.so|g' {} \;
+        # Critical fix: Replace all x86_64 library paths with ARM64 paths in generated Makefiles
+        echo "Fixing generated Makefiles to use ARM64 libraries instead of x86_64..."
+        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/|/usr/lib/aarch64-linux-gnu/|g' {} \;
+        
+        # Also fix any absolute library paths that might reference x86_64 libs
+        find . -name "Makefile*" -exec sed -i 's|-L/usr/lib/x86_64-linux-gnu|-L/usr/lib/aarch64-linux-gnu|g' {} \;
+        
+        # Debug: Show what libraries are still being linked after the fix
+        echo "Checking for any remaining x86_64 library references in Makefiles..."
+        find . -name "Makefile*" -exec grep -l "x86_64" {} \; || echo "No x86_64 references found - good!"
         
         echo "Building (with OpenSSL and FFmpeg for ARM64)..."
         if ! make -j$(nproc); then
           echo "Initial build failed (likely OpenSSL/FFmpeg). Retrying without OpenSSL support..."
           # Clean generated Makefiles before reconfigure
-            find . -name "Makefile*" -delete || true
+          find . -name "Makefile*" -delete || true
           $QMAKE_CMD artemis.pro CONFIG+=release CONFIG+=no-openssl \
             QMAKE_CC=aarch64-linux-gnu-gcc \
             QMAKE_CXX=aarch64-linux-gnu-g++ \
@@ -1419,9 +1423,16 @@ jobs:
             'QMAKE_CXXFLAGS+=-I/usr/include/aarch64-linux-gnu' \
             'QMAKE_LFLAGS+=-L/usr/lib/aarch64-linux-gnu -Wl,-rpath,/usr/lib/aarch64-linux-gnu -lavcodec -lavformat -lavutil -lswscale' \
             'QMAKE_LIBDIR=/usr/lib/aarch64-linux-gnu' \
+            'QMAKE_LIBDIR_QT=/usr/lib/aarch64-linux-gnu' \
             'QT_SYSROOT=/usr/lib/aarch64-linux-gnu' \
             'PKG_CONFIG_SYSROOT_DIR=/' \
             'PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig'
+          
+          # Apply the same comprehensive library path fix for retry
+          echo "Fixing retry build Makefiles to use ARM64 libraries..."
+          find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/|/usr/lib/aarch64-linux-gnu/|g' {} \;
+          find . -name "Makefile*" -exec sed -i 's|-L/usr/lib/x86_64-linux-gnu|-L/usr/lib/aarch64-linux-gnu|g' {} \;
+          
           make -j$(nproc)
         fi
         
