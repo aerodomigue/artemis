@@ -1398,14 +1398,26 @@ jobs:
         
         # Critical fix: Replace all x86_64 library paths with ARM64 paths in generated Makefiles
         echo "Fixing generated Makefiles to use ARM64 libraries instead of x86_64..."
-        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/|/usr/lib/aarch64-linux-gnu/|g' {} \;
         
-        # Also fix any absolute library paths that might reference x86_64 libs
+        # Debug: Show what libraries are being linked before the fix
+        echo "=== BEFORE FIX: Checking for x86_64 library references in Makefiles ==="
+        find . -name "Makefile*" -exec grep -H "x86_64" {} \; || echo "No x86_64 references found initially"
+        
+        # More comprehensive path replacement - target ALL x86_64 paths
+        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/|/usr/lib/aarch64-linux-gnu/|g' {} \;
         find . -name "Makefile*" -exec sed -i 's|-L/usr/lib/x86_64-linux-gnu|-L/usr/lib/aarch64-linux-gnu|g' {} \;
+        find . -name "Makefile*" -exec sed -i 's|x86_64-linux-gnu|aarch64-linux-gnu|g' {} \;
         
         # Debug: Show what libraries are still being linked after the fix
-        echo "Checking for any remaining x86_64 library references in Makefiles..."
-        find . -name "Makefile*" -exec grep -l "x86_64" {} \; || echo "No x86_64 references found - good!"
+        echo "=== AFTER FIX: Checking for any remaining x86_64 library references ==="
+        find . -name "Makefile*" -exec grep -H "x86_64" {} \; || echo "SUCCESS: No x86_64 references found after fix!"
+        
+        # Extra debug: Show specific Qt library linking in the main app Makefile
+        echo "=== APP MAKEFILE Qt LIBRARY LINKING ==="
+        if [ -f "app/Makefile.Release" ]; then
+          echo "Qt libraries in app/Makefile.Release:"
+          grep -o '/usr/lib/[^/]*/libQt6[^[:space:]]*' app/Makefile.Release || echo "No Qt6 library paths found"
+        fi
         
         echo "Building (with OpenSSL and FFmpeg for ARM64)..."
         if ! make -j$(nproc); then
@@ -1429,9 +1441,16 @@ jobs:
             'PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig'
           
           # Apply the same comprehensive library path fix for retry
-          echo "Fixing retry build Makefiles to use ARM64 libraries..."
+          echo "=== RETRY BUILD: Fixing Makefiles to use ARM64 libraries ==="
+          echo "Before retry fix:"
+          find . -name "Makefile*" -exec grep -H "x86_64" {} \; || echo "No x86_64 references found initially"
+          
           find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/|/usr/lib/aarch64-linux-gnu/|g' {} \;
           find . -name "Makefile*" -exec sed -i 's|-L/usr/lib/x86_64-linux-gnu|-L/usr/lib/aarch64-linux-gnu|g' {} \;
+          find . -name "Makefile*" -exec sed -i 's|x86_64-linux-gnu|aarch64-linux-gnu|g' {} \;
+          
+          echo "After retry fix:"
+          find . -name "Makefile*" -exec grep -H "x86_64" {} \; || echo "SUCCESS: No x86_64 references found after retry fix!"
           
           make -j$(nproc)
         fi
