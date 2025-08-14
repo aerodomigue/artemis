@@ -1408,18 +1408,32 @@ jobs:
         fi
         
         # COMPREHENSIVE path replacement - target ALL possible x86_64 references
-        # 1. Direct library paths
-        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/|/usr/lib/aarch64-linux-gnu/|g' {} \;
-        # 2. Library directory flags
-        find . -name "Makefile*" -exec sed -i 's|-L/usr/lib/x86_64-linux-gnu|-L/usr/lib/aarch64-linux-gnu|g' {} \;
-        # 3. rpath-link parameters  
-        find . -name "Makefile*" -exec sed -i 's|-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu|-Wl,-rpath-link,/usr/lib/aarch64-linux-gnu|g' {} \;
-        # 4. Any remaining x86_64 architecture references
-        find . -name "Makefile*" -exec sed -i 's|x86_64-linux-gnu|aarch64-linux-gnu|g' {} \;
-        # 5. Target Qt library absolute paths specifically (most critical)
-        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/libQt6|/usr/lib/aarch64-linux-gnu/libQt6|g' {} \;
-        # 6. Target any remaining absolute library paths
-        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/lib|/usr/lib/aarch64-linux-gnu/lib|g' {} \;
+        # Show exactly what we're doing with verbose output
+        echo "=== APPLYING SED REPLACEMENTS ==="
+        echo "1. Replacing direct library paths..."
+        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/|/usr/lib/aarch64-linux-gnu/|g' {} \; -print
+        echo "2. Replacing library directory flags..."
+        find . -name "Makefile*" -exec sed -i 's|-L/usr/lib/x86_64-linux-gnu|-L/usr/lib/aarch64-linux-gnu|g' {} \; -print
+        echo "3. Replacing rpath-link parameters..."  
+        find . -name "Makefile*" -exec sed -i 's|-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu|-Wl,-rpath-link,/usr/lib/aarch64-linux-gnu|g' {} \; -print
+        echo "4. Replacing x86_64 architecture references..."
+        find . -name "Makefile*" -exec sed -i 's|x86_64-linux-gnu|aarch64-linux-gnu|g' {} \; -print
+        echo "5. Targeting Qt library absolute paths specifically..."
+        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/libQt6|/usr/lib/aarch64-linux-gnu/libQt6|g' {} \; -print
+        echo "6. Targeting any remaining absolute library paths..."
+        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/lib|/usr/lib/aarch64-linux-gnu/lib|g' {} \; -print
+        
+        # Additional ultra-aggressive replacements
+        echo "7. Ultra-aggressive Qt library replacements..."
+        find . -name "Makefile*" -exec sed -i 's|libQt6QuickControls2\.so|/usr/lib/aarch64-linux-gnu/libQt6QuickControls2.so|g' {} \; -print
+        find . -name "Makefile*" -exec sed -i 's|libQt6Quick\.so|/usr/lib/aarch64-linux-gnu/libQt6Quick.so|g' {} \; -print
+        find . -name "Makefile*" -exec sed -i 's|libQt6OpenGL\.so|/usr/lib/aarch64-linux-gnu/libQt6OpenGL.so|g' {} \; -print
+        find . -name "Makefile*" -exec sed -i 's|libQt6Svg\.so|/usr/lib/aarch64-linux-gnu/libQt6Svg.so|g' {} \; -print
+        find . -name "Makefile*" -exec sed -i 's|libQt6Gui\.so|/usr/lib/aarch64-linux-gnu/libQt6Gui.so|g' {} \; -print
+        find . -name "Makefile*" -exec sed -i 's|libQt6QmlModels\.so|/usr/lib/aarch64-linux-gnu/libQt6QmlModels.so|g' {} \; -print
+        find . -name "Makefile*" -exec sed -i 's|libQt6Qml\.so|/usr/lib/aarch64-linux-gnu/libQt6Qml.so|g' {} \; -print
+        find . -name "Makefile*" -exec sed -i 's|libQt6Network\.so|/usr/lib/aarch64-linux-gnu/libQt6Network.so|g' {} \; -print
+        find . -name "Makefile*" -exec sed -i 's|libQt6Core\.so|/usr/lib/aarch64-linux-gnu/libQt6Core.so|g' {} \; -print
         
         # Debug: Show what libraries are still being linked after the fix
         echo "=== AFTER FIX: Checking for any remaining x86_64 library references ==="
@@ -1467,18 +1481,32 @@ jobs:
           fi
           
           # COMPREHENSIVE path replacement - target ALL possible x86_64 references (same as main build)
-          # 1. Direct library paths
-          find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/|/usr/lib/aarch64-linux-gnu/|g' {} \;
-          # 2. Library directory flags
-          find . -name "Makefile*" -exec sed -i 's|-L/usr/lib/x86_64-linux-gnu|-L/usr/lib/aarch64-linux-gnu|g' {} \;
-          # 3. rpath-link parameters
-          find . -name "Makefile*" -exec sed -i 's|-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu|-Wl,-rpath-link,/usr/lib/aarch64-linux-gnu|g' {} \;
-          # 4. Any remaining x86_64 architecture references
-          find . -name "Makefile*" -exec sed -i 's|x86_64-linux-gnu|aarch64-linux-gnu|g' {} \;
-          # 5. Target Qt library absolute paths specifically (most critical)
-          find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/libQt6|/usr/lib/aarch64-linux-gnu/libQt6|g' {} \;
-          # 6. Target any remaining absolute library paths
-          find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/lib|/usr/lib/aarch64-linux-gnu/lib|g' {} \;
+          # Show exactly what we're doing with verbose output
+          echo "=== RETRY: APPLYING SED REPLACEMENTS ==="
+          echo "1. Replacing direct library paths..."
+          find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/|/usr/lib/aarch64-linux-gnu/|g' {} \; -print
+          echo "2. Replacing library directory flags..."
+          find . -name "Makefile*" -exec sed -i 's|-L/usr/lib/x86_64-linux-gnu|-L/usr/lib/aarch64-linux-gnu|g' {} \; -print
+          echo "3. Replacing rpath-link parameters..."
+          find . -name "Makefile*" -exec sed -i 's|-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu|-Wl,-rpath-link,/usr/lib/aarch64-linux-gnu|g' {} \; -print
+          echo "4. Replacing x86_64 architecture references..."
+          find . -name "Makefile*" -exec sed -i 's|x86_64-linux-gnu|aarch64-linux-gnu|g' {} \; -print
+          echo "5. Targeting Qt library absolute paths specifically..."
+          find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/libQt6|/usr/lib/aarch64-linux-gnu/libQt6|g' {} \; -print
+          echo "6. Targeting any remaining absolute library paths..."
+          find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/lib|/usr/lib/aarch64-linux-gnu/lib|g' {} \; -print
+          
+          # Additional ultra-aggressive replacements
+          echo "7. Ultra-aggressive Qt library replacements..."
+          find . -name "Makefile*" -exec sed -i 's|libQt6QuickControls2\.so|/usr/lib/aarch64-linux-gnu/libQt6QuickControls2.so|g' {} \; -print
+          find . -name "Makefile*" -exec sed -i 's|libQt6Quick\.so|/usr/lib/aarch64-linux-gnu/libQt6Quick.so|g' {} \; -print
+          find . -name "Makefile*" -exec sed -i 's|libQt6OpenGL\.so|/usr/lib/aarch64-linux-gnu/libQt6OpenGL.so|g' {} \; -print
+          find . -name "Makefile*" -exec sed -i 's|libQt6Svg\.so|/usr/lib/aarch64-linux-gnu/libQt6Svg.so|g' {} \; -print
+          find . -name "Makefile*" -exec sed -i 's|libQt6Gui\.so|/usr/lib/aarch64-linux-gnu/libQt6Gui.so|g' {} \; -print
+          find . -name "Makefile*" -exec sed -i 's|libQt6QmlModels\.so|/usr/lib/aarch64-linux-gnu/libQt6QmlModels.so|g' {} \; -print
+          find . -name "Makefile*" -exec sed -i 's|libQt6Qml\.so|/usr/lib/aarch64-linux-gnu/libQt6Qml.so|g' {} \; -print
+          find . -name "Makefile*" -exec sed -i 's|libQt6Network\.so|/usr/lib/aarch64-linux-gnu/libQt6Network.so|g' {} \; -print
+          find . -name "Makefile*" -exec sed -i 's|libQt6Core\.so|/usr/lib/aarch64-linux-gnu/libQt6Core.so|g' {} \; -print
           
           echo "After retry fix:"
           find . -name "Makefile*" -exec grep -H "x86_64" {} \; || echo "SUCCESS: No x86_64 references found after retry fix!"
