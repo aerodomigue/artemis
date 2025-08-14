@@ -1402,23 +1402,39 @@ jobs:
         # Debug: Show what libraries are being linked before the fix
         echo "=== BEFORE FIX: Checking for x86_64 library references in Makefiles ==="
         find . -name "Makefile*" -exec grep -H "x86_64" {} \; || echo "No x86_64 references found initially"
+        echo "=== BEFORE FIX: Complete app linking command ==="
+        if [ -f "app/Makefile.Release" ]; then
+          grep -A 20 -B 2 "aarch64-linux-gnu-g.*-o artemis" app/Makefile.Release || echo "Linking command not found"
+        fi
         
-        # More comprehensive path replacement - target ALL x86_64 paths including rpath-link
+        # COMPREHENSIVE path replacement - target ALL possible x86_64 references
+        # 1. Direct library paths
         find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/|/usr/lib/aarch64-linux-gnu/|g' {} \;
+        # 2. Library directory flags
         find . -name "Makefile*" -exec sed -i 's|-L/usr/lib/x86_64-linux-gnu|-L/usr/lib/aarch64-linux-gnu|g' {} \;
+        # 3. rpath-link parameters  
         find . -name "Makefile*" -exec sed -i 's|-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu|-Wl,-rpath-link,/usr/lib/aarch64-linux-gnu|g' {} \;
+        # 4. Any remaining x86_64 architecture references
         find . -name "Makefile*" -exec sed -i 's|x86_64-linux-gnu|aarch64-linux-gnu|g' {} \;
+        # 5. Target Qt library absolute paths specifically (most critical)
+        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/libQt6|/usr/lib/aarch64-linux-gnu/libQt6|g' {} \;
+        # 6. Target any remaining absolute library paths
+        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/lib|/usr/lib/aarch64-linux-gnu/lib|g' {} \;
         
         # Debug: Show what libraries are still being linked after the fix
         echo "=== AFTER FIX: Checking for any remaining x86_64 library references ==="
         find . -name "Makefile*" -exec grep -H "x86_64" {} \; || echo "SUCCESS: No x86_64 references found after fix!"
         
         # Extra debug: Show the exact linking command that will be executed
-        echo "=== APP MAKEFILE LINKING COMMAND DEBUG ==="
+        echo "=== AFTER FIX: Complete app linking command ==="
         if [ -f "app/Makefile.Release" ]; then
           echo "Complete linking command from app/Makefile.Release:"
-          grep -A 10 -B 2 "aarch64-linux-gnu-g.*-o artemis" app/Makefile.Release || echo "Linking command not found"
+          grep -A 20 -B 2 "aarch64-linux-gnu-g.*-o artemis" app/Makefile.Release || echo "Linking command not found"
         fi
+        
+        # Also check what Qt libraries are actually available in ARM64 path
+        echo "=== AVAILABLE ARM64 QT LIBRARIES ==="
+        ls -la /usr/lib/aarch64-linux-gnu/libQt6* 2>/dev/null | head -10 || echo "No ARM64 Qt libraries found"
         
         echo "Building (with OpenSSL and FFmpeg for ARM64)..."
         if ! make -j$(nproc); then
@@ -1445,19 +1461,36 @@ jobs:
           echo "=== RETRY BUILD: Fixing Makefiles to use ARM64 libraries ==="
           echo "Before retry fix:"
           find . -name "Makefile*" -exec grep -H "x86_64" {} \; || echo "No x86_64 references found initially"
+          echo "=== RETRY BEFORE FIX: Complete app linking command ==="
+          if [ -f "app/Makefile.Release" ]; then
+            grep -A 20 -B 2 "aarch64-linux-gnu-g.*-o artemis" app/Makefile.Release || echo "Retry linking command not found"
+          fi
           
+          # COMPREHENSIVE path replacement - target ALL possible x86_64 references (same as main build)
+          # 1. Direct library paths
           find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/|/usr/lib/aarch64-linux-gnu/|g' {} \;
+          # 2. Library directory flags
           find . -name "Makefile*" -exec sed -i 's|-L/usr/lib/x86_64-linux-gnu|-L/usr/lib/aarch64-linux-gnu|g' {} \;
+          # 3. rpath-link parameters
           find . -name "Makefile*" -exec sed -i 's|-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu|-Wl,-rpath-link,/usr/lib/aarch64-linux-gnu|g' {} \;
+          # 4. Any remaining x86_64 architecture references
           find . -name "Makefile*" -exec sed -i 's|x86_64-linux-gnu|aarch64-linux-gnu|g' {} \;
+          # 5. Target Qt library absolute paths specifically (most critical)
+          find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/libQt6|/usr/lib/aarch64-linux-gnu/libQt6|g' {} \;
+          # 6. Target any remaining absolute library paths
+          find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/lib|/usr/lib/aarch64-linux-gnu/lib|g' {} \;
           
           echo "After retry fix:"
           find . -name "Makefile*" -exec grep -H "x86_64" {} \; || echo "SUCCESS: No x86_64 references found after retry fix!"
           
-          echo "=== RETRY: Complete linking command ==="
+          echo "=== RETRY AFTER FIX: Complete linking command ==="
           if [ -f "app/Makefile.Release" ]; then
-            grep -A 10 -B 2 "aarch64-linux-gnu-g.*-o artemis" app/Makefile.Release || echo "Retry linking command not found"
+            grep -A 20 -B 2 "aarch64-linux-gnu-g.*-o artemis" app/Makefile.Release || echo "Retry linking command not found"
           fi
+          
+          # Also check what Qt libraries are actually available in ARM64 path for retry
+          echo "=== RETRY: AVAILABLE ARM64 QT LIBRARIES ==="
+          ls -la /usr/lib/aarch64-linux-gnu/libQt6* 2>/dev/null | head -10 || echo "No ARM64 Qt libraries found"
           
           make -j$(nproc)
         fi
