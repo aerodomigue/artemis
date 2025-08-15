@@ -1177,7 +1177,7 @@ jobs:
   build-raspberry-pi-dev:
     name: Raspberry Pi ARM64 Development Build
     needs: setup-version
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04-arm64  # Native ARM64 runner
     if: needs.setup-version.outputs.should_build == 'true'
     
     steps:
@@ -1192,352 +1192,57 @@ jobs:
         echo "Using semantic version: ${{ needs.setup-version.outputs.version }}"
         echo "Using numeric version: ${{ needs.setup-version.outputs.numeric_version }}"
         echo "Is prerelease: ${{ needs.setup-version.outputs.is_prerelease }}"
-    
-    - name: Setup ARM64 cross-compilation environment
+
+    - name: Install ARM64 dependencies and Qt
       run: |
         sudo apt-get update
-        
-        # Enable ARM64 (aarch64) multiarch to allow installing :arm64 packages
-        sudo dpkg --add-architecture arm64
-        
-        # Replace default sources to use ports.ubuntu.com for arm64 to avoid 404s
-        sudo cp /etc/apt/sources.list /etc/apt/sources.list.backup
-        sudo tee /etc/apt/sources.list >/dev/null << 'EOF'
-        # Default amd64 sources
-        deb [arch=amd64] http://azure.archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse
-        deb [arch=amd64] http://azure.archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe multiverse
-        deb [arch=amd64] http://azure.archive.ubuntu.com/ubuntu/ jammy-backports main restricted universe multiverse
-        deb [arch=amd64] http://azure.archive.ubuntu.com/ubuntu/ jammy-security main restricted universe multiverse
-        
-        # ARM64 sources from ports.ubuntu.com
-        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ jammy main restricted universe multiverse
-        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ jammy-updates main restricted universe multiverse
-        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ jammy-backports main restricted universe multiverse  
-        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ jammy-security main restricted universe multiverse
-        EOF
-        
-        sudo apt-get update
-        
-        # Install cross-compilation toolchain and pkg-config
         sudo apt-get install -y \
-          gcc-aarch64-linux-gnu \
-          g++-aarch64-linux-gnu \
-          libc6-dev-arm64-cross \
-          pkg-config \
-          qemu-user-static \
-          binfmt-support \
-          libssl-dev:arm64 \
-          zlib1g-dev:arm64 \
-          libopus-dev:arm64 \
-          libsdl2-dev:arm64 \
-          libsdl2-ttf-dev:arm64 \
-          libavcodec-dev:arm64 \
-          libavformat-dev:arm64 \
-          libavutil-dev:arm64 \
-          libswscale-dev:arm64 \
-          libswresample-dev:arm64 \
-          libavfilter-dev:arm64 || echo "Some ARM64 libs failed; will attempt minimal build"
-        
-        echo "ARM64 cross-compilation toolchain installed successfully"
-        echo "Note: Using arm64 ports.ubuntu.com sources to resolve 404s"
-    
-    - name: Setup Qt for ARM64 cross-compilation
-      run: |
-        # Update package lists (after adding arm64 arch previously)
-        sudo apt-get update
+          qt6-base-dev qt6-base-dev-tools qt6-declarative-dev qt6-declarative-dev-tools libqt6svg6-dev \
+          libegl1-mesa-dev libgl1-mesa-dev libopus-dev libsdl2-dev libsdl2-ttf-dev \
+          libssl-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev \
+          libva-dev libvdpau-dev libxkbcommon-dev wayland-protocols libdrm-dev nasm libgbm-dev \
+          libfreetype6-dev libasound2-dev libdbus-1-dev libgles2-mesa-dev libglu1-mesa-dev \
+          libibus-1.0-dev libpulse-dev libudev-dev libx11-dev libxcursor-dev libxext-dev \
+          libxi-dev libxinerama-dev libxrandr-dev libxss-dev libxt-dev libxv-dev libxxf86vm-dev \
+          libxcb-dri3-dev libx11-xcb-dev
 
-        echo "Diagnosing available Qt6 packages before installation (amd64)"
-        apt-cache policy qt6-base-dev || true
-        apt-cache policy qt6-declarative-dev || true
-        echo "Searching for qt6 packages (truncated)"; apt-cache search '^qt6-.*-dev' | head -40 || true
-
-        # Ensure universe component is enabled (both arches)
-        if ! grep -q 'universe' /etc/apt/sources.list; then
-          echo "Adding universe repository";
-          sudo add-apt-repository universe -y;
-          sudo apt-get update;
-        fi
-
-        echo "Installing Qt6 host toolchain + declarative modules (correct Jammy package names)"
-        # NOTE: On Ubuntu Jammy, qmake6 is provided by qt6-base-dev-tools; there is no separate qt6-qmake package.
-        sudo apt-get install -y \
-          qt6-base-dev \
-          qt6-base-dev-tools \
-          qt6-tools-dev \
-          qt6-tools-dev-tools \
-          qt6-declarative-dev \
-          qt6-declarative-dev-tools \
-          libqt6svg6-dev || {
-            echo "Primary Qt host installation failed. Dumping apt-cache policy for key packages:";
-            apt-cache policy qt6-base-dev qt6-declarative-dev || true
-            echo "Retrying with minimal subset (qt6-base-dev qt6-base-dev-tools)...";
-            sudo apt-get install -y qt6-base-dev qt6-base-dev-tools || echo "Minimal host Qt install also failed";
-        }
-
-        echo "Installing minimal ARM64 Qt runtime libraries (best-effort)"
-        # Install only runtime libraries for ARM64, not dev packages which may conflict
-        sudo apt-get install -y \
-          libqt6core6:arm64 \
-          libqt6gui6:arm64 \
-          libqt6network6:arm64 \
-          libqt6qml6:arm64 \
-          libqt6quick6:arm64 \
-          libqt6opengl6:arm64 \
-          libqt6svg6:arm64 || echo "Some ARM64 Qt runtime libs unavailable; continuing"
-
-        echo "Verifying qmake6 availability"
-        QMAKE_CMD=""
-        if command -v qmake6 >/dev/null 2>&1; then
-          QMAKE_CMD="qmake6"
-        else
-          # Fallback: locate qmake6 in typical path
-            if [ -x /usr/lib/qt6/bin/qmake6 ]; then
-              QMAKE_CMD="/usr/lib/qt6/bin/qmake6"
-            elif command -v qmake >/dev/null 2>&1; then
-              QMAKE_CMD="qmake"  # as a last resort
-            fi
-        fi
-
-        if [ -z "$QMAKE_CMD" ]; then
-          echo "ERROR: qmake6 not found after installation. Listing qt6-base-dev-tools contents for debugging:"
-          dpkg -L qt6-base-dev-tools | head -50 || true
-          echo "Failing build due to missing qmake6";
-          exit 1
-        fi
-
-        echo "Using qmake command: $QMAKE_CMD"
-        echo "QMAKE_CMD=$QMAKE_CMD" >> $GITHUB_ENV
-
-        # Determine QML install path & verify QtQuick / Controls
-        QML_BASE=$($QMAKE_CMD -query QT_INSTALL_QML 2>/dev/null || echo /usr/lib/qt6/qml)
-        echo "Detected QML install path: $QML_BASE"
-        ls -1 "$QML_BASE" | head -30 || true
-
-        MISSING_QTQUICK=0
-        if [ ! -d "$QML_BASE/QtQuick" ]; then
-          echo "QtQuick base module missing"
-          MISSING_QTQUICK=1
-        fi
-        if [ ! -d "$QML_BASE/QtQuick/Controls" ] && [ ! -d "$QML_BASE/QtQuick/Controls.2" ]; then
-          echo "QtQuick Controls module missing (Controls or Controls.2)"
-          MISSING_QTQUICK=1
-        fi
-
-        if [ $MISSING_QTQUICK -eq 1 ]; then
-          echo "Attempting to (re)install declarative + tools packages to obtain QML modules"
-          sudo apt-get install -y qt6-declarative-dev qt6-declarative-dev-tools || true
-          echo "Listing QtQuick directory after retry:"; ls -R "$QML_BASE/QtQuick" 2>/dev/null | head -80 || true
-        fi
-
-        # Export QML paths for later compile/runtime (even if limited)
-        echo "QML2_IMPORT_PATH=$QML_BASE" >> $GITHUB_ENV
-        echo "QT_QPA_PLATFORM=offscreen" >> $GITHUB_ENV
-
-        echo "Qt setup complete (host + partial arm64). Proceeding to build step."
-    
     - name: Clean any existing build
       run: |
         rm -f .qmake.stash .qmake.cache
-        find . -name "Makefile*" -delete
-        rm -rf moonlight-common-c/Makefile* moonlight-common-c/.qmake.stash
-        rm -rf qmdnsengine/Makefile* qmdnsengine/.qmake.stash 
-        rm -rf h264bitstream/Makefile* h264bitstream/.qmake.stash
-        rm -rf soundio/Makefile* soundio/.qmake.stash
-        rm -rf app/Makefile* app/.qmake.stash
+        find . -name "Makefile*" -delete || true
 
-    - name: Cross-compile for Raspberry Pi ARM64
-      env:
-        VERSION: ${{ needs.setup-version.outputs.version }}
-        PKG_CONFIG_PATH: /usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
-        PKG_CONFIG_LIBDIR: /usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
-        PKG_CONFIG_SYSROOT_DIR: /
-        CC: aarch64-linux-gnu-gcc
-        CXX: aarch64-linux-gnu-g++
-        AR: aarch64-linux-gnu-ar
-        STRIP: aarch64-linux-gnu-strip
+    - name: Build for Raspberry Pi ARM64
       run: |
-        # Use the qmake command we found earlier
-        QMAKE_CMD="${QMAKE_CMD:-qmake6}"
-        echo "Using qmake command: $QMAKE_CMD"
-        
-        # Provide explicit OpenSSL hints (headers + libs) for cross build
-        if [ -d /usr/include/aarch64-linux-gnu/openssl ]; then
-          export OPENSSL_INCLUDES="-I/usr/include/aarch64-linux-gnu -I/usr/include/aarch64-linux-gnu/openssl"
-          export OPENSSL_LIBS="-L/usr/lib/aarch64-linux-gnu -lssl -lcrypto"
-        fi
-        
-        # Configure FFmpeg/libav paths for ARM64 cross-compilation
-        export FFMPEG_INCLUDES="-I/usr/include/aarch64-linux-gnu"
-        export FFMPEG_LIBS="-L/usr/lib/aarch64-linux-gnu -lavcodec -lavformat -lavutil -lswscale -lswresample -lavfilter"
-        
-        # Configure Qt paths for ARM64 cross-compilation
-        export QT_HOST_PATH="/usr"
-        export QT_TARGET_PATH="/usr/lib/aarch64-linux-gnu"
-        
-        # Clean any existing build files
-        rm -f .qmake.stash .qmake.cache
-        find . -name "Makefile*" -delete
-        
-        echo "Configuring (with OpenSSL and FFmpeg for ARM64)..."
-        set -e
-        $QMAKE_CMD artemis.pro CONFIG+=release \
-          QMAKE_CC=aarch64-linux-gnu-gcc \
-          QMAKE_CXX=aarch64-linux-gnu-g++ \
-          QMAKE_LINK=aarch64-linux-gnu-g++ \
-          'QMAKE_AR=aarch64-linux-gnu-ar cqs' \
-          QMAKE_OBJCOPY=aarch64-linux-gnu-objcopy \
-          QMAKE_STRIP=aarch64-linux-gnu-strip \
-          'QMAKE_CFLAGS+=-I/usr/include/aarch64-linux-gnu -I/usr/include/aarch64-linux-gnu/openssl' \
-          'QMAKE_CXXFLAGS+=-I/usr/include/aarch64-linux-gnu -I/usr/include/aarch64-linux-gnu/openssl' \
-          'QMAKE_LFLAGS+=-L/usr/lib/aarch64-linux-gnu -Wl,-rpath,/usr/lib/aarch64-linux-gnu' \
-          'QMAKE_LIBDIR=/usr/lib/aarch64-linux-gnu' \
-          'QMAKE_LIBDIR_QT=/usr/lib/aarch64-linux-gnu' \
-          'QT_SYSROOT=/usr/lib/aarch64-linux-gnu' \
-          'PKG_CONFIG_SYSROOT_DIR=/' \
-          'PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig'
-        
-        # Force generation of ALL Makefiles first, then apply fixes
-        echo "=== Forcing generation of all Makefiles before applying fixes ==="
-        make qmake_all || echo "qmake_all not available, continuing"
-        
-        # Critical fix: Replace all x86_64 library paths with ARM64 paths in ALL generated Makefiles
-        echo "Fixing ALL generated Makefiles to use ARM64 libraries instead of x86_64..."
-        
-        # Debug: Show what libraries are being linked before the fix
-        echo "=== BEFORE FIX: Checking for x86_64 library references in ALL Makefiles ==="
-        find . -name "Makefile*" -exec grep -H "x86_64" {} \; || echo "No x86_64 references found initially"
-        echo "=== BEFORE FIX: Complete app linking command ==="
-        if [ -f "app/Makefile.Release" ]; then
-          grep -A 20 -B 2 "aarch64-linux-gnu-g.*-o artemis" app/Makefile.Release || echo "Linking command not found"
-        fi
-        
-        # COMPREHENSIVE path replacement - target ALL possible x86_64 references
-        # Show exactly what we're doing with verbose output
-        echo "=== APPLYING SED REPLACEMENTS TO ALL MAKEFILES ==="
-        echo "1. Replacing direct library paths..."
-        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/|/usr/lib/aarch64-linux-gnu/|g' {} \; -print
-        echo "2. Replacing library directory flags..."
-        find . -name "Makefile*" -exec sed -i 's|-L/usr/lib/x86_64-linux-gnu|-L/usr/lib/aarch64-linux-gnu|g' {} \; -print
-        echo "3. Replacing rpath-link parameters..."  
-        find . -name "Makefile*" -exec sed -i 's|-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu|-Wl,-rpath-link,/usr/lib/aarch64-linux-gnu|g' {} \; -print
-        echo "4. Replacing x86_64 architecture references..."
-        find . -name "Makefile*" -exec sed -i 's|x86_64-linux-gnu|aarch64-linux-gnu|g' {} \; -print
-        echo "5. Targeting Qt library absolute paths specifically..."
-        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/libQt6|/usr/lib/aarch64-linux-gnu/libQt6|g' {} \; -print
-        echo "6. Targeting any remaining absolute library paths..."
-        find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/lib|/usr/lib/aarch64-linux-gnu/lib|g' {} \; -print
-        
-        # Additional ultra-aggressive replacements
-        echo "7. Ultra-aggressive Qt library replacements..."
-        find . -name "Makefile*" -exec sed -i 's|libQt6QuickControls2\.so|/usr/lib/aarch64-linux-gnu/libQt6QuickControls2.so|g' {} \; -print
-        find . -name "Makefile*" -exec sed -i 's|libQt6Quick\.so|/usr/lib/aarch64-linux-gnu/libQt6Quick.so|g' {} \; -print
-        find . -name "Makefile*" -exec sed -i 's|libQt6OpenGL\.so|/usr/lib/aarch64-linux-gnu/libQt6OpenGL.so|g' {} \; -print
-        find . -name "Makefile*" -exec sed -i 's|libQt6Svg\.so|/usr/lib/aarch64-linux-gnu/libQt6Svg.so|g' {} \; -print
-        find . -name "Makefile*" -exec sed -i 's|libQt6Gui\.so|/usr/lib/aarch64-linux-gnu/libQt6Gui.so|g' {} \; -print
-        find . -name "Makefile*" -exec sed -i 's|libQt6QmlModels\.so|/usr/lib/aarch64-linux-gnu/libQt6QmlModels.so|g' {} \; -print
-        find . -name "Makefile*" -exec sed -i 's|libQt6Qml\.so|/usr/lib/aarch64-linux-gnu/libQt6Qml.so|g' {} \; -print
-        find . -name "Makefile*" -exec sed -i 's|libQt6Network\.so|/usr/lib/aarch64-linux-gnu/libQt6Network.so|g' {} \; -print
-        find . -name "Makefile*" -exec sed -i 's|libQt6Core\.so|/usr/lib/aarch64-linux-gnu/libQt6Core.so|g' {} \; -print
-        
-        # Debug: Show what libraries are still being linked after the fix
-        echo "=== AFTER FIX: Checking for any remaining x86_64 library references ==="
-        find . -name "Makefile*" -exec grep -H "x86_64" {} \; || echo "SUCCESS: No x86_64 references found after fix!"
-        
-        # Extra debug: Show the exact linking command that will be executed
-        echo "=== AFTER FIX: Complete app linking command ==="
-        if [ -f "app/Makefile.Release" ]; then
-          echo "Complete linking command from app/Makefile.Release:"
-          grep -A 20 -B 2 "aarch64-linux-gnu-g.*-o artemis" app/Makefile.Release || echo "Linking command not found"
-        fi
-        
-        # Also check what Qt libraries are actually available in ARM64 path
-        echo "=== AVAILABLE ARM64 QT LIBRARIES ==="
-        ls -la /usr/lib/aarch64-linux-gnu/libQt6* 2>/dev/null | head -10 || echo "No ARM64 Qt libraries found"
-        
-        echo "Building (with OpenSSL and FFmpeg for ARM64)..."
-        # Create qmake wrapper that applies ARM64 fixes after each qmake call
-        mkdir -p ./wrapper_bin
-        echo '#!/bin/bash' > ./wrapper_bin/qmake6
-        echo '# Call original qmake6 first' >> ./wrapper_bin/qmake6
-        echo '/usr/bin/qmake6 "$@"' >> ./wrapper_bin/qmake6
-        echo 'RESULT=$?' >> ./wrapper_bin/qmake6
-        echo 'echo "=== QMAKE WRAPPER: Applying ARM64 library fixes ==="' >> ./wrapper_bin/qmake6
-        echo 'find . -name "Makefile*" -exec sed -i "s|/usr/lib/x86_64-linux-gnu/|/usr/lib/aarch64-linux-gnu/|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
-        echo 'find . -name "Makefile*" -exec sed -i "s|-L/usr/lib/x86_64-linux-gnu|-L/usr/lib/aarch64-linux-gnu|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
-        echo 'find . -name "Makefile*" -exec sed -i "s|-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu|-Wl,-rpath-link,/usr/lib/aarch64-linux-gnu|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
-        echo 'find . -name "Makefile*" -exec sed -i "s|x86_64-linux-gnu|aarch64-linux-gnu|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
-        echo 'find . -name "Makefile*" -exec sed -i "s|/usr/lib/x86_64-linux-gnu/libQt6|/usr/lib/aarch64-linux-gnu/libQt6|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
-        echo 'find . -name "Makefile*" -exec sed -i "s|/usr/lib/x86_64-linux-gnu/lib|/usr/lib/aarch64-linux-gnu/lib|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
-        echo 'find . -name "Makefile*" -exec sed -i "s|libQt6QuickControls2\.so|/usr/lib/aarch64-linux-gnu/libQt6QuickControls2.so|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
-        echo 'find . -name "Makefile*" -exec sed -i "s|libQt6Quick\.so|/usr/lib/aarch64-linux-gnu/libQt6Quick.so|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
-        echo 'find . -name "Makefile*" -exec sed -i "s|libQt6OpenGL\.so|/usr/lib/aarch64-linux-gnu/libQt6OpenGL.so|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
-        echo 'find . -name "Makefile*" -exec sed -i "s|libQt6Svg\.so|/usr/lib/aarch64-linux-gnu/libQt6Svg.so|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
-        echo 'find . -name "Makefile*" -exec sed -i "s|libQt6Gui\.so|/usr/lib/aarch64-linux-gnu/libQt6Gui.so|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
-        echo 'find . -name "Makefile*" -exec sed -i "s|libQt6QmlModels\.so|/usr/lib/aarch64-linux-gnu/libQt6QmlModels.so|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
-        echo 'find . -name "Makefile*" -exec sed -i "s|libQt6Qml\.so|/usr/lib/aarch64-linux-gnu/libQt6Qml.so|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
-        echo 'find . -name "Makefile*" -exec sed -i "s|libQt6Network\.so|/usr/lib/aarch64-linux-gnu/libQt6Network.so|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
-        echo 'find . -name "Makefile*" -exec sed -i "s|libQt6Core\.so|/usr/lib/aarch64-linux-gnu/libQt6Core.so|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
-        echo 'echo "=== QMAKE WRAPPER: ARM64 fixes applied ==="' >> ./wrapper_bin/qmake6
-        echo 'exit $RESULT' >> ./wrapper_bin/qmake6
-        chmod +x ./wrapper_bin/qmake6
-        
-        # Override PATH so all qmake calls use our wrapper
-        export PATH="$(pwd)/wrapper_bin:$PATH"
-        echo "Using qmake wrapper: $(which qmake6)"
-        
-        if ! make -j$(nproc); then
-          echo "Initial build failed (likely OpenSSL/FFmpeg). Retrying without OpenSSL support..."
-          # Clean generated Makefiles before reconfigure
-          find . -name "Makefile*" -delete || true
-          $QMAKE_CMD artemis.pro CONFIG+=release CONFIG+=no-openssl \
-            QMAKE_CC=aarch64-linux-gnu-gcc \
-            QMAKE_CXX=aarch64-linux-gnu-g++ \
-            QMAKE_LINK=aarch64-linux-gnu-g++ \
-            'QMAKE_AR=aarch64-linux-gnu-ar cqs' \
-            QMAKE_OBJCOPY=aarch64-linux-gnu-objcopy \
-            QMAKE_STRIP=aarch64-linux-gnu-strip \
-            'QMAKE_CFLAGS+=-I/usr/include/aarch64-linux-gnu' \
-            'QMAKE_CXXFLAGS+=-I/usr/include/aarch64-linux-gnu' \
-            'QMAKE_LFLAGS+=-L/usr/lib/aarch64-linux-gnu -Wl,-rpath,/usr/lib/aarch64-linux-gnu -lavcodec -lavformat -lavutil -lswscale' \
-            'QMAKE_LIBDIR=/usr/lib/aarch64-linux-gnu' \
-            'QMAKE_LIBDIR_QT=/usr/lib/aarch64-linux-gnu' \
-            'QT_SYSROOT=/usr/lib/aarch64-linux-gnu' \
-            'PKG_CONFIG_SYSROOT_DIR=/' \
-            'PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig'
-          
-          # Our qmake wrapper is already in PATH, so make will use it for all subprojects
-          make -j$(nproc)
-        fi
-        
-        # Verify the binary was created and is ARM64
-        if [ -f "app/artemis" ]; then
-          echo "Binary created successfully:"
-          file app/artemis
-          ls -la app/artemis
-        else
-          echo "ERROR: Binary not created"
-          exit 1
-        fi
-    
-    - name: Package Raspberry Pi Development Build
-      env:
-        VERSION: ${{ needs.setup-version.outputs.version }}
+        # Simple native ARM64 build - no cross-compilation needed!
+        qmake6 artemis.pro CONFIG+=release
+        make -j$(nproc)
+
+    - name: Verify ARM64 binary
       run: |
-        # Create info file with semantic versioning for ARM64
+        echo "Verifying ARM64 binary:"
+        file app/artemis
+        readelf -h app/artemis | grep Machine || true
+
+    - name: Package Raspberry Pi build
+      env:
+        SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
+      run: |
+        mkdir -p artifacts
+        tar -C app -czf "artifacts/artemis-raspberry-pi-arm64-$SEMANTIC_VERSION.tar.gz" artemis
+        
+        # Create build info
         cat > build_info.txt << EOF
-        Artemis Desktop Development Build (Raspberry Pi ARM64)
-        Version: $VERSION
-        Numeric Version: ${{ needs.setup-version.outputs.numeric_version }}
-        Is Prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
-        Branch: ${{ github.ref_name }}
-        Commit: ${{ github.sha }}
+        Artemis Desktop Raspberry Pi ARM64 Build
+        Version: $SEMANTIC_VERSION
         Built: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-        Target: aarch64-linux-gnu
+        Architecture: ARM64 (native build)
+        Commit: ${{ github.sha }}
+        Branch: ${{ github.ref_name }}
+        Build Runner: ubuntu-22.04-arm64
         EOF
         
-        # Package with semantic version for ARM64
-        tar -czf artemis-raspberry-pi-arm64-$VERSION.tar.gz -C app artemis -C .. build_info.txt
-    
+        tar -czf "artemis-raspberry-pi-arm64-$SEMANTIC_VERSION.tar.gz" -C artifacts . -C .. build_info.txt
+
     - name: Upload Raspberry Pi Development Artifacts
       uses: actions/upload-artifact@v4
       with:
