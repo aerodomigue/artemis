@@ -1177,7 +1177,7 @@ jobs:
   build-raspberry-pi-dev:
     name: Raspberry Pi ARM64 Development Build
     needs: setup-version
-    runs-on: ubuntu-22.04-arm64  # Native ARM64 runner
+    runs-on: ubuntu-22.04-arm
     if: needs.setup-version.outputs.should_build == 'true'
     
     steps:
