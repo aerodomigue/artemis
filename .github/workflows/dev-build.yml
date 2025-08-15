@@ -1396,11 +1396,15 @@ jobs:
           'PKG_CONFIG_SYSROOT_DIR=/' \
           'PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig'
         
-        # Critical fix: Replace all x86_64 library paths with ARM64 paths in generated Makefiles
-        echo "Fixing generated Makefiles to use ARM64 libraries instead of x86_64..."
+        # Force generation of ALL Makefiles first, then apply fixes
+        echo "=== Forcing generation of all Makefiles before applying fixes ==="
+        make qmake_all || echo "qmake_all not available, continuing"
+        
+        # Critical fix: Replace all x86_64 library paths with ARM64 paths in ALL generated Makefiles
+        echo "Fixing ALL generated Makefiles to use ARM64 libraries instead of x86_64..."
         
         # Debug: Show what libraries are being linked before the fix
-        echo "=== BEFORE FIX: Checking for x86_64 library references in Makefiles ==="
+        echo "=== BEFORE FIX: Checking for x86_64 library references in ALL Makefiles ==="
         find . -name "Makefile*" -exec grep -H "x86_64" {} \; || echo "No x86_64 references found initially"
         echo "=== BEFORE FIX: Complete app linking command ==="
         if [ -f "app/Makefile.Release" ]; then
@@ -1409,7 +1413,7 @@ jobs:
         
         # COMPREHENSIVE path replacement - target ALL possible x86_64 references
         # Show exactly what we're doing with verbose output
-        echo "=== APPLYING SED REPLACEMENTS ==="
+        echo "=== APPLYING SED REPLACEMENTS TO ALL MAKEFILES ==="
         echo "1. Replacing direct library paths..."
         find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/|/usr/lib/aarch64-linux-gnu/|g' {} \; -print
         echo "2. Replacing library directory flags..."
@@ -1471,8 +1475,12 @@ jobs:
             'PKG_CONFIG_SYSROOT_DIR=/' \
             'PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig'
           
-          # Apply the same comprehensive library path fix for retry
-          echo "=== RETRY BUILD: Fixing Makefiles to use ARM64 libraries ==="
+          # Force generation of ALL Makefiles first, then apply fixes
+          echo "=== RETRY: Forcing generation of all Makefiles ==="
+          make qmake_all || echo "qmake_all not available, continuing"
+          
+          # Apply the same comprehensive library path fix for retry AFTER all Makefiles are generated
+          echo "=== RETRY BUILD: Fixing ALL Makefiles to use ARM64 libraries ==="
           echo "Before retry fix:"
           find . -name "Makefile*" -exec grep -H "x86_64" {} \; || echo "No x86_64 references found initially"
           echo "=== RETRY BEFORE FIX: Complete app linking command ==="
@@ -1482,7 +1490,7 @@ jobs:
           
           # COMPREHENSIVE path replacement - target ALL possible x86_64 references (same as main build)
           # Show exactly what we're doing with verbose output
-          echo "=== RETRY: APPLYING SED REPLACEMENTS ==="
+          echo "=== RETRY: APPLYING SED REPLACEMENTS TO ALL MAKEFILES ==="
           echo "1. Replacing direct library paths..."
           find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/|/usr/lib/aarch64-linux-gnu/|g' {} \; -print
           echo "2. Replacing library directory flags..."
