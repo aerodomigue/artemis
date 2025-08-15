@@ -1223,31 +1223,63 @@ jobs:
         file app/artemis
         readelf -h app/artemis | grep Machine || true
 
-    - name: Package Raspberry Pi build
+    - name: Create installation package
       env:
         SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
-        mkdir -p artifacts
-        tar -C app -czf "artifacts/artemis-raspberry-pi-arm64-$SEMANTIC_VERSION.tar.gz" artemis
+        mkdir -p artemis-package
+        cp app/artemis artemis-package/
+        
+        # Create simple install script
+        cat > artemis-package/install.sh << 'EOF'
+        #!/bin/bash
+        echo "Installing Artemis Desktop for Raspberry Pi..."
+        
+        # Make binary executable
+        chmod +x artemis
+        
+        # Copy to local bin directory
+        mkdir -p ~/.local/bin
+        cp artemis ~/.local/bin/
+        
+        # Create desktop entry
+        mkdir -p ~/.local/share/applications
+        cat > ~/.local/share/applications/artemis-desktop.desktop << 'EOD'
+        [Desktop Entry]
+        Type=Application
+        Name=Artemis Desktop
+        Comment=Game streaming client
+        Exec=artemis
+        Icon=artemis-desktop
+        Categories=Game;Network;
+        EOD
+        
+        echo "Installation complete!"
+        echo "You can now run 'artemis' from terminal or find it in applications menu"
+        EOF
+        
+        chmod +x artemis-package/install.sh
         
         # Create build info
-        cat > build_info.txt << EOF
+        cat > artemis-package/build_info.txt << EOF
         Artemis Desktop Raspberry Pi ARM64 Build
         Version: $SEMANTIC_VERSION
         Built: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
         Architecture: ARM64 (native build)
         Commit: ${{ github.sha }}
         Branch: ${{ github.ref_name }}
-        Build Runner: ubuntu-22.04-arm64
-        EOF
         
-        tar -czf "artemis-raspberry-pi-arm64-$SEMANTIC_VERSION.tar.gz" -C artifacts . -C .. build_info.txt
+        Quick Start:
+        1. Extract this archive
+        2. Run: ./install.sh
+        3. Launch from terminal: artemis
+        EOF
 
     - name: Upload Raspberry Pi Development Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: artemis-raspberry-pi-arm64-${{ needs.setup-version.outputs.version }}
-        path: artemis-raspberry-pi-arm64-${{ needs.setup-version.outputs.version }}.tar.gz
+        path: artemis-package/
         retention-days: 30
 
   build-steamdeck-dev:
