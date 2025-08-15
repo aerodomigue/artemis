@@ -1455,6 +1455,36 @@ jobs:
         ls -la /usr/lib/aarch64-linux-gnu/libQt6* 2>/dev/null | head -10 || echo "No ARM64 Qt libraries found"
         
         echo "Building (with OpenSSL and FFmpeg for ARM64)..."
+        # Create qmake wrapper that applies ARM64 fixes after each qmake call
+        mkdir -p ./wrapper_bin
+        echo '#!/bin/bash' > ./wrapper_bin/qmake6
+        echo '# Call original qmake6 first' >> ./wrapper_bin/qmake6
+        echo '/usr/bin/qmake6 "$@"' >> ./wrapper_bin/qmake6
+        echo 'RESULT=$?' >> ./wrapper_bin/qmake6
+        echo 'echo "=== QMAKE WRAPPER: Applying ARM64 library fixes ==="' >> ./wrapper_bin/qmake6
+        echo 'find . -name "Makefile*" -exec sed -i "s|/usr/lib/x86_64-linux-gnu/|/usr/lib/aarch64-linux-gnu/|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
+        echo 'find . -name "Makefile*" -exec sed -i "s|-L/usr/lib/x86_64-linux-gnu|-L/usr/lib/aarch64-linux-gnu|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
+        echo 'find . -name "Makefile*" -exec sed -i "s|-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu|-Wl,-rpath-link,/usr/lib/aarch64-linux-gnu|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
+        echo 'find . -name "Makefile*" -exec sed -i "s|x86_64-linux-gnu|aarch64-linux-gnu|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
+        echo 'find . -name "Makefile*" -exec sed -i "s|/usr/lib/x86_64-linux-gnu/libQt6|/usr/lib/aarch64-linux-gnu/libQt6|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
+        echo 'find . -name "Makefile*" -exec sed -i "s|/usr/lib/x86_64-linux-gnu/lib|/usr/lib/aarch64-linux-gnu/lib|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
+        echo 'find . -name "Makefile*" -exec sed -i "s|libQt6QuickControls2\.so|/usr/lib/aarch64-linux-gnu/libQt6QuickControls2.so|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
+        echo 'find . -name "Makefile*" -exec sed -i "s|libQt6Quick\.so|/usr/lib/aarch64-linux-gnu/libQt6Quick.so|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
+        echo 'find . -name "Makefile*" -exec sed -i "s|libQt6OpenGL\.so|/usr/lib/aarch64-linux-gnu/libQt6OpenGL.so|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
+        echo 'find . -name "Makefile*" -exec sed -i "s|libQt6Svg\.so|/usr/lib/aarch64-linux-gnu/libQt6Svg.so|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
+        echo 'find . -name "Makefile*" -exec sed -i "s|libQt6Gui\.so|/usr/lib/aarch64-linux-gnu/libQt6Gui.so|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
+        echo 'find . -name "Makefile*" -exec sed -i "s|libQt6QmlModels\.so|/usr/lib/aarch64-linux-gnu/libQt6QmlModels.so|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
+        echo 'find . -name "Makefile*" -exec sed -i "s|libQt6Qml\.so|/usr/lib/aarch64-linux-gnu/libQt6Qml.so|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
+        echo 'find . -name "Makefile*" -exec sed -i "s|libQt6Network\.so|/usr/lib/aarch64-linux-gnu/libQt6Network.so|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
+        echo 'find . -name "Makefile*" -exec sed -i "s|libQt6Core\.so|/usr/lib/aarch64-linux-gnu/libQt6Core.so|g" {} \; 2>/dev/null' >> ./wrapper_bin/qmake6
+        echo 'echo "=== QMAKE WRAPPER: ARM64 fixes applied ==="' >> ./wrapper_bin/qmake6
+        echo 'exit $RESULT' >> ./wrapper_bin/qmake6
+        chmod +x ./wrapper_bin/qmake6
+        
+        # Override PATH so all qmake calls use our wrapper
+        export PATH="$(pwd)/wrapper_bin:$PATH"
+        echo "Using qmake wrapper: $(which qmake6)"
+        
         if ! make -j$(nproc); then
           echo "Initial build failed (likely OpenSSL/FFmpeg). Retrying without OpenSSL support..."
           # Clean generated Makefiles before reconfigure
@@ -1475,59 +1505,7 @@ jobs:
             'PKG_CONFIG_SYSROOT_DIR=/' \
             'PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig'
           
-          # Force generation of ALL Makefiles first, then apply fixes
-          echo "=== RETRY: Forcing generation of all Makefiles ==="
-          make qmake_all || echo "qmake_all not available, continuing"
-          
-          # Apply the same comprehensive library path fix for retry AFTER all Makefiles are generated
-          echo "=== RETRY BUILD: Fixing ALL Makefiles to use ARM64 libraries ==="
-          echo "Before retry fix:"
-          find . -name "Makefile*" -exec grep -H "x86_64" {} \; || echo "No x86_64 references found initially"
-          echo "=== RETRY BEFORE FIX: Complete app linking command ==="
-          if [ -f "app/Makefile.Release" ]; then
-            grep -A 20 -B 2 "aarch64-linux-gnu-g.*-o artemis" app/Makefile.Release || echo "Retry linking command not found"
-          fi
-          
-          # COMPREHENSIVE path replacement - target ALL possible x86_64 references (same as main build)
-          # Show exactly what we're doing with verbose output
-          echo "=== RETRY: APPLYING SED REPLACEMENTS TO ALL MAKEFILES ==="
-          echo "1. Replacing direct library paths..."
-          find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/|/usr/lib/aarch64-linux-gnu/|g' {} \; -print
-          echo "2. Replacing library directory flags..."
-          find . -name "Makefile*" -exec sed -i 's|-L/usr/lib/x86_64-linux-gnu|-L/usr/lib/aarch64-linux-gnu|g' {} \; -print
-          echo "3. Replacing rpath-link parameters..."
-          find . -name "Makefile*" -exec sed -i 's|-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu|-Wl,-rpath-link,/usr/lib/aarch64-linux-gnu|g' {} \; -print
-          echo "4. Replacing x86_64 architecture references..."
-          find . -name "Makefile*" -exec sed -i 's|x86_64-linux-gnu|aarch64-linux-gnu|g' {} \; -print
-          echo "5. Targeting Qt library absolute paths specifically..."
-          find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/libQt6|/usr/lib/aarch64-linux-gnu/libQt6|g' {} \; -print
-          echo "6. Targeting any remaining absolute library paths..."
-          find . -name "Makefile*" -exec sed -i 's|/usr/lib/x86_64-linux-gnu/lib|/usr/lib/aarch64-linux-gnu/lib|g' {} \; -print
-          
-          # Additional ultra-aggressive replacements
-          echo "7. Ultra-aggressive Qt library replacements..."
-          find . -name "Makefile*" -exec sed -i 's|libQt6QuickControls2\.so|/usr/lib/aarch64-linux-gnu/libQt6QuickControls2.so|g' {} \; -print
-          find . -name "Makefile*" -exec sed -i 's|libQt6Quick\.so|/usr/lib/aarch64-linux-gnu/libQt6Quick.so|g' {} \; -print
-          find . -name "Makefile*" -exec sed -i 's|libQt6OpenGL\.so|/usr/lib/aarch64-linux-gnu/libQt6OpenGL.so|g' {} \; -print
-          find . -name "Makefile*" -exec sed -i 's|libQt6Svg\.so|/usr/lib/aarch64-linux-gnu/libQt6Svg.so|g' {} \; -print
-          find . -name "Makefile*" -exec sed -i 's|libQt6Gui\.so|/usr/lib/aarch64-linux-gnu/libQt6Gui.so|g' {} \; -print
-          find . -name "Makefile*" -exec sed -i 's|libQt6QmlModels\.so|/usr/lib/aarch64-linux-gnu/libQt6QmlModels.so|g' {} \; -print
-          find . -name "Makefile*" -exec sed -i 's|libQt6Qml\.so|/usr/lib/aarch64-linux-gnu/libQt6Qml.so|g' {} \; -print
-          find . -name "Makefile*" -exec sed -i 's|libQt6Network\.so|/usr/lib/aarch64-linux-gnu/libQt6Network.so|g' {} \; -print
-          find . -name "Makefile*" -exec sed -i 's|libQt6Core\.so|/usr/lib/aarch64-linux-gnu/libQt6Core.so|g' {} \; -print
-          
-          echo "After retry fix:"
-          find . -name "Makefile*" -exec grep -H "x86_64" {} \; || echo "SUCCESS: No x86_64 references found after retry fix!"
-          
-          echo "=== RETRY AFTER FIX: Complete linking command ==="
-          if [ -f "app/Makefile.Release" ]; then
-            grep -A 20 -B 2 "aarch64-linux-gnu-g.*-o artemis" app/Makefile.Release || echo "Retry linking command not found"
-          fi
-          
-          # Also check what Qt libraries are actually available in ARM64 path for retry
-          echo "=== RETRY: AVAILABLE ARM64 QT LIBRARIES ==="
-          ls -la /usr/lib/aarch64-linux-gnu/libQt6* 2>/dev/null | head -10 || echo "No ARM64 Qt libraries found"
-          
+          # Our qmake wrapper is already in PATH, so make will use it for all subprojects
           make -j$(nproc)
         fi
         
