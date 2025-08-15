@@ -1589,3 +1589,17 @@ jobs:
           ${{ (steps.check-artifacts.outputs.artifacts_exist == 'true' || steps.find-previous.outputs.reused_artifacts_available == 'true') && '1. Download the appropriate file for your platform
           2. Extract the archive (if applicable)
           3. Run the executable (may require additional setup on some platforms)' || 'No installation files are available for this release. Please check recent releases or feature branches for builds.' }}
+        files: |
+          artifacts/**/*.zip
+          artifacts/**/*.exe
+          artifacts/**/*.dmg
+          artifacts/**/*.tar.gz
+          artifacts/**/*.AppImage
+          artifacts/**/*.flatpak
+          artifacts/**/artemis
+          artifacts/**/build_info.txt
+          artifacts/**/install.sh
+        prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
+        draft: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
