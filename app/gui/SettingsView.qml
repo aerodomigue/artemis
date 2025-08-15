@@ -472,32 +472,24 @@ Flickable {
                                     return false
                                 }
 
-                                // The textbox needs to have text or placeholder text
-                                if (!fpsField.text && !fpsField.placeholderText) {
-                                    return false
-                                }
-
+                                // Allow empty field (will use placeholder text) or valid input
                                 return true
                             }
 
                             id: customFpsDialog
-                            title: isRefreshRateMode ? qsTr("Custom Refresh Rate") : qsTr("Custom Frame Rate")
+                            title: qsTr("Custom Display Refresh Rate")
                             standardButtons: Dialog.Ok | Dialog.Cancel
                             onOpened: {
                                 // Force keyboard focus on the textbox so keyboard navigation works
                                 fpsField.forceActiveFocus()
 
-                                // Check if we should default to refresh rate mode
-                                isRefreshRateMode = StreamingPreferences.enableFractionalRefreshRate
-                                refreshRateModeCheckBox.checked = isRefreshRateMode
-                                
-                                // Update field based on mode
-                                if (isRefreshRateMode) {
+                                // Check if we have a saved custom refresh rate value
+                                if (StreamingPreferences.enableFractionalRefreshRate && StreamingPreferences.customRefreshRate > 0) {
                                     fpsField.text = StreamingPreferences.customRefreshRate.toString()
-                                    fpsField.validator = refreshRateValidator
+                                    customFpsDialog.isRefreshRateMode = true
                                 } else {
-                                    fpsField.text = fpsListModel.get(fpsComboBox.currentIndex).video_fps
-                                    fpsField.validator = intValidator
+                                    fpsField.text = ""
+                                    customFpsDialog.isRefreshRateMode = false
                                 }
 
                                 // standardButton() was added in Qt 5.10, so we must check for it first
@@ -521,8 +513,13 @@ Flickable {
                                     return
                                 }
 
-                                if (isRefreshRateMode) {
-                                    var refreshRate = parseFloat(fpsField.text ? fpsField.text : fpsField.placeholderText)
+                                // Check if user entered a value
+                                var enteredValue = fpsField.text ? fpsField.text : fpsField.placeholderText
+                                var hasCustomValue = fpsField.text && fpsField.text.trim() !== ""
+                                
+                                if (hasCustomValue) {
+                                    // User entered a custom refresh rate - enable fractional refresh rate mode
+                                    var refreshRate = parseFloat(enteredValue)
                                     if (!isNaN(refreshRate)) {
                                         StreamingPreferences.customRefreshRate = refreshRate
                                         StreamingPreferences.enableFractionalRefreshRate = true
@@ -541,7 +538,14 @@ Flickable {
                                         }
                                     }
                                 } else {
-                                    var fps = parseInt(fpsField.text ? fpsField.text : fpsField.placeholderText)
+                                    // User didn't enter a value - disable fractional refresh rate mode
+                                    StreamingPreferences.enableFractionalRefreshRate = false
+                                    
+                                    // Use default/standard FPS value 
+                                    var fps = parseInt(fpsField.placeholderText)
+                                    if (isNaN(fps)) fps = 60 // fallback to 60 FPS
+                                    
+                                    StreamingPreferences.fps = fps
 
                                     // Find and update the custom entry
                                     for (var i = 0; i < fpsListModel.count; i++) {
@@ -566,57 +570,39 @@ Flickable {
                                 width: Math.max(300, customFpsDialog.availableWidth)
                                 spacing: 10
 
-                                CheckBox {
-                                    id: refreshRateModeCheckBox
-                                    width: parent.width
-                                    text: qsTr("Enable Fractional Refresh Rate (allows decimals like 59.94 Hz)")
-                                    font.pointSize: 10
-                                    checked: StreamingPreferences.enableFractionalRefreshRate
-                                    
-                                    onCheckedChanged: {
-                                        customFpsDialog.isRefreshRateMode = checked
-                                        StreamingPreferences.enableFractionalRefreshRate = checked
-                                        
-                                        if (checked) {
-                                            fpsField.text = StreamingPreferences.customRefreshRate.toString()
-                                            fpsField.validator = refreshRateValidator
-                                            fpsField.inputMethodHints = Qt.ImhFormattedNumbersOnly
-                                        } else {
-                                            fpsField.text = fpsListModel.get(fpsComboBox.currentIndex).video_fps
-                                            fpsField.validator = intValidator
-                                            fpsField.inputMethodHints = Qt.ImhDigitsOnly
-                                        }
-                                    }
-                                }
-
                                 Label {
-                                    text: isRefreshRateMode ? qsTr("Enter a custom refresh rate:") : qsTr("Enter a custom frame rate:")
+                                    text: qsTr("Enter a custom display refresh rate (Hz):")
                                     font.bold: true
                                 }
 
                                 RowLayout {
-                                    TextField {
-                                        id: fpsField
-                                        maximumLength: isRefreshRateMode ? 6 : 4
-                                        inputMethodHints: isRefreshRateMode ? Qt.ImhFormattedNumbersOnly : Qt.ImhDigitsOnly
-                                        placeholderText: isRefreshRateMode ? "59.94" : fpsListModel.get(fpsComboBox.currentIndex).video_fps
-                                        validator: isRefreshRateMode ? refreshRateValidator : intValidator
-                                        focus: true
+                                        TextField {
+                                            id: fpsField
+                                            maximumLength: 6
+                                            inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                            placeholderText: "144.0"
+                                            validator: refreshRateValidator
+                                            focus: true
 
-                                        IntValidator {
-                                            id: intValidator
-                                            bottom: 10
-                                            top: 500
-                                        }
-                                        
-                                        DoubleValidator {
-                                            id: refreshRateValidator
-                                            bottom: 10.0
-                                            top: 500.0
-                                            decimals: 2
-                                        }
+                                            IntValidator {
+                                                id: intValidator
+                                                bottom: 10
+                                                top: 500
+                                            }
+                                            
+                                            DoubleValidator {
+                                                id: refreshRateValidator
+                                                bottom: 10.0
+                                                top: 500.0
+                                                decimals: 2
+                                            }
 
                                         onTextChanged: {
+                                            // Automatically enable fractional refresh rate if there's a value
+                                            var hasValue = fpsField.text && fpsField.text.trim() !== ""
+                                            customFpsDialog.isRefreshRateMode = hasValue
+                                            StreamingPreferences.enableFractionalRefreshRate = hasValue
+                                            
                                             // standardButton() was added in Qt 5.10, so we must check for it first
                                             if (customFpsDialog.standardButton) {
                                                 customFpsDialog.standardButton(Dialog.Ok).enabled = customFpsDialog.isInputValid()
@@ -947,7 +933,7 @@ Flickable {
 
                 Label {
                     width: parent.width
-                    text: qsTr("These features work with any GameStream server and don't require Apollo backend.")
+                    text: qsTr("These features require Apollo as the host streaming software.")
                     font.pointSize: 9
                     wrapMode: Text.Wrap
                     color: "#888888"

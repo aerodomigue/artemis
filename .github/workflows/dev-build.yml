@@ -172,8 +172,8 @@ jobs:
           echo "  Numeric Version: $NUMERIC_VERSION"
           echo "  Is Prerelease: $IS_PRERELEASE"
           echo "  Branch: $BRANCH_NAME"
-  build-windows-dev:
-    name: Windows Development Build
+  build-windows-x64-portable:
+    name: Windows x64 Portable Build
     needs: setup-version
     runs-on: windows-latest
     if: needs.setup-version.outputs.should_build == 'true'
@@ -199,17 +199,18 @@ jobs:
         target: 'desktop'
         arch: 'win64_msvc2022_64'
         modules: 'qtmultimedia'
+      continue-on-error: true
+      id: qt_install_primary
     
-    - name: Install WiX Toolset
-      run: |
-        # Install .NET SDK first (required for WiX v5)
-        choco install dotnet-sdk -y
-        
-        # Install WiX Toolset v5 as a .NET tool (recommended approach for v5)
-        dotnet tool install --global wix --version 5.0.1
-        
-        # Verify installation
-        wix --version
+    - name: Retry Qt Installation (if failed)
+      if: steps.qt_install_primary.outcome == 'failure'
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_64'
+        modules: 'qtmultimedia'
     
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
@@ -221,18 +222,8 @@ jobs:
       run: |
         # Write numeric version for Windows RC compilation
         echo $env:NUMERIC_VERSION > app\version.txt
-        
-        # Create detailed version info file for reference  
-        @"
-        Semantic Version: $env:SEMANTIC_VERSION
-        Numeric Version: $env:NUMERIC_VERSION
-        Is Prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
-        Branch: ${{ github.ref_name }}
-        Commit: ${{ github.sha }}
-        Build Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')
-        "@ | Out-File -FilePath "build_version_info.txt" -Encoding utf8
     
-    - name: Build using build-artemis-arch.bat script
+    - name: Build portable package only
       env:
         SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
@@ -247,69 +238,34 @@ jobs:
           exit $LASTEXITCODE
         }
     
-    - name: Rename artifacts for development build
+    - name: Rename portable ZIP
       env:
         SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
-        # Find the generated MSI and portable ZIP files
-        $msiFile = Get-ChildItem -Path "build\installer-x64-release" -Filter "*.msi" | Select-Object -First 1
+        # Find the generated portable ZIP file
         $zipFile = Get-ChildItem -Path "build\installer-x64-release" -Filter "ArtemisPortable-*.zip" | Select-Object -First 1
-        
-        if ($msiFile) {
-          # Rename MSI installer for Artemis using semantic version
-          $newMsiName = "artemis-windows-installer-$env:SEMANTIC_VERSION.msi"
-          Move-Item $msiFile.FullName $newMsiName
-          echo "Created MSI installer: $newMsiName"
-        }
         
         if ($zipFile) {
           # Rename portable ZIP for Artemis using semantic version
-          $newZipName = "artemis-windows-portable-$env:SEMANTIC_VERSION.zip"
+          $newZipName = "artemis-windows-x64-portable-$env:SEMANTIC_VERSION.zip"
           Move-Item $zipFile.FullName $newZipName
-          echo "Created portable ZIP: $newZipName"
+          echo "Created x64 portable ZIP: $newZipName"
+        } else {
+          echo "ERROR: Portable ZIP not found"
+          Get-ChildItem -Path "build\installer-x64-release" -Recurse
+          exit 1
         }
-        
-        # Create info file with semantic versioning
-        @"
-        Artemis Desktop Development Build
-        Version: $env:SEMANTIC_VERSION
-        Numeric Version: ${{ needs.setup-version.outputs.numeric_version }}
-        Is Prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
-        Branch: ${{ github.ref_name }}
-        Commit: ${{ github.sha }}
-        Built: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')
-        
-        This build includes:
-        - MSI Installer with proper dependency handling
-        - Portable ZIP package  
-        - All required Windows runtime dependencies
-        "@ | Out-File -FilePath "build_info.txt" -Encoding utf8
     
-    - name: Upload MSI Installer
+    - name: Upload x64 Portable ZIP
       uses: actions/upload-artifact@v4
       with:
-        name: artemis-windows-installer-${{ needs.setup-version.outputs.version }}
-        path: artemis-windows-installer-${{ needs.setup-version.outputs.version }}.msi
+        name: artemis-windows-x64-portable-${{ needs.setup-version.outputs.version }}
+        path: artemis-windows-x64-portable-${{ needs.setup-version.outputs.version }}.zip
         retention-days: 30
         if-no-files-found: warn
-    
-    - name: Upload Portable ZIP
-      uses: actions/upload-artifact@v4
-      with:
-        name: artemis-windows-portable-${{ needs.setup-version.outputs.version }}
-        path: artemis-windows-portable-${{ needs.setup-version.outputs.version }}.zip
-        retention-days: 30
-        if-no-files-found: warn
-    
-    - name: Upload Build Info
-      uses: actions/upload-artifact@v4
-      with:
-        name: artemis-windows-build-info-${{ needs.setup-version.outputs.version }}
-        path: build_info.txt
-        retention-days: 30
 
-  build-windows-arm64-dev:
-    name: Windows ARM64 Development Build
+  build-windows-arm64-portable:
+    name: Windows ARM64 Portable Build
     needs: setup-version
     runs-on: windows-latest
     if: needs.setup-version.outputs.should_build == 'true'
@@ -335,6 +291,8 @@ jobs:
         target: 'desktop'
         arch: 'win64_msvc2022_64'
         modules: 'qtmultimedia'
+      continue-on-error: true
+      id: qt_install_desktop
         
     - name: Setup Qt for ARM64
       uses: jurplel/install-qt-action@v3
@@ -344,17 +302,28 @@ jobs:
         target: 'desktop'
         arch: 'win64_msvc2022_arm64_cross_compiled'  # Correct ARM64 architecture name
         set-env: false  # Don't let this override our Qt6_DIR - we'll set it manually
+      continue-on-error: true
+      id: qt_install_arm64
     
-    - name: Install WiX Toolset
-      run: |
-        # Install .NET SDK first (required for WiX v5)
-        choco install dotnet-sdk -y
-        
-        # Install WiX Toolset v5 as a .NET tool (recommended approach for v5)
-        dotnet tool install --global wix --version 5.0.1
-        
-        # Verify installation
-        wix --version
+    - name: Retry Qt Desktop Installation (if failed)
+      if: steps.qt_install_desktop.outcome == 'failure'
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_64'
+        modules: 'qtmultimedia'
+    
+    - name: Retry Qt ARM64 Installation (if failed)
+      if: steps.qt_install_arm64.outcome == 'failure'
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_arm64_cross_compiled'
+        set-env: false
     
     - name: Setup MSVC for ARM64
       uses: ilammy/msvc-dev-cmd@v1
@@ -377,19 +346,8 @@ jobs:
       run: |
         # Write numeric version for Windows RC compilation
         echo $env:NUMERIC_VERSION > app\version.txt
-        
-        # Create detailed version info file for reference  
-        @"
-        Semantic Version: $env:SEMANTIC_VERSION
-        Numeric Version: $env:NUMERIC_VERSION
-        Is Prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
-        Branch: ${{ github.ref_name }}
-        Commit: ${{ github.sha }}
-        Build Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')
-        Architecture: ARM64
-        "@ | Out-File -FilePath "build_version_info_arm64.txt" -Encoding utf8
     
-    - name: Build using build-artemis-arch.bat script for ARM64
+    - name: Build ARM64 portable package only
       env:
         SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
@@ -412,23 +370,6 @@ jobs:
         echo "  Qt6_DIR: $env:Qt6_DIR"
         echo "  qmake available: $(Test-Path "$qtArm64Path\bin\qmake.bat")"
         
-        # Verify MSVC ARM64 cross-compilation tools
-        echo "Verifying MSVC ARM64 tools..."
-        $clPath = where.exe cl.exe 2>$null | Select-String "arm64" | Select-Object -First 1
-        $nmakePath = where.exe nmake.exe 2>$null | Select-String "arm64" | Select-Object -First 1
-        
-        if (-not $clPath) {
-          echo "WARNING: ARM64 cl.exe not found in PATH, build script will use explicit paths"
-        } else {
-          echo "Found ARM64 cl.exe: $clPath"
-        }
-        
-        if (-not $nmakePath) {
-          echo "WARNING: ARM64 nmake.exe not found in PATH, build script will use explicit paths"
-        } else {
-          echo "Found ARM64 nmake.exe: $nmakePath"
-        }
-        
         # Run the build script
         echo "Running build script for ARM64..."
         cmd /c "scripts\build-artemis-arch.bat release"
@@ -438,84 +379,26 @@ jobs:
         
         if ($buildExitCode -ne 0) {
           echo "ERROR: Build script failed with exit code $buildExitCode"
-          
-          # Check for nmake.log
-          $nmakeLog = Get-ChildItem -Path "build\build-arm64-release" -Filter "nmake.log" -ErrorAction SilentlyContinue
-          if ($nmakeLog) {
-            echo "=== nmake.log contents ==="
-            Get-Content $nmakeLog.FullName
-            echo "=== end nmake.log ==="
-          }
-          
-          # Show what was created
-          echo "=== Build directory contents ==="
-          Get-ChildItem -Path "build" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
-          echo "=== end build directory ==="
-          
           exit $buildExitCode
         }
-        
-        # Verify build output
-        echo "Verifying ARM64 build artifacts..."
-        $artemisExe = "build\build-arm64-release\app\release\Artemis.exe"
-        if (Test-Path $artemisExe) {
-          echo "SUCCESS: Artemis.exe found at $artemisExe"
-          $fileInfo = Get-Item $artemisExe
-          echo "  Size: $($fileInfo.Length) bytes"
-          echo "  Created: $($fileInfo.CreationTime)"
-        } else {
-          echo "ERROR: Artemis.exe not found at expected location: $artemisExe"
-          echo "Contents of build\build-arm64-release\app:"
-          Get-ChildItem -Path "build\build-arm64-release\app" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
-          exit 1
-        }
     
-    - name: Rename artifacts for ARM64 development build
+    - name: Rename ARM64 portable ZIP
       env:
         SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
-        # Find the generated MSI and portable ZIP files
-        $msiFile = Get-ChildItem -Path "build\installer-arm64-release" -Filter "*.msi" | Select-Object -First 1
+        # Find the generated portable ZIP file
         $zipFile = Get-ChildItem -Path "build\installer-arm64-release" -Filter "ArtemisPortable-*.zip" | Select-Object -First 1
-        
-        if ($msiFile) {
-          # Rename MSI installer for Artemis ARM64 using semantic version
-          $newMsiName = "artemis-windows-arm64-installer-$env:SEMANTIC_VERSION.msi"
-          Move-Item $msiFile.FullName $newMsiName
-          echo "Created ARM64 MSI installer: $newMsiName"
-        }
         
         if ($zipFile) {
           # Rename portable ZIP for Artemis ARM64 using semantic version
           $newZipName = "artemis-windows-arm64-portable-$env:SEMANTIC_VERSION.zip"
           Move-Item $zipFile.FullName $newZipName
           echo "Created ARM64 portable ZIP: $newZipName"
+        } else {
+          echo "ERROR: ARM64 Portable ZIP not found"
+          Get-ChildItem -Path "build\installer-arm64-release" -Recurse
+          exit 1
         }
-        
-        # Create info file with semantic versioning
-        @"
-        Artemis Desktop Development Build (ARM64)
-        Version: $env:SEMANTIC_VERSION
-        Numeric Version: ${{ needs.setup-version.outputs.numeric_version }}
-        Is Prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
-        Branch: ${{ github.ref_name }}
-        Commit: ${{ github.sha }}
-        Built: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')
-        Architecture: ARM64
-        
-        This build includes:
-        - MSI Installer with proper dependency handling for Windows ARM64
-        - Portable ZIP package for Windows ARM64  
-        - All required Windows ARM64 runtime dependencies
-        "@ | Out-File -FilePath "build_info_arm64.txt" -Encoding utf8
-    
-    - name: Upload ARM64 MSI Installer
-      uses: actions/upload-artifact@v4
-      with:
-        name: artemis-windows-arm64-installer-${{ needs.setup-version.outputs.version }}
-        path: artemis-windows-arm64-installer-${{ needs.setup-version.outputs.version }}.msi
-        retention-days: 30
-        if-no-files-found: warn
     
     - name: Upload ARM64 Portable ZIP
       uses: actions/upload-artifact@v4
@@ -524,13 +407,203 @@ jobs:
         path: artemis-windows-arm64-portable-${{ needs.setup-version.outputs.version }}.zip
         retention-days: 30
         if-no-files-found: warn
+
+  build-windows-universal-installer:
+    name: Windows Universal Installer
+    needs: setup-version
+    runs-on: windows-latest
+    if: needs.setup-version.outputs.should_build == 'true'
     
-    - name: Upload ARM64 Build Info
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+        fetch-depth: 0
+    
+    - name: Setup Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_64'
+        modules: 'qtmultimedia'
+      continue-on-error: true
+      id: qt_install_universal_desktop
+        
+    - name: Setup Qt for ARM64
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_arm64_cross_compiled'
+        set-env: false
+      continue-on-error: true
+      id: qt_install_universal_arm64
+    
+    - name: Retry Qt Desktop Installation (if failed)
+      if: steps.qt_install_universal_desktop.outcome == 'failure'
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_64'
+        modules: 'qtmultimedia'
+    
+    - name: Retry Qt ARM64 Installation (if failed)
+      if: steps.qt_install_universal_arm64.outcome == 'failure'
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_arm64_cross_compiled'
+        set-env: false
+    
+    - name: Setup build environment
+      run: |
+        # Install .NET SDK first (required for WiX v5)
+        choco install dotnet-sdk -y
+        
+        # Install WiX Toolset v5 as a .NET tool (recommended approach for v5)
+        dotnet tool install --global wix --version 5.0.1
+        
+        # Verify installation
+        wix --version
+        
+        # Also install Visual Studio Build Tools (includes MSBuild) for compatibility
+        choco install visualstudio2022buildtools --package-parameters "--includeRecommended --includeOptional --quiet --wait" -y
+    
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+    
+    - name: Setup MSVC for ARM64
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: amd64_arm64
+    
+    - name: Update version file
+      env:
+        NUMERIC_VERSION: ${{ needs.setup-version.outputs.numeric_version }}
+      run: |
+        echo $env:NUMERIC_VERSION > app\version.txt
+    
+    - name: Build x64 MSI
+      env:
+        SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
+      run: |
+        $env:PATH = "$env:Qt6_DIR\bin;$env:PATH"
+        cmd /c "scripts\build-artemis-arch.bat release"
+        
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        
+        # Ensure MSI was created
+        $msiFile = Get-ChildItem -Path "build\installer-x64-release" -Filter "*.msi" | Select-Object -First 1
+        if (-not $msiFile) {
+          echo "ERROR: x64 MSI not found in build\installer-x64-release"
+          exit 1
+        }
+        
+        echo "x64 MSI created successfully: $($msiFile.FullName)"
+    
+    - name: Build ARM64 MSI
+      env:
+        SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
+      run: |
+        # Set up Qt ARM64 environment
+        $qtArm64Path = "D:\a\artemis\Qt\6.8.3\msvc2022_arm64"
+        $env:Qt6_DIR = $qtArm64Path
+        $env:PATH = "$qtArm64Path\bin;$env:PATH"
+        
+        cmd /c "scripts\build-artemis-arch.bat release"
+        
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        
+        # Ensure MSI was created
+        $msiFile = Get-ChildItem -Path "build\installer-arm64-release" -Filter "*.msi" | Select-Object -First 1
+        if (-not $msiFile) {
+          echo "ERROR: ARM64 MSI not found in build\installer-arm64-release"
+          exit 1
+        }
+        
+        echo "ARM64 MSI created successfully: $($msiFile.FullName)"
+    
+    - name: Generate Universal Bundle  
+      env:
+        SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
+        NUMERIC_VERSION: ${{ needs.setup-version.outputs.numeric_version }}
+      run: |
+        # Prefer a purely numeric version for MSBuild/NuGet and WiX
+        $msbuildVersion = $env:NUMERIC_VERSION
+        if ([string]::IsNullOrWhiteSpace($msbuildVersion)) {
+          # Fallback: extract up to 4 numeric segments from semantic version
+          $match = [regex]::Match($env:SEMANTIC_VERSION, '\d+(?:\.\d+){2,3}')
+          if ($match.Success) { $msbuildVersion = $match.Value } else { $msbuildVersion = '0.0.0.0' }
+        }
+        
+        echo "Original semantic version: $env:SEMANTIC_VERSION"
+        echo "MSBuild/WiX version: $msbuildVersion"
+        
+        # Update version file with MSBuild-compatible version
+        echo $msbuildVersion > app\version.txt
+        
+        # Set environment variables that the WiX scripts expect
+        $env:BUILD_CONFIG = "release"
+        $env:BUILD_ROOT = $PWD
+        
+        # Restore and build with explicit version properties for WiX v5
+        dotnet restore wix\ArtemisSetup\ArtemisSetup.wixproj
+        
+        $buildCmd = "dotnet build wix\ArtemisSetup\ArtemisSetup.wixproj --configuration Release --no-restore"
+        $buildCmd += " -p:INSTALLER_FOLDER=build\installer-release"
+        $buildCmd += " -p:BUILD_FOLDER=build\build-release"
+        $buildCmd += " -p:BUILD_ROOT=$env:BUILD_ROOT"
+        $buildCmd += " -p:Version=$msbuildVersion -p:WixVersion=$msbuildVersion -p:WixBundleVersion=$msbuildVersion"
+        
+        Write-Host "Running: $buildCmd"
+        cmd /c $buildCmd
+        
+        if ($LASTEXITCODE -ne 0) {
+          echo "Bundle generation failed with exit code $LASTEXITCODE"
+          echo "Trying fallback approach with generate-artemis-bundle.bat script..."
+          
+          # Fallback to original script approach with version override
+          cmd /c "scripts\generate-artemis-bundle.bat release $msbuildVersion"
+          
+          if ($LASTEXITCODE -ne 0) {
+            echo "Fallback also failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+        }
+    
+    - name: Rename universal bundle
+      env:
+        SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
+      run: |
+        # Find the generated bundle
+        $bundleFile = Get-ChildItem -Path "build\installer-release" -Filter "ArtemisSetup*.exe" | Select-Object -First 1
+        
+        if ($bundleFile) {
+          # Rename universal bundle
+          $newBundleName = "artemis-windows-universal-installer-$env:SEMANTIC_VERSION.exe"
+          Move-Item $bundleFile.FullName $newBundleName
+          echo "Created universal installer: $newBundleName"
+        } else {
+          echo "ERROR: Universal bundle not found"
+          Get-ChildItem -Path "build\installer-release" -Recurse
+          exit 1
+        }
+    
+    - name: Upload Universal Installer
       uses: actions/upload-artifact@v4
       with:
-        name: artemis-windows-arm64-build-info-${{ needs.setup-version.outputs.version }}
-        path: build_info_arm64.txt
+        name: artemis-windows-universal-installer-${{ needs.setup-version.outputs.version }}
+        path: artemis-windows-universal-installer-${{ needs.setup-version.outputs.version }}.exe
         retention-days: 30
+        if-no-files-found: warn
 
   build-macos-dev:
     name: macOS Development Build
@@ -558,6 +631,11 @@ jobs:
         host: 'mac'
         target: 'desktop'
         modules: 'qtmultimedia'
+        
+    - name: Set macOS deployment target for compatibility
+      run: |
+        echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV
+        echo "Qt6_DIR=$Qt6_DIR" >> $GITHUB_ENV
     
     - name: Install dependencies
       run: |
@@ -567,87 +645,171 @@ jobs:
       run: |
         rm -f .qmake.stash .qmake.cache
         find . -name "Makefile*" -delete
+        find . -name "*.moc" -delete
+        find . -name "moc_*.cpp" -delete
+        find . -name "moc_*.h" -delete
         rm -rf moonlight-common-c/Makefile* moonlight-common-c/.qmake.stash
         rm -rf qmdnsengine/Makefile* qmdnsengine/.qmake.stash 
         rm -rf h264bitstream/Makefile* h264bitstream/.qmake.stash
         rm -rf soundio/Makefile* soundio/.qmake.stash
         rm -rf app/Makefile* app/.qmake.stash
+        rm -rf app/debug app/release
     
     - name: Build
       run: |
         export PATH="$Qt6_DIR/bin:$PATH"
         export QMAKE="$Qt6_DIR/bin/qmake6"
-        qmake6 artemis.pro CONFIG+=release CONFIG+=sdk_no_version_check
+        export MACOSX_DEPLOYMENT_TARGET=14.0
+        
+        # Force a complete clean build to ensure MOC files are generated
+        make clean || true
+        qmake6 artemis.pro CONFIG+=release CONFIG+=sdk_no_version_check QMAKE_MACOSX_DEPLOYMENT_TARGET=14.0
+        
+        # Generate MOC files explicitly and ensure they're created before building
+        make -j$(sysctl -n hw.ncpu) qmake_all
+        
+        # Force generation of specific problematic MOC files first
+        cd app
+        if [ -f Makefile.Release ]; then
+          # Generate MOC headers explicitly
+          make -f Makefile.Release compiler_moc_header_make_all || echo "MOC header generation completed"
+          # Generate MOC source files explicitly  
+          make -f Makefile.Release compiler_moc_source_make_all || echo "MOC source generation completed"
+          
+          # Verify critical MOC files exist, generate manually if needed
+          # Generate into the source folder so #include "*.moc" resolves relative to the .cpp file
+          if [ ! -f backend/computermanager.moc ]; then
+            echo "Manually generating backend/computermanager.moc"
+            "$Qt6_DIR/libexec/moc" backend/computermanager.cpp -o backend/computermanager.moc
+          fi
+          if [ ! -f backend/boxartmanager.moc ]; then
+            echo "Manually generating backend/boxartmanager.moc"
+            "$Qt6_DIR/libexec/moc" backend/boxartmanager.cpp -o backend/boxartmanager.moc
+          fi
+          if [ ! -f gui/computermodel.moc ]; then
+            echo "Manually generating gui/computermodel.moc"
+            "$Qt6_DIR/libexec/moc" gui/computermodel.cpp -o gui/computermodel.moc
+          fi
+        fi
+        
+        # Clean and rebuild all subprojects with consistent deployment target
+        cd ..
+        make clean || true
+        
+        # Build each subproject individually with deployment target
+        for subdir in moonlight-common-c qmdnsengine h264bitstream soundio; do
+          if [ -d "$subdir" ]; then
+            echo "Building $subdir with deployment target..."
+            cd "$subdir"
+            make clean || true
+            qmake6 *.pro CONFIG+=release QMAKE_MACOSX_DEPLOYMENT_TARGET=14.0
+            make -j$(sysctl -n hw.ncpu)
+            cd ..
+          fi
+        done
+        
+        # Build app sub-project to ensure .moc is picked up correctly
+        cd app
+        qmake6 app.pro CONFIG+=release QMAKE_MACOSX_DEPLOYMENT_TARGET=14.0
+        make -j$(sysctl -n hw.ncpu) release
+        cd ..
+        
+        # Final build
+        qmake6 artemis.pro CONFIG+=release CONFIG+=sdk_no_version_check QMAKE_MACOSX_DEPLOYMENT_TARGET=14.0
         make -j$(sysctl -n hw.ncpu)
     
     - name: Package macOS Development Build
       env:
         VERSION: ${{ needs.setup-version.outputs.version }}
       run: |
-        # Deploy Qt frameworks to the app bundle
-        echo "Deploying Qt frameworks using macdeployqt..."
-        macdeployqt app/Artemis.app -qmldir=app/gui -appstore-compliant || {
-          echo "macdeployqt failed with -appstore-compliant, trying without"
-          macdeployqt app/Artemis.app -qmldir=app/gui
-        }
+        # Install create-dmg if not available
+        if ! command -v create-dmg &> /dev/null; then
+          echo "Installing create-dmg..."
+          brew install create-dmg
+        fi
         
-        # Verify frameworks were bundled
-        echo "Checking bundled frameworks:"
-        ls -la app/Artemis.app/Contents/Frameworks/ || echo "No Frameworks directory found"
+        # Use the DMG generation script to create universal DMG
+        # Ensure version is available for DMG naming
+        echo "$VERSION" > app/version.txt
         
-        # Verify the app can find its dependencies
-        echo "Checking app dependencies:"
-        otool -L app/Artemis.app/Contents/MacOS/Artemis | head -20
-        
-        # Test that the app bundle structure is correct
-        echo "App bundle structure:"
-        find app/Artemis.app -name "*.framework" | head -10
-        
-        # Check and fix permissions
-        echo "Setting proper permissions..."
-        chmod -R 755 app/Artemis.app
-        chmod +x app/Artemis.app/Contents/MacOS/Artemis
-        
-        # Check for any signing that might have been applied
-        echo "Checking code signing status:"
-        codesign -dv app/Artemis.app 2>&1 || echo "App is not code signed"
-        
-        # Remove quarantine attributes that might interfere
-        echo "Removing quarantine attributes..."
-        xattr -cr app/Artemis.app || echo "No quarantine attributes to remove"
-        
-        # For development builds, add a simple ad-hoc signature to prevent "damaged" errors
-        echo "Applying ad-hoc code signature for development..."
-        codesign --force --deep --sign - app/Artemis.app || echo "Ad-hoc signing failed, continuing anyway"
-        
-        # Verify the signature was applied
-        echo "Verifying signature:"
-        codesign -dv app/Artemis.app 2>&1 || echo "No signature found"
-        
-        # Create info file with semantic versioning
-        cat > build_info.txt << EOF
-        Artemis Desktop Development Build
-        Version: $VERSION
-        Numeric Version: ${{ needs.setup-version.outputs.numeric_version }}
-        Is Prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
-        Branch: ${{ github.ref_name }}
-        Commit: ${{ github.sha }}
-        Built: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-        
-        Installation Notes:
-        - If macOS says the app is "damaged", run: xattr -cr Artemis.app
-        - Or go to System Preferences > Security & Privacy and allow the app
-        - This is a development build and may trigger Gatekeeper warnings
-        EOF
-        
-        # Package with semantic version including the properly bundled app
-        tar -czf artemis-macos-$VERSION.tar.gz -C app Artemis.app -C .. build_info.txt
+        # Run DMG generation with error handling
+        DMG_OUTPUT="Artemis-${VERSION}.dmg"
+        if ! ./scripts/generate-dmg.sh Release "$VERSION"; then
+          echo "DMG generation failed, checking for common issues..."
+          
+          # Check if create-dmg is available
+          create-dmg --help || echo "create-dmg not properly installed"
+          
+          # List what was actually created
+          echo "Contents of build directory:"
+          find build -name "*.dmg" -o -name "*.app" -o -name "Artemis*" | head -20
+          
+          # Try a simpler fallback DMG creation with proper .dmg extension
+          echo "Attempting fallback DMG creation..."
+          
+          if [ -d "build/build-Release" ]; then
+            # Use create-dmg directly with correct argument order
+            echo "Found Artemis.app at app/Artemis.app"
+            mkdir -p build/installer-Release
+            # Simple approach using hdiutil which is more reliable
+            if [ -d "app/Artemis.app" ]; then
+              echo "Creating DMG with hdiutil..."
+              hdiutil create -srcfolder app/Artemis.app -volname "Artemis" "build/installer-Release/Artemis-${VERSION}.dmg" || {
+                echo "hdiutil failed, trying create-dmg with minimal options..."
+                create-dmg \
+                  --volname "Artemis" \
+                  --no-internet-enable \
+                  --app-drop-link 350 185 \
+                  "build/installer-Release/Artemis-${VERSION}.dmg" \
+                  "app/" || exit 1
+              }
+            else
+              echo "Error: No Artemis.app found in app/ directory"
+              exit 1
+            fi
+            cd build/build-Release
+            # Look for the app bundle in the most likely locations
+            if [ -d "app/Artemis.app" ]; then
+              echo "Found Artemis.app at app/Artemis.app"
+              # Create a simple DMG manually with proper filename
+              mkdir -p ../installer-Release
+              create-dmg --volname "Artemis-$VERSION" \
+                --icon-size 80 \
+                --icon "app/Artemis.app" 200 190 \
+                --hide-extension "app/Artemis.app" \
+                --app-drop-link 400 185 \
+                "../installer-Release/Artemis-$VERSION.dmg" \
+                "app/Artemis.app"
+              cd ../..
+            elif [ -d "Artemis.app" ]; then
+              echo "Found Artemis.app at root level"
+              # Create a simple DMG manually with proper filename
+              mkdir -p ../installer-Release
+              create-dmg --volname "Artemis-$VERSION" \
+                --icon-size 80 \
+                --icon "Artemis.app" 200 190 \
+                --hide-extension "Artemis.app" \
+                --app-drop-link 400 185 \
+                "../installer-Release/Artemis-$VERSION.dmg" \
+                "Artemis.app"
+              cd ../..
+            else
+              echo "ERROR: Artemis.app not found in build/build-Release"
+              echo "Available directories in build/build-Release:"
+              find . -name "*.app" -type d | head -10
+              exit 1
+            fi
+          else
+            echo "ERROR: build/build-Release directory not found"
+            exit 1
+          fi
+        fi
     
-    - name: Upload Development Artifacts
+    - name: Upload macOS Universal DMG
       uses: actions/upload-artifact@v4
       with:
-        name: artemis-macos-${{ needs.setup-version.outputs.version }}
-        path: artemis-macos-${{ needs.setup-version.outputs.version }}.tar.gz
+        name: artemis-macos-universal-${{ needs.setup-version.outputs.version }}
+        path: build/installer-Release/Artemis-${{ needs.setup-version.outputs.version }}.dmg
         retention-days: 30
 
   build-linux-dev:
@@ -1012,6 +1174,114 @@ jobs:
         path: artemis-flatpak-${{ needs.setup-version.outputs.version }}.flatpak
         retention-days: 30
 
+  build-raspberry-pi-dev:
+    name: Raspberry Pi ARM64 Development Build
+    needs: setup-version
+    runs-on: ubuntu-22.04-arm
+    if: needs.setup-version.outputs.should_build == 'true'
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+        fetch-depth: 0
+
+    - name: Display version info
+      run: |
+        echo "Using semantic version: ${{ needs.setup-version.outputs.version }}"
+        echo "Using numeric version: ${{ needs.setup-version.outputs.numeric_version }}"
+        echo "Is prerelease: ${{ needs.setup-version.outputs.is_prerelease }}"
+
+    - name: Install ARM64 dependencies and Qt
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          qt6-base-dev qt6-base-dev-tools qt6-declarative-dev qt6-declarative-dev-tools libqt6svg6-dev \
+          libegl1-mesa-dev libgl1-mesa-dev libopus-dev libsdl2-dev libsdl2-ttf-dev \
+          libssl-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev \
+          libva-dev libvdpau-dev libxkbcommon-dev wayland-protocols libdrm-dev nasm libgbm-dev \
+          libfreetype6-dev libasound2-dev libdbus-1-dev libgles2-mesa-dev libglu1-mesa-dev \
+          libibus-1.0-dev libpulse-dev libudev-dev libx11-dev libxcursor-dev libxext-dev \
+          libxi-dev libxinerama-dev libxrandr-dev libxss-dev libxt-dev libxv-dev libxxf86vm-dev \
+          libxcb-dri3-dev libx11-xcb-dev
+
+    - name: Clean any existing build
+      run: |
+        rm -f .qmake.stash .qmake.cache
+        find . -name "Makefile*" -delete || true
+
+    - name: Build for Raspberry Pi ARM64
+      run: |
+        # Simple native ARM64 build - no cross-compilation needed!
+        qmake6 artemis.pro CONFIG+=release
+        make -j$(nproc)
+
+    - name: Verify ARM64 binary
+      run: |
+        echo "Verifying ARM64 binary:"
+        file app/artemis
+        readelf -h app/artemis | grep Machine || true
+
+    - name: Create installation package
+      env:
+        SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
+      run: |
+        mkdir -p artemis-package
+        cp app/artemis artemis-package/
+        
+        # Create simple install script
+        cat > artemis-package/install.sh << 'EOF'
+        #!/bin/bash
+        echo "Installing Artemis Desktop for Raspberry Pi..."
+        
+        # Make binary executable
+        chmod +x artemis
+        
+        # Copy to local bin directory
+        mkdir -p ~/.local/bin
+        cp artemis ~/.local/bin/
+        
+        # Create desktop entry
+        mkdir -p ~/.local/share/applications
+        cat > ~/.local/share/applications/artemis-desktop.desktop << 'EOD'
+        [Desktop Entry]
+        Type=Application
+        Name=Artemis Desktop
+        Comment=Game streaming client
+        Exec=artemis
+        Icon=artemis-desktop
+        Categories=Game;Network;
+        EOD
+        
+        echo "Installation complete!"
+        echo "You can now run 'artemis' from terminal or find it in applications menu"
+        EOF
+        
+        chmod +x artemis-package/install.sh
+        
+        # Create build info
+        cat > artemis-package/build_info.txt << EOF
+        Artemis Desktop Raspberry Pi ARM64 Build
+        Version: $SEMANTIC_VERSION
+        Built: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        Architecture: ARM64 (native build)
+        Commit: ${{ github.sha }}
+        Branch: ${{ github.ref_name }}
+        
+        Quick Start:
+        1. Extract this archive
+        2. Run: ./install.sh
+        3. Launch from terminal: artemis
+        EOF
+
+    - name: Upload Raspberry Pi Development Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: artemis-raspberry-pi-arm64-${{ needs.setup-version.outputs.version }}
+        path: artemis-package/
+        retention-days: 30
+
   build-steamdeck-dev:
     name: Steam Deck Development Build
     needs: setup-version
@@ -1142,7 +1412,7 @@ jobs:
 
   create-dev-release:
     name: Create Development Release
-    needs: [setup-version, build-windows-dev, build-windows-arm64-dev, build-macos-dev, build-linux-dev, build-appimage-dev, build-flatpak-dev, build-steamdeck-dev]
+    needs: [setup-version, build-windows-x64-portable, build-windows-arm64-portable, build-windows-universal-installer, build-macos-dev, build-linux-dev, build-appimage-dev, build-flatpak-dev, build-raspberry-pi-dev, build-steamdeck-dev]
     runs-on: ubuntu-latest
     if: (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && needs.setup-version.outputs.should_build == 'true'  # Create releases for develop/main branches when builds ran
     
@@ -1200,6 +1470,7 @@ jobs:
         [ ! -z "$IMPROVEMENTS" ] && CHANGELOG="${CHANGELOG}### 🔧 Improvements\n${IMPROVEMENTS}\n"
         [ ! -z "$OTHER" ] && CHANGELOG="${CHANGELOG}### 📝 Other Changes\n${OTHER}\n"
         echo -e "$CHANGELOG" > changelog.md
+       
         echo "Generated changelog:"
         cat changelog.md
         {
@@ -1231,6 +1502,7 @@ jobs:
         fi
 
     - name: Find and download previous artifacts if builds were skipped
+     
       id: find-previous
       if: steps.check-artifacts.outputs.artifacts_exist == 'false'
       run: |
@@ -1317,13 +1589,3 @@ jobs:
           ${{ (steps.check-artifacts.outputs.artifacts_exist == 'true' || steps.find-previous.outputs.reused_artifacts_available == 'true') && '1. Download the appropriate file for your platform
           2. Extract the archive (if applicable)
           3. Run the executable (may require additional setup on some platforms)' || 'No installation files are available for this release. Please check recent releases or feature branches for builds.' }}
-          
-          ## 🐛 Found a Bug?
-          Please report issues on our [GitHub Issues](https://github.com/${{ github.repository }}/issues) page.
-        files: |
-          ${{ steps.check-artifacts.outputs.artifacts_exist == 'true' && 'artifacts/*/*' || '' }}
-          ${{ steps.check-artifacts.outputs.artifacts_exist == 'false' && 'reused-artifacts/*' || '' }}
-        prerelease: ${{ needs.setup-version.outputs.is_prerelease }}
-        draft: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

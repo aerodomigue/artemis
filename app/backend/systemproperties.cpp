@@ -595,8 +595,8 @@ bool SystemProperties::hasVulkanHdrSupport()
         
         if (hdrDebug) {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "Vulkan HDR Detection: vulkaninfo output length: %d characters",
-                        output.length());
+                        "Vulkan HDR Detection: vulkaninfo output length: %lld characters",
+                            static_cast<long long>(output.length()));
         }
         
         // Check for modern GPU drivers that support HDR
