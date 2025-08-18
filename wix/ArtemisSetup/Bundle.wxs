@@ -18,7 +18,7 @@
           HelpUrl="https://github.com/wjbeckett/artemis/wiki/Setup-Guide"
           UpdateUrl="https://github.com/wjbeckett/artemis/releases"
           DisableModify="yes"
-          IconSourceFile="Artemis.ico">
+          IconSourceFile="..\..\app\artemis.ico">
 
     <bal:Condition Message="This version of Artemis requires Windows 10 or later." Condition="VersionNT &gt;= v10.0" />
     <bal:Condition Message="This version of Artemis requires a 64-bit version of Windows." Condition="NativeMachine &lt;&gt; 332" />
@@ -36,7 +36,7 @@
         Theme="rtfLicense"
         ThemeFile="RtfTheme.xml"
         LocalizationFile="RtfTheme.wxl" />
-      <Payload SourceFile="Artemis.ico" Name="Artemis.ico" />
+      <Payload SourceFile="..\..\app\artemis.ico" Name="Artemis.ico" />
       <Payload SourceFile="RtfTheme.xml" Name="RtfTheme.xml" />
       <Payload SourceFile="RtfTheme.wxl" Name="RtfTheme.wxl" />
       <Payload SourceFile="..\..\app\artemis.png" Name="artemis.png" />
