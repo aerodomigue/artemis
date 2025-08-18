@@ -490,6 +490,70 @@ jobs:
         NUMERIC_VERSION: ${{ needs.setup-version.outputs.numeric_version }}
       run: |
         echo $env:NUMERIC_VERSION > app\version.txt
+
+    - name: Prepare WiX build assets and verify structure
+      run: |
+        echo "=== Preparing WiX build assets ==="
+        
+        # First, let's see what WiX project files exist and where they expect the icon
+        echo "Searching for WiX project files..."
+        Get-ChildItem -Recurse -Name "*.wixproj" | ForEach-Object {
+          echo "Found WiX project: $_"
+        }
+        
+        Get-ChildItem -Recurse -Name "*.wxs" | ForEach-Object {
+          echo "Found WiX source: $_"
+        }
+        
+        # Look for theme files that might reference the icon
+        Get-ChildItem -Recurse -Name "*.xml" | Where-Object { $_ -like "*thm*" -or $_ -like "*theme*" } | ForEach-Object {
+          echo "Found theme file: $_"
+          if (Test-Path $_) {
+            echo "Contents that mention icon:"
+            Get-Content $_ | Select-String -Pattern "IconFile|Artemis.ico" -Context 1,1
+          }
+        }
+        
+        # Ensure the icon file is available in ALL possible locations
+        if (Test-Path "app/Artemis.ico") {
+          echo "Found Artemis.ico in app directory"
+          
+          # Copy to every possible location WiX might look
+          $locations = @(
+            ".",
+            "wix",
+            "wix/ArtemisSetup", 
+            "build",
+            "build/installer-release",
+            "build/installer-x64-release",
+            "build/installer-arm64-release"
+          )
+          
+          foreach ($location in $locations) {
+            New-Item -ItemType Directory -Force -Path $location -ErrorAction SilentlyContinue | Out-Null
+            Copy-Item "app/Artemis.ico" "$location/Artemis.ico" -Force
+            echo "Copied icon to $location/"
+          }
+          
+        } else {
+          echo "ERROR: Artemis.ico not found in app directory"
+          echo "Available files in app directory:"
+          Get-ChildItem "app" -Name "*.ico"
+          exit 1
+        }
+        
+        # Final verification
+        echo "=== Final verification ==="
+        $checkLocations = @(".", "wix", "wix/ArtemisSetup", "build")
+        foreach ($location in $checkLocations) {
+          $iconPath = "$location/Artemis.ico"
+          if (Test-Path $iconPath) {
+            $size = (Get-Item $iconPath).Length
+            echo "✓ Found: $iconPath ($size bytes)"
+          } else {
+            echo "✗ Missing: $iconPath"
+          }
+        }
     
     - name: Build x64 MSI
       env:
@@ -530,45 +594,6 @@ jobs:
         }
         
         echo "ARM64 MSI created successfully: $($msiFile.FullName)"
-
-    - name: Prepare WiX build assets
-      run: |
-        echo "=== Preparing WiX build assets ==="
-        
-        # Ensure the icon file is in the correct location for WiX
-        if (Test-Path "app/Artemis.ico") {
-          echo "Found Artemis.ico in app directory"
-          
-          # Copy to WiX project directory if it has one
-          if (Test-Path "wix/ArtemisSetup") {
-            Copy-Item "app/Artemis.ico" "wix/ArtemisSetup/Artemis.ico" -Force
-            echo "Copied icon to wix/ArtemisSetup/"
-          }
-          
-          # Copy to root build directory where WiX might expect it
-          Copy-Item "app/Artemis.ico" "Artemis.ico" -Force
-          echo "Copied icon to root directory"
-          
-          # Also copy to build output directories
-          if (Test-Path "build") {
-            Copy-Item "app/Artemis.ico" "build/Artemis.ico" -Force
-            echo "Copied icon to build directory"
-          }
-        } else {
-          echo "ERROR: Artemis.ico not found in app directory"
-          exit 1
-        }
-        
-        # Verify the file is now accessible
-        echo "=== Verifying icon file placement ==="
-        @("Artemis.ico", "wix/ArtemisSetup/Artemis.ico", "build/Artemis.ico") | ForEach-Object {
-          if (Test-Path $_) {
-            $size = (Get-Item $_).Length
-            echo "✓ Found: $_ ($size bytes)"
-          } else {
-            echo "✗ Missing: $_"
-          }
-        }
     
     - name: Generate Universal Bundle  
       env:
