@@ -36,12 +36,10 @@
         Theme="rtfLicense"
         ThemeFile="RtfTheme.xml"
         LocalizationFile="RtfTheme.wxl" />
-      <BootstrapperApplicationData>
-        <Payload SourceFile="Artemis.ico" Name="Artemis.ico" />
-        <Payload SourceFile="RtfTheme.xml" Name="RtfTheme.xml" />
-        <Payload SourceFile="RtfTheme.wxl" Name="RtfTheme.wxl" />
-        <Payload SourceFile="..\..\app\artemis.png" Name="artemis.png" />
-      </BootstrapperApplicationData>
+      <Payload SourceFile="Artemis.ico" Name="Artemis.ico" />
+      <Payload SourceFile="RtfTheme.xml" Name="RtfTheme.xml" />
+      <Payload SourceFile="RtfTheme.wxl" Name="RtfTheme.wxl" />
+      <Payload SourceFile="..\..\app\artemis.png" Name="artemis.png" />
     </BootstrapperApplication>
 
     <!-- Search for installed Visual C++ Redistributables -->
