@@ -1275,11 +1275,16 @@ jobs:
         3. Launch from terminal: artemis
         EOF
 
+        # Create the zip file
+        cd artemis-package
+        zip -r "../artemis-raspberry-pi-arm64-$SEMANTIC_VERSION.zip" .
+        cd ..
+
     - name: Upload Raspberry Pi Development Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: artemis-raspberry-pi-arm64-${{ needs.setup-version.outputs.version }}
-        path: artemis-package/
+        path: artemis-raspberry-pi-arm64-${{ needs.setup-version.outputs.version }}.zip
         retention-days: 30
 
   build-steamdeck-dev:
