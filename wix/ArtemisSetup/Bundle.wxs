@@ -36,6 +36,12 @@
         Theme="rtfLicense"
         ThemeFile="RtfTheme.xml"
         LocalizationFile="RtfTheme.wxl" />
+      <BootstrapperApplicationData>
+        <Payload SourceFile="Artemis.ico" Name="Artemis.ico" />
+        <Payload SourceFile="RtfTheme.xml" Name="RtfTheme.xml" />
+        <Payload SourceFile="RtfTheme.wxl" Name="RtfTheme.wxl" />
+        <Payload SourceFile="..\..\app\artemis.png" Name="artemis.png" />
+      </BootstrapperApplicationData>
     </BootstrapperApplication>
 
     <!-- Search for installed Visual C++ Redistributables -->
@@ -48,13 +54,6 @@
                         UpgradeCode="$(var.VCREDIST_ARM64_UPGRADE_CODE)"
                         Result="version"
                         Variable="VCREDIST_14_ARM64" />
-
-    <!-- Embed BA theme assets so IconFile="Artemis.ico" resolves at runtime -->
-    <Payload SourceFile="Artemis.ico" Name="Artemis.ico" />
-    <Payload SourceFile="RtfTheme.xml" Name="RtfTheme.xml" />
-    <Payload SourceFile="RtfTheme.wxl" Name="RtfTheme.wxl" />
-    <!-- If your theme references other images, embed them too -->
-    <Payload SourceFile="..\..\app\artemis.png" Name="artemis.png" />
 
     <Chain>
       <!-- Visual C++ 2022 Redistributable (x64) -->
