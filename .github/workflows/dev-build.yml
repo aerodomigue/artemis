@@ -530,6 +530,45 @@ jobs:
         }
         
         echo "ARM64 MSI created successfully: $($msiFile.FullName)"
+
+    - name: Prepare WiX build assets
+      run: |
+        echo "=== Preparing WiX build assets ==="
+        
+        # Ensure the icon file is in the correct location for WiX
+        if (Test-Path "app/Artemis.ico") {
+          echo "Found Artemis.ico in app directory"
+          
+          # Copy to WiX project directory if it has one
+          if (Test-Path "wix/ArtemisSetup") {
+            Copy-Item "app/Artemis.ico" "wix/ArtemisSetup/Artemis.ico" -Force
+            echo "Copied icon to wix/ArtemisSetup/"
+          }
+          
+          # Copy to root build directory where WiX might expect it
+          Copy-Item "app/Artemis.ico" "Artemis.ico" -Force
+          echo "Copied icon to root directory"
+          
+          # Also copy to build output directories
+          if (Test-Path "build") {
+            Copy-Item "app/Artemis.ico" "build/Artemis.ico" -Force
+            echo "Copied icon to build directory"
+          }
+        } else {
+          echo "ERROR: Artemis.ico not found in app directory"
+          exit 1
+        }
+        
+        # Verify the file is now accessible
+        echo "=== Verifying icon file placement ==="
+        @("Artemis.ico", "wix/ArtemisSetup/Artemis.ico", "build/Artemis.ico") | ForEach-Object {
+          if (Test-Path $_) {
+            $size = (Get-Item $_).Length
+            echo "✓ Found: $_ ($size bytes)"
+          } else {
+            echo "✗ Missing: $_"
+          }
+        }
     
     - name: Generate Universal Bundle  
       env:
