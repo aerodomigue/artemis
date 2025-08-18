@@ -18,7 +18,7 @@
           HelpUrl="https://github.com/wjbeckett/artemis/wiki/Setup-Guide"
           UpdateUrl="https://github.com/wjbeckett/artemis/releases"
           DisableModify="yes"
-          IconSourceFile="..\..\app\artemis.ico">
+          IconSourceFile="Artemis.ico">
 
     <bal:Condition Message="This version of Artemis requires Windows 10 or later." Condition="VersionNT &gt;= v10.0" />
     <bal:Condition Message="This version of Artemis requires a 64-bit version of Windows." Condition="NativeMachine &lt;&gt; 332" />
@@ -48,6 +48,13 @@
                         UpgradeCode="$(var.VCREDIST_ARM64_UPGRADE_CODE)"
                         Result="version"
                         Variable="VCREDIST_14_ARM64" />
+
+    <!-- Embed BA theme assets so IconFile="Artemis.ico" resolves at runtime -->
+    <Payload SourceFile="Artemis.ico" Name="Artemis.ico" />
+    <Payload SourceFile="RtfTheme.xml" Name="RtfTheme.xml" />
+    <Payload SourceFile="RtfTheme.wxl" Name="RtfTheme.wxl" />
+    <!-- If your theme references other images, embed them too -->
+    <Payload SourceFile="..\..\app\artemis.png" Name="artemis.png" />
 
     <Chain>
       <!-- Visual C++ 2022 Redistributable (x64) -->
