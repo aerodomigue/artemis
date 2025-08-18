@@ -36,7 +36,7 @@
         Theme="rtfLicense"
         ThemeFile="RtfTheme.xml"
         LocalizationFile="RtfTheme.wxl" />
-      <Payload SourceFile="..\..\app\artemis.ico" Name="Artemis.ico" />
+      <Payload SourceFile="..\..\app\artemis.ico" Name="artemis.ico" />
       <Payload SourceFile="RtfTheme.xml" Name="RtfTheme.xml" />
       <Payload SourceFile="RtfTheme.wxl" Name="RtfTheme.wxl" />
       <Payload SourceFile="..\..\app\artemis.png" Name="artemis.png" />

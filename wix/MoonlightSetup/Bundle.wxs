@@ -52,7 +52,7 @@
                                               LaunchTarget="[InstallFolder]\Artemis.exe"
                                               ThemeFile="RtfTheme.xml"
                                               Theme="rtfLicense" />
-      <Payload Name="Artemis.ico" SourceFile="..\..\app\artemis.ico" Compressed="yes" />
+      <Payload Name="artemis.ico" SourceFile="..\..\app\artemis.ico" Compressed="yes" />
     </BootstrapperApplication>
 
     <Chain>
