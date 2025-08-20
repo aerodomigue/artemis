@@ -1064,9 +1064,6 @@ jobs:
         sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
         sudo flatpak install -y flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08 org.kde.Platform//6.6 org.kde.Sdk//6.6
 
-    - name: Find available LLVM extensions
-      run: flatpak remote-ls flathub | grep org.freedesktop.Sdk.Extension.llvm
-    
     - name: Create Flatpak manifest
       run: |
         cat > com.artemisdesktop.ArtemisDesktopDev.yml << 'EOF'
@@ -1075,7 +1072,7 @@ jobs:
         runtime-version: '6.6'
         sdk: org.kde.Sdk
         sdk-extensions:
-          - org.freedesktop.Sdk.Extension.llvm17
+          - org.freedesktop.Sdk.Extension.llvm18//23.08
           - org.freedesktop.Sdk.Extension.rust-stable
         command: artemis-dev
         add-extensions:
