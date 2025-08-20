@@ -1071,8 +1071,6 @@ jobs:
         runtime: org.kde.Platform
         runtime-version: '6.6'
         sdk: org.kde.Sdk
-        sdk-extensions:
-          - org.freedesktop.Sdk.Extension.rust-stable
         command: artemis-dev
         add-extensions:
           org.freedesktop.Platform.GL.default:
