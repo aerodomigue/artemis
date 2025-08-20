@@ -419,56 +419,6 @@ bool FFmpegVideoDecoder::createFrontendRenderer(PDECODER_PARAMETERS params, bool
             }
 #endif
         }
-        else
-        {
-#ifdef HAVE_LIBPLACEBO_VULKAN
-            // Auto-enable Vulkan for HDR support on capable systems, or if explicitly requested
-            bool explicitVulkan = qgetenv("PREFER_VULKAN") == "1";
-            bool steamDeckAuto = SystemProperties::isSteamDeckOrGamescope();
-            bool vulkanHdrAuto = SystemProperties::hasVulkanHdrSupport();
-            bool forceVulkan = qgetenv("FORCE_VULKAN") == "1";
-            bool preferVulkan = explicitVulkan || steamDeckAuto || vulkanHdrAuto || forceVulkan;
-            
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "HDR Debug: Non-10bit content Vulkan decision:");
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "  PREFER_VULKAN=%s, FORCE_VULKAN=%s",
-                        explicitVulkan ? "YES" : "NO",
-                        forceVulkan ? "YES" : "NO");
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "  Steam Deck auto=%s, Vulkan HDR auto=%s",
-                        steamDeckAuto ? "YES" : "NO",
-                        vulkanHdrAuto ? "YES" : "NO");
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "  Final decision: preferVulkan=%s",
-                        preferVulkan ? "YES" : "NO");
-            
-            if (preferVulkan) {
-                if (m_BackendRenderer->getRendererType() != IFFmpegRenderer::RendererType::Vulkan) {
-                    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                                "HDR Debug: Creating PlVkRenderer due to preference (backend type: %d)",
-                                (int)m_BackendRenderer->getRendererType());
-                    m_FrontendRenderer = new PlVkRenderer(false, m_BackendRenderer);
-                    if (initializeRendererInternal(m_FrontendRenderer, params)) {
-                        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                                    "HDR Debug: PlVkRenderer success - attributes=0x%x, HDR=%s",
-                                    m_FrontendRenderer->getRendererAttributes(),
-                                    (m_FrontendRenderer->getRendererAttributes() & RENDERER_ATTRIBUTE_HDR_SUPPORT) ? "YES" : "NO");
-                        return true;
-                    }
-                    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                                "HDR Debug: PlVkRenderer initialization failed");
-                    delete m_FrontendRenderer;
-                    m_FrontendRenderer = nullptr;
-                }
-                else {
-                    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                                "HDR Debug: Backend renderer is already Vulkan, skipping frontend Vulkan");
-                }
-            }
-#endif
-        }
-
 #if defined(HAVE_EGL) && !defined(GL_IS_SLOW)
         if (m_BackendRenderer->canExportEGL()) {
             m_FrontendRenderer = new EGLRenderer(m_BackendRenderer);
