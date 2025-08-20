@@ -1,5 +1,6 @@
 # This script requires create-dmg to be installed from https://github.com/sindresorhus/create-dmg
 BUILD_CONFIG=$1
+OVERRIDE_VERSION=$2
 
 fail()
 {
@@ -15,7 +16,13 @@ BUILD_ROOT=$PWD/build
 SOURCE_ROOT=$PWD
 BUILD_FOLDER=$BUILD_ROOT/build-$BUILD_CONFIG
 INSTALLER_FOLDER=$BUILD_ROOT/installer-$BUILD_CONFIG
-VERSION=`cat $SOURCE_ROOT/app/version.txt`
+
+# Use override version if provided, otherwise read from version.txt
+if [ "$OVERRIDE_VERSION" != "" ]; then
+  VERSION="$OVERRIDE_VERSION"
+else
+  VERSION=`cat $SOURCE_ROOT/app/version.txt`
+fi
 
 if [ "$SIGNING_PROVIDER_SHORTNAME" == "" ]; then
   SIGNING_PROVIDER_SHORTNAME=$SIGNING_IDENTITY
@@ -38,7 +45,7 @@ pushd $BUILD_FOLDER
 qmake $SOURCE_ROOT/artemis.pro QMAKE_APPLE_DEVICE_ARCHS="x86_64 arm64" || fail "Qmake failed!"
 popd
 
-echo Compiling Moonlight in $BUILD_CONFIG configuration
+echo Compiling Artemis in $BUILD_CONFIG configuration
 pushd $BUILD_FOLDER
 make -j$(sysctl -n hw.logicalcpu) $(echo "$BUILD_CONFIG" | tr '[:upper:]' '[:lower:]') || fail "Make failed!"
 popd
@@ -64,32 +71,10 @@ if [ "$SIGNING_IDENTITY" != "" ]; then
 fi
 
 echo Creating DMG
-DMG_NAME="Artemis-$VERSION.dmg"
 if [ "$SIGNING_IDENTITY" != "" ]; then
-  create-dmg \
-    --volname "Artemis $VERSION" \
-    --background "$SOURCE_ROOT/scripts/dmg-background.png" \
-    --window-pos 200 120 \
-    --window-size 660 400 \
-    --icon-size 80 \
-    --icon \"Artemis.app\" \"$SOURCE_ROOT/scripts/artemis.png\" 180 170 \
-    --hide-extension "Artemis.app" \
-    --app-drop-link 480 170 \
-    "$INSTALLER_FOLDER/$DMG_NAME" \
-    "$BUILD_FOLDER/app/Artemis.app" --identity="$SIGNING_IDENTITY" || fail "create-dmg failed!"
+  create-dmg $BUILD_FOLDER/app/Artemis.app $INSTALLER_FOLDER --identity="$SIGNING_IDENTITY" || fail "create-dmg failed!"
 else
-  create-dmg \
-    --volname "Artemis $VERSION" \
-    --background "$SOURCE_ROOT/scripts/dmg-background.png" \
-    --window-pos 200 120 \
-    --window-size 660 400 \
-    --icon-size 80 \
-    --icon \"Artemis.app\" \"$SOURCE_ROOT/scripts/artemis.png\" 180 170 \
-    --app-drop-link 480 170 \
-    --hide-extension "Artemis.app" \
-    --app-drop-link 480 170 \
-    "$INSTALLER_FOLDER/$DMG_NAME" \
-    "$BUILD_FOLDER/app/Artemis.app"
+  create-dmg $BUILD_FOLDER/app/Artemis.app $INSTALLER_FOLDER
   case $? in
     0) ;;
     2) ;;
@@ -99,11 +84,13 @@ fi
 
 if [ "$NOTARY_KEYCHAIN_PROFILE" != "" ]; then
   echo Uploading to App Notary service
-  xcrun notarytool submit --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait "$INSTALLER_FOLDER/$DMG_NAME" || fail "Notary submission failed"
+  xcrun notarytool submit --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait $INSTALLER_FOLDER/Artemis\ $VERSION.dmg || fail "Notary submission failed"
 
   echo Stapling notary ticket to DMG
-  xcrun stapler staple -v "$INSTALLER_FOLDER/$DMG_NAME" || fail "Notary ticket stapling failed!"
+  xcrun stapler staple -v $INSTALLER_FOLDER/Artemis\ $VERSION.dmg || fail "Notary ticket stapling failed!"
 fi
+
+mv $INSTALLER_FOLDER/Artemis\ $VERSION.dmg $INSTALLER_FOLDER/Artemis-$VERSION.dmg
 
 # Create build info file
 cat > $INSTALLER_FOLDER/build_info_macos.txt << EOF
