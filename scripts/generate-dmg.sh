@@ -72,7 +72,7 @@ if [ "$SIGNING_IDENTITY" != "" ]; then
     --window-pos 200 120 \
     --window-size 800 400 \
     --icon-size 80 \
-    --icon "Artemis.app" 150 190 \
+    --icon \"Artemis.app\" \"$SOURCE_ROOT/scripts/artemis.png\" 150 190 \
     --hide-extension "Artemis.app" \
     --app-drop-link 650 190 \
     "$INSTALLER_FOLDER/$DMG_NAME" \
@@ -84,7 +84,7 @@ else
     --window-pos 200 120 \
     --window-size 800 400 \
     --icon-size 80 \
-    --icon "Artemis.app" 150 190 \
+    --app-drop-link 650 190 \
     --hide-extension "Artemis.app" \
     --app-drop-link 650 190 \
     "$INSTALLER_FOLDER/$DMG_NAME" \
