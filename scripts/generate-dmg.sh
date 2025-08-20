@@ -68,25 +68,27 @@ DMG_NAME="Artemis-$VERSION.dmg"
 if [ "$SIGNING_IDENTITY" != "" ]; then
   create-dmg \
     --volname "Artemis $VERSION" \
+    --volicon "$SOURCE_ROOT/app/artemis.icns" \
     --background "$SOURCE_ROOT/scripts/dmg-background.png" \
     --window-pos 200 120 \
-    --window-size 800 400 \
-    --icon-size 80 \
-    --icon \"Artemis.app\" \"$SOURCE_ROOT/scripts/artemis.png\" 150 190 \
+    --window-size 660 400 \
+    --icon-size 160 \
+    --icon \"Artemis.app\" \"$SOURCE_ROOT/scripts/artemis.png\" 180 170 \
     --hide-extension "Artemis.app" \
-    --app-drop-link 650 190 \
+    --app-drop-link 480 170 \
     "$INSTALLER_FOLDER/$DMG_NAME" \
     "$BUILD_FOLDER/app/Artemis.app" --identity="$SIGNING_IDENTITY" || fail "create-dmg failed!"
 else
   create-dmg \
     --volname "Artemis $VERSION" \
+    --volicon "$SOURCE_ROOT/app/artemis.icns" \
     --background "$SOURCE_ROOT/scripts/dmg-background.png" \
     --window-pos 200 120 \
-    --window-size 800 400 \
-    --icon-size 80 \
-    --app-drop-link 650 190 \
+    --window-size 660 400 \
+    --icon-size 160 \
+    --icon \"Artemis.app\" \"$SOURCE_ROOT/scripts/artemis.png\" 180 170 \
     --hide-extension "Artemis.app" \
-    --app-drop-link 650 190 \
+    --app-drop-link 480 170 \
     "$INSTALLER_FOLDER/$DMG_NAME" \
     "$BUILD_FOLDER/app/Artemis.app"
   case $? in
