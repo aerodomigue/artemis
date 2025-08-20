@@ -84,6 +84,7 @@ else
     --window-pos 200 120 \
     --window-size 660 400 \
     --icon-size 80 \
+    --icon \"Artemis.app\" \"$SOURCE_ROOT/scripts/artemis.png\" 180 170 \
     --app-drop-link 480 170 \
     --hide-extension "Artemis.app" \
     --app-drop-link 480 170 \

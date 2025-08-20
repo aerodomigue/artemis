@@ -1072,7 +1072,6 @@ jobs:
         runtime-version: '6.6'
         sdk: org.kde.Sdk
         sdk-extensions:
-          - org.freedesktop.Sdk.Extension.llvm18//23.08
           - org.freedesktop.Sdk.Extension.rust-stable
         command: artemis-dev
         add-extensions:
