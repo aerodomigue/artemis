@@ -490,7 +490,7 @@ jobs:
         NUMERIC_VERSION: ${{ needs.setup-version.outputs.numeric_version }}
       run: |
         echo $env:NUMERIC_VERSION > app\version.txt
-    
+
     - name: Build x64 MSI
       env:
         SEMANTIC_VERSION: ${{ needs.setup-version.outputs.version }}
