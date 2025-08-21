@@ -71,26 +71,63 @@ if [ "$SIGNING_IDENTITY" != "" ]; then
 fi
 
 echo Creating DMG
+DMG_NAME="Artemis-$VERSION.dmg"
+
+# Create a properly formatted DMG with custom background and icons
 if [ "$SIGNING_IDENTITY" != "" ]; then
-  create-dmg $BUILD_FOLDER/app/Artemis.app $INSTALLER_FOLDER --identity="$SIGNING_IDENTITY" || fail "create-dmg failed!"
+  echo "Creating signed DMG with custom styling..."
+  create-dmg \
+    --volname "Artemis" \
+    --volicon "$SOURCE_ROOT/app/artemis.icns" \
+    --background "$SOURCE_ROOT/scripts/dmg-background.png" \
+    --window-pos 200 120 \
+    --window-size 800 400 \
+    --icon-size 100 \
+    --icon "Artemis.app" 200 190 \
+    --hide-extension "Artemis.app" \
+    --app-drop-link 600 185 \
+    --no-internet-enable \
+    --identity="$SIGNING_IDENTITY" \
+    "$INSTALLER_FOLDER/$DMG_NAME" \
+    "$BUILD_FOLDER/app/Artemis.app" || {
+      echo "create-dmg failed! Trying fallback method..."
+      # Fallback to basic DMG creation if fancy DMG fails
+      hdiutil create -volname "Artemis" -srcfolder "$BUILD_FOLDER/app/Artemis.app" -ov -format UDZO "$INSTALLER_FOLDER/$DMG_NAME"
+      if [ "$?" -ne 0 ]; then
+        fail "DMG creation failed even with fallback method!"
+      fi
+    }
 else
-  create-dmg $BUILD_FOLDER/app/Artemis.app $INSTALLER_FOLDER
-  case $? in
-    0) ;;
-    2) ;;
-    *) fail "create-dmg failed!";;
-  esac
+  echo "Creating unsigned DMG with custom styling..."
+  create-dmg \
+    --volname "Artemis" \
+    --volicon "$SOURCE_ROOT/app/artemis.icns" \
+    --background "$SOURCE_ROOT/scripts/dmg-background.png" \
+    --window-pos 200 120 \
+    --window-size 800 400 \
+    --icon-size 100 \
+    --icon "Artemis.app" 200 190 \
+    --hide-extension "Artemis.app" \
+    --app-drop-link 600 185 \
+    --no-internet-enable \
+    "$INSTALLER_FOLDER/$DMG_NAME" \
+    "$BUILD_FOLDER/app/Artemis.app" || {
+      echo "create-dmg failed! Trying fallback method..."
+      # Fallback to basic DMG creation if fancy DMG fails
+      hdiutil create -volname "Artemis" -srcfolder "$BUILD_FOLDER/app/Artemis.app" -ov -format UDZO "$INSTALLER_FOLDER/$DMG_NAME"
+      if [ "$?" -ne 0 ]; then
+        fail "DMG creation failed even with fallback method!"
+      fi
+    }
 fi
 
 if [ "$NOTARY_KEYCHAIN_PROFILE" != "" ]; then
   echo Uploading to App Notary service
-  xcrun notarytool submit --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait $INSTALLER_FOLDER/Artemis\ $VERSION.dmg || fail "Notary submission failed"
+  xcrun notarytool submit --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait "$INSTALLER_FOLDER/$DMG_NAME" || fail "Notary submission failed"
 
   echo Stapling notary ticket to DMG
-  xcrun stapler staple -v $INSTALLER_FOLDER/Artemis\ $VERSION.dmg || fail "Notary ticket stapling failed!"
+  xcrun stapler staple -v "$INSTALLER_FOLDER/$DMG_NAME" || fail "Notary ticket stapling failed!"
 fi
-
-mv $INSTALLER_FOLDER/Artemis\ $VERSION.dmg $INSTALLER_FOLDER/Artemis-$VERSION.dmg
 
 # Create build info file
 cat > $INSTALLER_FOLDER/build_info_macos.txt << EOF
