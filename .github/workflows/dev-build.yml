@@ -1063,7 +1063,7 @@ jobs:
         sudo apt-get install -y flatpak flatpak-builder
         sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
         sudo flatpak install -y flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08 org.kde.Platform//6.6 org.kde.Sdk//6.6
-    
+
     - name: Create Flatpak manifest
       run: |
         cat > com.artemisdesktop.ArtemisDesktopDev.yml << 'EOF'
@@ -1077,6 +1077,13 @@ jobs:
             directory: lib/GL
             version: "23.08"
             subdirectory: lib
+            no-autodownload: true
+            autodelete: false
+            add-ld-path: lib
+          org.freedesktop.Platform.GL.Mesa:
+            directory: lib/GL
+            version: "23.08"
+            subdirectory: mesa
             no-autodownload: true
             autodelete: false
             add-ld-path: lib
