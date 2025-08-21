@@ -66,8 +66,8 @@ echo Removing dSYM files from app bundle
 find $BUILD_FOLDER/app/Artemis.app/ -name '*.dSYM' | xargs rm -rf
 
 if [ "$SIGNING_IDENTITY" != "" ]; then
-  echo Signing app bundle
-  codesign --force --deep --options runtime --timestamp --sign "$SIGNING_IDENTITY" $BUILD_FOLDER/app/Artemis.app || fail "Signing failed!"
+  echo Signing app bundle with entitlements
+  codesign --force --deep --options runtime --timestamp --entitlements "$SOURCE_ROOT/scripts/entitlements.plist" --sign "$SIGNING_IDENTITY" $BUILD_FOLDER/app/Artemis.app || fail "Signing failed!"
 fi
 
 echo Creating DMG
@@ -95,6 +95,10 @@ if [ "$SIGNING_IDENTITY" != "" ]; then
       hdiutil create -volname "Artemis" -srcfolder "$BUILD_FOLDER/app/Artemis.app" -ov -format UDZO "$INSTALLER_FOLDER/$DMG_NAME"
       if [ "$?" -ne 0 ]; then
         fail "DMG creation failed even with fallback method!"
+      fi
+      # Sign the fallback DMG if we have signing identity
+      if [ "$SIGNING_IDENTITY" != "" ]; then
+        codesign --force --sign "$SIGNING_IDENTITY" "$INSTALLER_FOLDER/$DMG_NAME" || echo "Warning: DMG signing failed but DMG was created"
       fi
     }
 else
