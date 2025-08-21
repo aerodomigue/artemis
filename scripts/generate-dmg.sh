@@ -81,11 +81,11 @@ if [ "$SIGNING_IDENTITY" != "" ]; then
     --volicon "$SOURCE_ROOT/app/artemis.icns" \
     --background "$SOURCE_ROOT/scripts/dmg-background.png" \
     --window-pos 200 120 \
-    --window-size 800 400 \
+    --window-size 660 400 \
     --icon-size 100 \
-    --icon "Artemis.app" 200 190 \
+    --icon "Artemis.app" 180 170 \
     --hide-extension "Artemis.app" \
-    --app-drop-link 600 185 \
+    --app-drop-link 480 170 \
     --no-internet-enable \
     --identity="$SIGNING_IDENTITY" \
     "$INSTALLER_FOLDER/$DMG_NAME" \
@@ -104,11 +104,11 @@ else
     --volicon "$SOURCE_ROOT/app/artemis.icns" \
     --background "$SOURCE_ROOT/scripts/dmg-background.png" \
     --window-pos 200 120 \
-    --window-size 800 400 \
+    --window-size 660 400 \
     --icon-size 100 \
-    --icon "Artemis.app" 200 190 \
+    --icon "Artemis.app" 180 170 \
     --hide-extension "Artemis.app" \
-    --app-drop-link 600 185 \
+    --app-drop-link 480 170 \
     --no-internet-enable \
     "$INSTALLER_FOLDER/$DMG_NAME" \
     "$BUILD_FOLDER/app/Artemis.app" || {
