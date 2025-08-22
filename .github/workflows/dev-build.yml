@@ -1036,7 +1036,7 @@ jobs:
         version: ${{ env.QT_VERSION }}
         host: 'linux'
         target: 'desktop'
-        modules: 'qtmultimedia qtquickcontrols2 qtdeclarative qtsvg'
+        modules: 'qtmultimedia'
     
     - name: Install dependencies
       run: |
@@ -1091,10 +1091,29 @@ jobs:
         wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
         chmod +x linuxdeploy*.AppImage
         
-        # Create AppDir structure
-        mkdir -p AppDir/usr/bin
+        # Create AppDir structure and manually bundle essential Qt components
+        # This is more reliable than hoping linuxdeploy finds everything
+        echo \"=== Manually preparing AppDir ===\"
+        mkdir -p AppDir/usr/bin AppDir/usr/lib AppDir/usr/plugins AppDir/usr/qml
+        
+        echo \"Copying executable...\"
         cp app/artemis AppDir/usr/bin/artemis-dev
         
+        echo \"Copying Qt libraries...\"
+        cp -L $Qt6_DIR/lib/libQt6Core.so* AppDir/usr/lib/
+        cp -L $Qt6_DIR/lib/libQt6Gui.so* AppDir/usr/lib/
+        cp -L $Qt6_DIR/lib/libQt6Qml.so* AppDir/usr/lib/
+        cp -L $Qt6_DIR/lib/libQt6Quick.so* AppDir/usr/lib/
+        cp -L $Qt6_DIR/lib/libQt6Widgets.so* AppDir/usr/lib/
+        cp -L $Qt6_DIR/lib/libQt6Svg.so* AppDir/usr/lib/ || echo \"SVG library not found, continuing...\"
+        cp -L $Qt6_DIR/lib/libQt6Network.so* AppDir/usr/lib/
+        
+        echo \"Copying Qt plugins...\"
+        cp -r $Qt6_DIR/plugins AppDir/usr/
+        
+        echo \"Copying QML modules...\"
+        cp -r $Qt6_DIR/qml AppDir/usr/
+
         # Create desktop file
         cat > AppDir/artemis-dev.desktop << 'EOF'
         [Desktop Entry]
