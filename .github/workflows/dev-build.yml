@@ -870,6 +870,21 @@ jobs:
         qmake6 artemis.pro CONFIG+=release
         make -j$(nproc)
     
+    - name: Debug Linux binary dependencies
+      run: |
+        echo "=== Debugging Linux binary ==="
+        ls -la app/artemis
+        file app/artemis
+        echo "\n=== Checking dynamic library dependencies ==="
+        ldd app/artemis || echo "ldd failed"
+        echo "\n=== Checking for missing dependencies ==="
+        ldd app/artemis 2>&1 | grep "not found" || echo "No missing dependencies found"
+        echo "\n=== Testing basic execution ==="
+        app/artemis --help || echo "Binary execution failed with exit code: $?"
+        echo "\n=== Qt library info ==="
+        export QT_DEBUG_PLUGINS=1
+        app/artemis --version 2>&1 | head -20 || echo "Version check failed"
+    
     - name: Package Linux Development Build
       env:
         VERSION: ${{ needs.setup-version.outputs.version }}
@@ -1072,27 +1087,6 @@ jobs:
         runtime-version: '6.6'
         sdk: org.kde.Sdk
         command: artemis-dev
-        add-extensions:
-          org.freedesktop.Platform.GL.default:
-            directory: lib/GL
-            version: "23.08"
-            subdirectory: lib
-            no-autodownload: true
-            autodelete: false
-            add-ld-path: lib
-          org.freedesktop.Platform.GL.Mesa:
-            directory: lib/GL
-            version: "23.08"
-            subdirectory: mesa
-            no-autodownload: true
-            autodelete: false
-            add-ld-path: lib
-          org.freedesktop.Platform.VAAPI.Intel:
-            directory: lib/dri/intel-vaapi-driver
-            version: "23.08"
-            subdirectory: lib
-            no-autodownload: true
-            autodelete: false
         finish-args:
           - --share=ipc
           - --socket=x11
