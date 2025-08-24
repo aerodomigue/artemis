@@ -881,9 +881,9 @@ jobs:
         cp app/artemis linux-package/bin/
         
         # Bundle critical shared libraries that may not be available on all systems
-        # Focus on SDL2_ttf which is the main missing dependency
-        echo "Bundling SDL2_ttf library..."
-        ldd app/artemis | grep -E "(libSDL2_ttf|libopus|libssl)" | while read -r line; do
+        # Include SDL2 main library and SDL2_ttf which are commonly missing
+        echo "Bundling SDL2 libraries..."
+        ldd app/artemis | grep -E "(libSDL2-2\.0|libSDL2_ttf|libopus|libssl)" | while read -r line; do
           lib_path=$(echo "$line" | grep -o '/[^[:space:]]*')
           if [ -n "$lib_path" ] && [ -f "$lib_path" ]; then
             lib_name=$(basename "$lib_path")
@@ -892,13 +892,34 @@ jobs:
           fi
         done
         
+        # Also explicitly check for and bundle SDL2 main library if not caught above
+        if [ ! -f "linux-package/lib/libSDL2-2.0.so.0" ]; then
+          echo "Explicitly looking for SDL2 main library..."
+          SDL2_LIB=$(find /usr/lib* /lib* -name "libSDL2-2.0.so.0" 2>/dev/null | head -1)
+          if [ -n "$SDL2_LIB" ] && [ -f "$SDL2_LIB" ]; then
+            echo "Found and bundling SDL2 main library: $SDL2_LIB"
+            cp "$SDL2_LIB" linux-package/lib/
+          fi
+        fi
+        
         # Create launch script that sets library path
         cat > linux-package/artemis << 'EOF'
         #!/bin/bash
         # Artemis Desktop launcher script
-        DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-        export LD_LIBRARY_PATH="$DIR/lib:$LD_LIBRARY_PATH"
-        exec "$DIR/bin/artemis" "$@"
+        
+        # Resolve the actual directory where this script is located
+        # This handles symlinks properly (e.g., ~/.local/bin/artemis -> ~/.local/share/artemis-desktop/artemis)
+        if [ -L "${BASH_SOURCE[0]}" ]; then
+            # Script is a symlink, resolve to actual location
+            SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+        else
+            # Script is not a symlink, use dirname normally
+            SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        fi
+        
+        # Set library path and execute binary
+        export LD_LIBRARY_PATH="$SCRIPT_DIR/lib:$LD_LIBRARY_PATH"
+        exec "$SCRIPT_DIR/bin/artemis" "$@"
         EOF
         chmod +x linux-package/artemis
         
