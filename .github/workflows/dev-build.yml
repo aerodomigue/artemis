@@ -1036,10 +1036,14 @@ jobs:
         retention-days: 30
 
   build-appimage-dev:
-    name: AppImage Development Build
+    name: AppImage Development Build (Moonlight Compatible)
     needs: setup-version
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-20.04  # Use Ubuntu 20.04 like Moonlight
     if: needs.setup-version.outputs.should_build == 'true'
+    
+    env:
+      QT_VERSION: "5.15.4"  # Use Qt 5.15.4 like Moonlight
+      FFMPEG_CONFIGURE_ARGS: --enable-pic --disable-static --enable-shared --disable-all --enable-avcodec --enable-avformat --enable-swscale --enable-decoder=h264 --enable-decoder=hevc --enable-decoder=av1 --enable-hwaccel=h264_vaapi --enable-hwaccel=hevc_vaapi --enable-hwaccel=av1_vaapi --enable-hwaccel=h264_vdpau --enable-hwaccel=hevc_vdpau --enable-hwaccel=av1_vdpau --enable-libdrm --enable-hwaccel=h264_vulkan --enable-hwaccel=hevc_vulkan --enable-hwaccel=av1_vulkan --enable-libdav1d --enable-decoder=libdav1d
     
     steps:
     - name: Checkout
@@ -1048,226 +1052,155 @@ jobs:
         submodules: 'recursive'
         fetch-depth: 0
     
-    - name: Display version info
-      run: echo "Using development version ${{ needs.setup-version.outputs.version }}"
-    
-    - name: Setup Qt
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: ${{ env.QT_VERSION }}
-        host: 'linux'
-        target: 'desktop'
-        modules: 'qtmultimedia'
-    
-    - name: Install dependencies
+    - name: Get version
+      id: version
       run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          libegl1-mesa-dev libgl1-mesa-dev libopus-dev libsdl2-dev \
-          libsdl2-ttf-dev libssl-dev libavcodec-dev libavformat-dev \
-          libswscale-dev libva-dev libvdpau-dev libxkbcommon-dev \
-          wayland-protocols libdrm-dev nasm libgbm-dev \
-          libfreetype6-dev libasound2-dev libdbus-1-dev \
-          libgles2-mesa-dev libglu1-mesa-dev libibus-1.0-dev \
-          libpulse-dev libudev-dev libx11-dev libxcursor-dev \
-          libxext-dev libxi-dev libxinerama-dev libxrandr-dev \
-          libxss-dev libxt-dev libxv-dev libxxf86vm-dev \
-          libxcb-dri3-dev libx11-xcb-dev file wget desktop-file-utils \
-          libxcb-cursor-dev
+        VERSION=${{ needs.setup-version.outputs.version }}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Using version: $VERSION"
     
-    - name: Clean any existing build
+    - name: Install Qt 5.15.4 from PPA (matching Moonlight)
       run: |
-        rm -f .qmake.stash .qmake.cache
-        find . -name "Makefile*" -delete
-        rm -rf moonlight-common-c/Makefile* moonlight-common-c/.qmake.stash
-        rm -rf qmdnsengine/Makefile* qmdnsengine/.qmake.stash 
-        rm -rf h264bitstream/Makefile* h264bitstream/.qmake.stash
-        rm -rf soundio/Makefile* soundio/.qmake.stash
-        rm -rf app/Makefile* app/.qmake.stash
+        sudo add-apt-repository ppa:beineri/opt-qt-5.15.4-focal || true
+        sudo apt update || true
+        sudo apt install -y qt515base qt515quickcontrols2 qt515svg qt515wayland
+        source /opt/qt515/bin/qt515-env.sh
+        echo "Qt5_DIR=/opt/qt515" >> $GITHUB_ENV
+        echo "PATH=/opt/qt515/bin:$PATH" >> $GITHUB_ENV
+        echo "PKG_CONFIG_PATH=/opt/qt515/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=/opt/qt515/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
     
-    - name: Build
+    - name: Install Vulkan SDK and build dependencies (matching Moonlight)
       run: |
-        export PATH="$Qt6_DIR/bin:$PATH"
-        export QMAKE="$Qt6_DIR/bin/qmake6"
-        # Clean any problematic files
-        rm -rf AntiHooking/ || true
-        rm -rf config.tests/SL/ || true
-        rm -f app/test_*.cpp || true
-        # Build with proper configuration
-        qmake6 artemis.pro CONFIG+=release
+        wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
+        sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-1.3.280-focal.list https://packages.lunarg.com/vulkan/1.3.280/lunarg-vulkan-1.3.280-focal.list
+        sudo apt update || true
+        sudo apt install -y python3-pip nasm libgbm-dev libdrm-dev libfreetype6-dev libasound2-dev libdbus-1-dev libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libglu1-mesa-dev libibus-1.0-dev libpulse-dev libudev-dev libx11-dev libxcursor-dev libxext-dev libxi-dev libxinerama-dev libxkbcommon-dev libxrandr-dev libxss-dev libxt-dev libxv-dev libxxf86vm-dev libxcb-dri3-dev libx11-xcb-dev wayland-protocols libopus-dev libvdpau-dev vulkan-sdk
+        sudo pip3 install meson
+    
+    - name: Build SDL2 from source (exact version used by Moonlight)
+      run: |
+        export SDL2_REV=86fd4ed83cdcf71fef6a57766b126e88f923acd3
+        git clone https://github.com/libsdl-org/SDL.git SDL2
+        cd SDL2
+        git checkout $SDL2_REV
+        ./configure
         make -j$(nproc)
+        sudo make install
+        cd ..
     
-    - name: Verify build output
+    - name: Build SDL2_ttf from source (exact version used by Moonlight)
       run: |
-        ls -la app/
-        file app/artemis || echo "artemis binary not found"
-        ldd app/artemis || echo "ldd failed"
+        export SDL2_TTF_VER=2.22.0
+        wget https://github.com/libsdl-org/SDL_ttf/releases/download/release-$SDL2_TTF_VER/SDL2_ttf-$SDL2_TTF_VER.tar.gz
+        tar -xf SDL2_ttf-$SDL2_TTF_VER.tar.gz
+        cd SDL2_ttf-$SDL2_TTF_VER
+        ./configure
+        make -j$(nproc)
+        sudo make install
+        cd ..
     
-    - name: Create AppImage
-      env:
-          VERSION: ${{ needs.setup-version.outputs.version }}
+    - name: Build libva from source (exact version used by Moonlight)
       run: |
-        # Download linuxdeploy and Qt plugin
-        wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-        wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
-        chmod +x linuxdeploy*.AppImage
-        
-        # Create AppDir structure and manually bundle essential Qt components
-        # This is more reliable than hoping linuxdeploy finds everything
-        echo \"=== Manually preparing AppDir ===\"
-        mkdir -p AppDir/usr/bin AppDir/usr/lib AppDir/usr/plugins AppDir/usr/qml
-        
-        echo \"Copying executable...\"
-        cp app/artemis AppDir/usr/bin/artemis-dev
-        
-        echo \"Copying Qt libraries...\"
-        cp -L $Qt6_DIR/lib/libQt6Core.so* AppDir/usr/lib/
-        cp -L $Qt6_DIR/lib/libQt6Gui.so* AppDir/usr/lib/
-        cp -L $Qt6_DIR/lib/libQt6Qml.so* AppDir/usr/lib/
-        cp -L $Qt6_DIR/lib/libQt6Quick.so* AppDir/usr/lib/
-        cp -L $Qt6_DIR/lib/libQt6Widgets.so* AppDir/usr/lib/
-        cp -L $Qt6_DIR/lib/libQt6Svg.so* AppDir/usr/lib/ || echo \"SVG library not found, continuing...\"
-        cp -L $Qt6_DIR/lib/libQt6Network.so* AppDir/usr/lib/
-        
-        echo \"Copying Qt plugins...\"
-        cp -r $Qt6_DIR/plugins AppDir/usr/
-        
-        echo \"Copying QML modules...\"
-        cp -r $Qt6_DIR/qml AppDir/usr/
-
-        # Create desktop file
-        cat > AppDir/artemis-dev.desktop << 'EOF'
-        [Desktop Entry]
-        Type=Application
-        Name=Artemis Desktop (Dev)
-        Comment=Artemis Desktop Development Build
-        Exec=artemis-dev
-        Icon=artemis-dev
-        Categories=Game;Network;
-        StartupNotify=true
-        EOF
-        
-        # Create a simple icon placeholder
-        mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-        convert -size 256x256 xc:blue -fill white -gravity center -pointsize 24 -annotate +0+0 "Artemis\nDev" AppDir/usr/share/icons/hicolor/256x256/apps/artemis-dev.png 2>/dev/null || {
-          echo "Creating placeholder icon"
-          touch AppDir/usr/share/icons/hicolor/256x256/apps/artemis-dev.png
-        }
-        
-        # Create build info
-        cat > AppDir/build_info.txt << EOF
-        Artemis Desktop Development Build (AppImage)
-        Version: $VERSION
-        Branch: ${{ github.ref_name }}
-        Commit: ${{ github.sha }}
-        Built: $(date)
-        EOF
-        
-        # Debug: Check what QML modules are available
-        echo "=== Available Qt QML modules ==="
-        ls -la "$Qt6_DIR/qml/" | head -20
-        echo "\n=== Checking for QtQuick.Controls ==="
-        ls -la "$Qt6_DIR/qml/QtQuick/" | grep -i control || echo "QtQuick Controls not found in expected location"
-        
-        # Verify the binary works with Qt plugins
-        echo "=== Testing binary with Qt debug info ==="
-        export QT_DEBUG_PLUGINS=1
-        export LD_LIBRARY_PATH="$Qt6_DIR/lib:$LD_LIBRARY_PATH"
-        ldd AppDir/usr/bin/artemis-dev | grep -E "(Qt|qt)" | head -10
-        
-        # Set comprehensive environment variables for linuxdeploy
-        export OUTPUT="artemis-appimage-${VERSION}-x86_64.AppImage"
-        export QMAKE="$Qt6_DIR/bin/qmake6"
-        export QML_SOURCES_PATH="$Qt6_DIR/qml"
-        export QML_MODULES_PATH="$Qt6_DIR/qml"
-        export EXTRA_QT_PLUGINS="platforms/libqxcb.so;platformthemes/libqgtk3.so;platforminputcontexts"
-        
-        # Additional Qt paths
-        export QT_PLUGIN_PATH="$Qt6_DIR/plugins"
-        export QT_QML_PATH="$Qt6_DIR/qml"
-        
-        # Add QML import paths for the application
-        mkdir -p AppDir/usr/qml
-        if [ -d "$Qt6_DIR/qml/QtQuick" ]; then
-          echo "Copying QtQuick modules..."
-          cp -r "$Qt6_DIR/qml/QtQuick" AppDir/usr/qml/ || echo "Failed to copy QtQuick"
+        export LIBVA_VER=2.22.0
+        git clone --branch $LIBVA_VER --depth 1 https://github.com/intel/libva.git
+        cd libva
+        ./autogen.sh
+        ./configure --enable-x11 --enable-wayland
+        make -j$(nproc)
+        sudo make install
+        cd ..
+    
+    - name: Build dav1d from source (exact version used by Moonlight)
+      run: |
+        export DAV1D_VER=1.5.0
+        git clone --branch $DAV1D_VER --depth 1 https://code.videolan.org/videolan/dav1d.git
+        cd dav1d
+        meson setup build -Ddefault_library=static -Dbuildtype=release -Denable_tools=false -Denable_tests=false
+        ninja -C build
+        sudo ninja install -C build
+        sudo ldconfig
+        cd ..
+    
+    - name: Build libplacebo from source with patches (exact version used by Moonlight)
+      run: |
+        export LIBPLACEBO_REV=v7.349.0
+        git clone https://code.videolan.org/videolan/libplacebo.git
+        cd libplacebo
+        git checkout $LIBPLACEBO_REV
+        # Apply the same patch that Moonlight uses
+        if [ -f "../app/deploy/linux/appimage/*.patch" ]; then
+          git apply ../app/deploy/linux/appimage/*.patch || echo "No patches to apply"
         fi
-        if [ -d "$Qt6_DIR/qml/Qt" ]; then
-          echo "Copying Qt modules..."
-          cp -r "$Qt6_DIR/qml/Qt" AppDir/usr/qml/ || echo "Failed to copy Qt modules"
-        fi
+        git submodule update --init --recursive
+        meson setup build -Dvulkan=enabled -Dopengl=disabled -Ddemos=false
+        ninja -C build
+        sudo ninja install -C build
+        sudo ldconfig
+        cd ..
+    
+    - name: Build FFmpeg from source (exact version and config used by Moonlight)
+      run: |
+        export FFMPEG_REV=87ccf995cb855f0baced9916928b7b48d8b6ed9d
+        git clone https://github.com/FFmpeg/FFmpeg.git FFmpeg
+        cd FFmpeg
+        git checkout $FFMPEG_REV
+        ./configure $FFMPEG_CONFIGURE_ARGS
+        make -j$(nproc)
+        sudo make install
+        sudo ldconfig
+        cd ..
+    
+    - name: Download linuxdeployqt (exact version used by Moonlight)
+      run: |
+        mkdir -p $HOME/bin
+        wget -O $HOME/bin/linuxdeployqt https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
+        chmod a+x $HOME/bin/linuxdeployqt
+        echo "$HOME/bin" >> $GITHUB_PATH
+    
+    - name: Build Artemis with exact Moonlight configuration
+      run: |
+        # Set Qt environment
+        source /opt/qt515/bin/qt515-env.sh
         
-        # Create a qt.conf file to help find QML modules
-        mkdir -p AppDir/usr/bin
-        cat > AppDir/usr/bin/qt.conf << 'EOF'
-        [Paths]
-        Plugins = ../lib/qt6/plugins
-        Qml2Imports = ../qml
-        EOF
+        # Clean any existing build
+        rm -rf build/
         
-        # Build AppImage with verbose output and extra QML paths
-        echo "=== Building AppImage with Qt plugin ==="
-        ./linuxdeploy-x86_64.AppImage \
-          --appdir AppDir \
-          --executable AppDir/usr/bin/artemis-dev \
-          --desktop-file AppDir/artemis-dev.desktop \
-          --plugin qt \
-          --output appimage || {
-            echo "AppImage creation failed, trying fallback approach..."
-            
-            # Fallback: Manual Qt library and plugin deployment
-            echo "=== Fallback: Manual Qt deployment ==="
-            mkdir -p AppDir/usr/lib/qt6
-            
-            # Copy essential Qt libraries
-            for lib in libQt6Core libQt6Gui libQt6Widgets libQt6Quick libQt6Qml libQt6QmlModels libQt6Network libQt6OpenGL; do
-              if [ -f "$Qt6_DIR/lib/${lib}.so.6" ]; then
-                echo "Copying $lib"
-                cp "$Qt6_DIR/lib/${lib}.so.6" AppDir/usr/lib/
-              fi
-            done
-            
-            # Copy Qt plugins
-            if [ -d "$Qt6_DIR/plugins" ]; then
-              echo "Copying Qt plugins"
-              cp -r "$Qt6_DIR/plugins" AppDir/usr/lib/qt6/
-            fi
-            
-            # Try linuxdeploy without Qt plugin
-            ./linuxdeploy-x86_64.AppImage \
-              --appdir AppDir \
-              --executable AppDir/usr/bin/artemis-dev \
-              --desktop-file AppDir/artemis-dev.desktop \
-              --output appimage
-        }
+        # Build exactly like Moonlight (but skip the submodules they disable)
+        git -c submodule.libs.update=none submodule update --init --recursive
         
-        # Verify and rename if necessary
-        ls -la *.AppImage || echo "No AppImage files found"
-        if [ ! -f "$OUTPUT" ]; then
-          APPIMAGE_FILE=$(ls *.AppImage | head -n1)
-          if [ -n "$APPIMAGE_FILE" ]; then
-            mv "$APPIMAGE_FILE" "$OUTPUT"
-            echo "Renamed $APPIMAGE_FILE to $OUTPUT"
-          else
-            echo "Error: No AppImage file was created"
-            exit 1
+        # Use their exact build script approach
+        export PATH=$HOME/bin:$PATH
+        scripts/build-appimage.sh
+    
+    - name: Verify AppImage size and contents
+      run: |
+        ls -lh build/installer-release/
+        APPIMAGE_FILE=$(ls build/installer-release/*.AppImage | head -n1)
+        if [ -f "$APPIMAGE_FILE" ]; then
+          echo "AppImage created: $APPIMAGE_FILE"
+          file "$APPIMAGE_FILE"
+          echo "Size: $(du -h "$APPIMAGE_FILE" | cut -f1)"
+          
+          # Extract and check contents
+          chmod +x "$APPIMAGE_FILE"
+          "$APPIMAGE_FILE" --appimage-extract >/dev/null 2>&1 || echo "Extraction failed"
+          if [ -d "squashfs-root" ]; then
+            echo "AppImage contents size:"
+            du -sh squashfs-root/
+            echo "Key libraries bundled:"
+            find squashfs-root -name "*.so*" -type f | grep -E "(Qt|SDL|ffmpeg|av|codec|va|vdpau)" | sort
           fi
+        else
+          echo "ERROR: No AppImage file found!"
+          exit 1
         fi
-        
-        # Final verification
-        chmod +x "$OUTPUT"
-        ls -la "$OUTPUT"
-        file "$OUTPUT"
-        
-        # Test the AppImage briefly (without GUI)
-        echo "=== Testing AppImage ==="
-        ./$OUTPUT --help 2>&1 | head -10 || echo "AppImage test failed (expected if no display)"
     
-    - name: Upload AppImage Development Artifacts
+    - name: Upload AppImage
       uses: actions/upload-artifact@v4
       with:
         name: artemis-appimage-${{ needs.setup-version.outputs.version }}
-        path: artemis-appimage-${{ needs.setup-version.outputs.version }}-x86_64.AppImage
+        path: build/installer-release/Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage
         retention-days: 30
 
   build-flatpak-dev:
