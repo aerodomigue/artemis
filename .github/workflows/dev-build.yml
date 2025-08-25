@@ -1036,13 +1036,12 @@ jobs:
         retention-days: 30
 
   build-appimage-dev:
-    name: AppImage Development Build (Moonlight Compatible)
+    name: AppImage Development Build (Moonlight Compatible Dependencies)
     needs: setup-version
     runs-on: ubuntu-22.04  # Use Ubuntu 22.04 since 20.04 is deprecated
     if: needs.setup-version.outputs.should_build == 'true'
     
     env:
-      QT_VERSION: "5.15.7"  # Use Qt 5.15.7 for Ubuntu 22.04
       FFMPEG_CONFIGURE_ARGS: --enable-pic --disable-static --enable-shared --disable-all --enable-avcodec --enable-avformat --enable-swscale --enable-decoder=h264 --enable-decoder=hevc --enable-decoder=av1 --enable-hwaccel=h264_vaapi --enable-hwaccel=hevc_vaapi --enable-hwaccel=av1_vaapi --enable-hwaccel=h264_vdpau --enable-hwaccel=hevc_vdpau --enable-hwaccel=av1_vdpau --enable-hwaccel=h264_vulkan --enable-hwaccel=hevc_vulkan --enable-hwaccel=av1_vulkan --enable-libdav1d --enable-decoder=libdav1d
     
     steps:
@@ -1059,17 +1058,24 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Using version: $VERSION"
     
-    - name: Install Qt 5.15.7 from PPA (matching Moonlight)
-      run: |
-        sudo add-apt-repository ppa:s-schmeisser/opt-qt-5.15.7-jammy || true
-        sudo apt update || true
-        sudo apt install -y qt515base qt515quickcontrols2 qt515svg qt515wayland qt515declarative
-        # Set environment variables directly without sourcing (which may not exist yet)
-        echo "Qt5_DIR=/opt/qt515" >> $GITHUB_ENV
-        echo "PATH=/opt/qt515/bin:$PATH" >> $GITHUB_ENV
-        echo "PKG_CONFIG_PATH=/opt/qt515/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=/opt/qt515/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-        echo "QTDIR=/opt/qt515" >> $GITHUB_ENV
+    - name: Setup Qt 6
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'linux'
+        target: 'desktop'
+        modules: 'qtmultimedia'
+      continue-on-error: true
+      id: qt_install
+        
+    - name: Retry Qt Installation (if failed)
+      if: steps.qt_install.outcome == 'failure'
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: 'linux'
+        target: 'desktop'
+        modules: 'qtmultimedia'
     
     - name: Install Vulkan SDK and build dependencies (matching Moonlight)
       run: |
@@ -1166,28 +1172,63 @@ jobs:
         chmod a+x $HOME/bin/linuxdeployqt
         echo "$HOME/bin" >> $GITHUB_PATH
     
-    - name: Build Artemis with exact Moonlight configuration
+    - name: Build Artemis with Qt 6 for AppImage
       run: |
-        # Set Qt environment (variables already set from previous step)
-        export Qt5_DIR=/opt/qt515
-        export PATH=/opt/qt515/bin:$PATH
-        export PKG_CONFIG_PATH=/opt/qt515/lib/pkgconfig:$PKG_CONFIG_PATH
-        export LD_LIBRARY_PATH=/opt/qt515/lib:$LD_LIBRARY_PATH
-        export QTDIR=/opt/qt515
+        # Set Qt 6 environment (variables are set from jurplel/install-qt-action)
+        export PATH="$Qt6_DIR/bin:$PATH"
+        export QMAKE="$Qt6_DIR/bin/qmake6"
         
         # Verify Qt installation
-        which qmake || echo "qmake not found in PATH"
-        ls -la /opt/qt515/bin/ || echo "Qt bin directory not found"
+        which qmake6 || echo "qmake6 not found in PATH"
+        echo "Qt6_DIR: $Qt6_DIR"
+        ls -la "$Qt6_DIR/bin/" || echo "Qt6 bin directory not found"
         
         # Clean any existing build
         rm -rf build/
+        rm -f .qmake.stash .qmake.cache
+        find . -name "Makefile*" -delete || true
         
-        # Build exactly like Moonlight (but skip the submodules they disable)
+        # Build with Qt 6 (similar to Artemis but without Moonlight-specific dependencies)
         git -c submodule.libs.update=none submodule update --init --recursive
         
-        # Use their exact build script approach
+        # Build the project using Qt 6
+        qmake6 artemis.pro CONFIG+=release
+        make -j$(nproc)
+        
+        # Create AppImage directory structure
+        mkdir -p build/installer-release
+        mkdir -p build/build-release/usr/bin
+        mkdir -p build/build-release/usr/share/applications
+        mkdir -p build/build-release/usr/share/icons/hicolor/256x256/apps
+        
+        # Copy the binary
+        cp app/artemis build/build-release/usr/bin/
+        
+        # Create a desktop file
+        cat > build/build-release/usr/share/applications/artemis.desktop << 'EOF'
+        [Desktop Entry]
+        Type=Application
+        Name=Artemis
+        Comment=Game streaming client
+        Exec=artemis
+        Icon=artemis
+        Categories=Game;Network;
+        EOF
+        
+        # Use linuxdeployqt to create AppImage
         export PATH=$HOME/bin:$PATH
-        scripts/build-appimage.sh
+        cd build/build-release
+        linuxdeployqt usr/share/applications/artemis.desktop -appimage -unsupported-allow-new-glibc || echo "AppImage creation completed with warnings"
+        
+        # Find and rename the AppImage
+        APPIMAGE_FILE=$(find . -name "*.AppImage" | head -n1)
+        if [ -f "$APPIMAGE_FILE" ]; then
+          mv "$APPIMAGE_FILE" "../installer-release/Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage"
+          echo "AppImage created: Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage"
+        else
+          echo "ERROR: AppImage not created"
+          exit 1
+        fi
     
     - name: Verify AppImage size and contents
       run: |
