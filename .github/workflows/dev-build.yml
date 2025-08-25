@@ -1077,14 +1077,17 @@ jobs:
         target: 'desktop'
         modules: 'qtmultimedia'
     
-    - name: Install Vulkan SDK and build dependencies (matching Moonlight)
+    - name: Install FUSE and build dependencies (matching Moonlight)
       run: |
         # Use the correct Vulkan SDK repository for Ubuntu 22.04 (Jammy)
         wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
         sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-1.3.280-jammy.list https://packages.lunarg.com/vulkan/1.3.280/lunarg-vulkan-1.3.280-jammy.list
         sudo apt update || true
         
-        # Install build dependencies first (without Vulkan SDK to avoid conflicts)
+        # Install FUSE first (required for AppImage creation)
+        sudo apt install -y libfuse2 fuse
+        
+        # Install build dependencies (without Vulkan SDK to avoid conflicts)
         sudo apt install -y python3-pip nasm libgbm-dev libdrm-dev libfreetype6-dev libasound2-dev libdbus-1-dev libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libglu1-mesa-dev libibus-1.0-dev libpulse-dev libudev-dev libx11-dev libxcursor-dev libxext-dev libxi-dev libxinerama-dev libxkbcommon-dev libxrandr-dev libxss-dev libxt-dev libxv-dev libxxf86vm-dev libxcb-dri3-dev libx11-xcb-dev wayland-protocols libopus-dev libvdpau-dev libwayland-dev libwayland-client0 libwayland-cursor0 libwayland-server0 libwayland-egl1-mesa
         
         # Try to install Vulkan SDK, but don't fail the build if it has dependency issues
@@ -1165,11 +1168,29 @@ jobs:
         sudo ldconfig
         cd ..
     
-    - name: Download linuxdeployqt (exact version used by Moonlight)
+    - name: Download and extract linuxdeployqt
       run: |
         mkdir -p $HOME/bin
-        wget -O $HOME/bin/linuxdeployqt https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
-        chmod a+x $HOME/bin/linuxdeployqt
+        wget -O $HOME/linuxdeployqt.AppImage https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
+        chmod a+x $HOME/linuxdeployqt.AppImage
+        
+        # Try to run the AppImage normally first
+        if $HOME/linuxdeployqt.AppImage --version > /dev/null 2>&1; then
+          echo "AppImage works directly"
+          mv $HOME/linuxdeployqt.AppImage $HOME/bin/linuxdeployqt
+        else
+          echo "AppImage needs extraction, extracting..."
+          cd $HOME
+          # Extract the AppImage
+          $HOME/linuxdeployqt.AppImage --appimage-extract
+          # Move the executable to bin and make it available
+          mv squashfs-root/AppRun $HOME/bin/linuxdeployqt
+          chmod +x $HOME/bin/linuxdeployqt
+          # Clean up
+          rm -rf squashfs-root
+          rm $HOME/linuxdeployqt.AppImage
+        fi
+        
         echo "$HOME/bin" >> $GITHUB_PATH
     
     - name: Build Artemis with Qt 6 for AppImage
