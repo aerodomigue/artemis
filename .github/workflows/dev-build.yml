@@ -1038,12 +1038,12 @@ jobs:
   build-appimage-dev:
     name: AppImage Development Build (Moonlight Compatible)
     needs: setup-version
-    runs-on: ubuntu-20.04  # Use Ubuntu 20.04 like Moonlight
+    runs-on: ubuntu-22.04  # Use Ubuntu 22.04 since 20.04 is deprecated
     if: needs.setup-version.outputs.should_build == 'true'
     
     env:
-      QT_VERSION: "5.15.4"  # Use Qt 5.15.4 like Moonlight
-      FFMPEG_CONFIGURE_ARGS: --enable-pic --disable-static --enable-shared --disable-all --enable-avcodec --enable-avformat --enable-swscale --enable-decoder=h264 --enable-decoder=hevc --enable-decoder=av1 --enable-hwaccel=h264_vaapi --enable-hwaccel=hevc_vaapi --enable-hwaccel=av1_vaapi --enable-hwaccel=h264_vdpau --enable-hwaccel=hevc_vdpau --enable-hwaccel=av1_vdpau --enable-libdrm --enable-hwaccel=h264_vulkan --enable-hwaccel=hevc_vulkan --enable-hwaccel=av1_vulkan --enable-libdav1d --enable-decoder=libdav1d
+      QT_VERSION: "5.15.7"  # Use Qt 5.15.7 for Ubuntu 22.04
+      FFMPEG_CONFIGURE_ARGS: --enable-pic --disable-static --enable-shared --disable-all --enable-avcodec --enable-avformat --enable-swscale --enable-decoder=h264 --enable-decoder=hevc --enable-decoder=av1 --enable-hwaccel=h264_vaapi --enable-hwaccel=hevc_vaapi --enable-hwaccel=av1_vaapi --enable-hwaccel=h264_vdpau --enable-hwaccel=hevc_vdpau --enable-hwaccel=av1_vdpau --enable-hwaccel=h264_vulkan --enable-hwaccel=hevc_vulkan --enable-hwaccel=av1_vulkan --enable-libdav1d --enable-decoder=libdav1d
     
     steps:
     - name: Checkout
@@ -1059,9 +1059,9 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Using version: $VERSION"
     
-    - name: Install Qt 5.15.4 from PPA (matching Moonlight)
+    - name: Install Qt 5.15.7 from PPA (matching Moonlight)
       run: |
-        sudo add-apt-repository ppa:beineri/opt-qt-5.15.4-focal || true
+        sudo add-apt-repository ppa:s-schmeisser/opt-qt-5.15.7-jammy || true
         sudo apt update || true
         sudo apt install -y qt515base qt515quickcontrols2 qt515svg qt515wayland
         source /opt/qt515/bin/qt515-env.sh
@@ -1435,137 +1435,10 @@ jobs:
         path: artemis-raspberry-pi-arm64-${{ needs.setup-version.outputs.version }}.zip
         retention-days: 30
 
-  build-steamdeck-dev:
-    name: Steam Deck Development Build
-    needs: setup-version
-    runs-on: ubuntu-22.04
-    if: needs.setup-version.outputs.should_build == 'true'
-    
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        submodules: 'recursive'
-        fetch-depth: 0
-    
-    - name: Display version info
-      run: echo "Using development version ${{ needs.setup-version.outputs.version }}"
-    
-    - name: Setup Qt
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: ${{ env.QT_VERSION }}
-        host: 'linux'
-        target: 'desktop'
-        modules: 'qtmultimedia'
-    
-    - name: Install Steam Deck specific dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          libegl1-mesa-dev libgl1-mesa-dev libopus-dev libsdl2-dev \
-          libsdl2-ttf-dev libssl-dev libavcodec-dev libavformat-dev \
-          libswscale-dev libva-dev libvdpau-dev libxkbcommon-dev \
-          wayland-protocols libdrm-dev nasm libgbm-dev \
-          libfreetype6-dev libasound2-dev libdbus-1-dev \
-          libgles2-mesa-dev libglu1-mesa-dev libibus-1.0-dev \
-          libpulse-dev libudev-dev libx11-dev libxcursor-dev \
-          libxext-dev libxi-dev libxinerama-dev libxrandr-dev \
-          libxss-dev libxt-dev libxv-dev libxxf86vm-dev \
-          libxcb-dri3-dev libx11-xcb-dev
-    
-    - name: Build for Steam Deck
-      run: |
-        export PATH="$Qt6_DIR/bin:$PATH"
-        export QMAKE="$Qt6_DIR/bin/qmake6"
-        # Build with Steam Deck optimizations
-        qmake6 artemis.pro CONFIG+=release CONFIG+=steamdeck
-        make -j$(nproc)
-    
-    - name: Package Steam Deck Development Build
-      env:
-        VERSION: ${{ needs.setup-version.outputs.version }}
-      run: |
-        mkdir -p steamdeck-package
-        cp app/artemis steamdeck-package/artemis-dev
-        
-        # Create Steam Deck specific files
-        cat > steamdeck-package/artemis-dev.desktop << EOF
-        [Desktop Entry]
-        Type=Application
-        Name=Artemis Desktop (Dev)
-        Comment=Artemis Desktop Development Build - Optimized for Steam Deck
-        Exec=artemis-dev
-        Icon=artemis-dev
-        Categories=Game;Network;
-        EOF
-        
-        # Create installation script for Steam Deck
-        cat > steamdeck-package/install-steamdeck.sh << 'EOF'
-        #!/bin/bash
-        echo "Installing Artemis Desktop Development Build for Steam Deck..."
-        
-        # Create directories
-        mkdir -p ~/.local/share/applications
-        mkdir -p ~/.local/bin
-        
-        # Copy files
-        cp artemis-dev ~/.local/bin/
-        chmod +x ~/.local/bin/artemis-dev
-        cp artemis-dev.desktop ~/.local/share/applications/
-        
-        echo "Installation complete!"
-        echo "You can now find Artemis Desktop (Dev) in your applications menu."
-        EOF
-        
-        chmod +x steamdeck-package/install-steamdeck.sh
-        
-        # Create build info
-        cat > steamdeck-package/build_info.txt << EOF
-        Artemis Desktop Development Build (Steam Deck)
-        Version: $VERSION
-        Branch: ${{ github.ref_name }}
-        Commit: ${{ github.sha }}
-        Built: $(date)
-        
-        Installation:
-        1. Extract this archive
-        2. Run: ./install-steamdeck.sh
-        3. Find Artemis Desktop (Dev) in your applications
-        EOF
-        
-        # Create README for Steam Deck users
-        cat > steamdeck-package/README-SteamDeck.md << EOF
-        # Artemis Desktop for Steam Deck (Development Build)
-        
-        ## Installation
-        1. Extract this archive to a folder
-        2. Open a terminal in that folder
-        3. Run: \`./install-steamdeck.sh\`
-        4. The app will be available in your applications menu
-        
-        ## Steam Deck Specific Notes
-        - This build is optimized for Steam Deck's controls and display
-        - Use the touchscreen or external mouse/keyboard for initial setup
-        - Game mode streaming works best with the built-in controls
-        
-        ## Troubleshooting
-        - If you have issues, try running from terminal: \`~/.local/bin/artemis-dev\`
-        - Check the build_info.txt for version details
-        EOF
-        
-        tar -czf artemis-steamdeck-$VERSION.tar.gz -C steamdeck-package .
-    
-    - name: Upload Steam Deck Development Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: artemis-steamdeck-${{ needs.setup-version.outputs.version }}
-        path: artemis-steamdeck-${{ needs.setup-version.outputs.version }}.tar.gz
-        retention-days: 30
 
   create-dev-release:
     name: Create Development Release
-    needs: [setup-version, build-windows-x64-portable, build-windows-arm64-portable, build-windows-universal-installer, build-macos-dev, build-linux-dev, build-appimage-dev, build-flatpak-dev, build-raspberry-pi-dev, build-steamdeck-dev]
+    needs: [setup-version, build-windows-x64-portable, build-windows-arm64-portable, build-windows-universal-installer, build-macos-dev, build-linux-dev, build-appimage-dev, build-flatpak-dev, build-raspberry-pi-dev]
     runs-on: ubuntu-latest
     if: (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && needs.setup-version.outputs.should_build == 'true'  # Create releases for develop/main branches when builds ran
     
