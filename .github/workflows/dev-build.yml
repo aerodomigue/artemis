@@ -1087,6 +1087,14 @@ jobs:
         # Install FUSE first (required for AppImage creation)
         sudo apt install -y libfuse2 fuse
         
+        # Install AppImage creation tools
+        sudo apt install -y squashfs-tools
+        
+        # Try to install appimagetool from GitHub releases
+        wget -O /tmp/appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        chmod +x /tmp/appimagetool.AppImage
+        sudo mv /tmp/appimagetool.AppImage /usr/local/bin/appimagetool
+        
         # Install build dependencies (without Vulkan SDK to avoid conflicts)
         sudo apt install -y python3-pip nasm libgbm-dev libdrm-dev libfreetype6-dev libasound2-dev libdbus-1-dev libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libglu1-mesa-dev libibus-1.0-dev libpulse-dev libudev-dev libx11-dev libxcursor-dev libxext-dev libxi-dev libxinerama-dev libxkbcommon-dev libxrandr-dev libxss-dev libxt-dev libxv-dev libxxf86vm-dev libxcb-dri3-dev libx11-xcb-dev wayland-protocols libopus-dev libvdpau-dev libwayland-dev libwayland-client0 libwayland-cursor0 libwayland-server0 libwayland-egl1-mesa
         
