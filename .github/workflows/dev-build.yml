@@ -1221,19 +1221,31 @@ jobs:
         mkdir -p build/build-release/usr/bin
         mkdir -p build/build-release/usr/share/applications
         mkdir -p build/build-release/usr/share/icons/hicolor/256x256/apps
+        mkdir -p build/build-release/usr/share/icons/hicolor/scalable/apps
         
         # Copy the binary
         cp app/artemis build/build-release/usr/bin/
+        
+        # Copy existing Artemis icons
+        if [ -f "app/artemis.png" ]; then
+          cp app/artemis.png build/build-release/usr/share/icons/hicolor/256x256/apps/artemis.png
+        fi
+        if [ -f "app/res/artemis.svg" ]; then
+          cp app/res/artemis.svg build/build-release/usr/share/icons/hicolor/scalable/apps/artemis.svg
+        fi
         
         # Create a desktop file
         cat > build/build-release/usr/share/applications/artemis.desktop << 'EOF'
         [Desktop Entry]
         Type=Application
-        Name=Artemis
-        Comment=Game streaming client
+        Name=Artemis Desktop
+        Comment=Game streaming client for NVIDIA GameStream and Sunshine
         Exec=artemis
         Icon=artemis
-        Categories=Game;Network;
+        Categories=Game;Network;AudioVideo;
+        Keywords=gaming;streaming;nvidia;gamestream;sunshine;
+        StartupNotify=true
+        MimeType=x-scheme-handler/artemis;
         EOF
         
         # Use linuxdeployqt to create AppImage
