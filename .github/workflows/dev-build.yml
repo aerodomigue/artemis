@@ -1248,19 +1248,61 @@ jobs:
         MimeType=x-scheme-handler/artemis;
         EOF
         
-        # Use linuxdeployqt to create AppImage
+        # Use linuxdeployqt to create AppImage with verbose output
         export PATH=$HOME/bin:$PATH
         cd build/build-release
-        linuxdeployqt usr/share/applications/artemis.desktop -appimage -unsupported-allow-new-glibc || echo "AppImage creation completed with warnings"
+        
+        echo "=== Starting linuxdeployqt with verbose logging ==="
+        echo "Current directory: $(pwd)"
+        echo "Contents before linuxdeployqt:"
+        ls -la
+        
+        # Run linuxdeployqt with more verbose output and better error handling
+        echo "Running: linuxdeployqt usr/share/applications/artemis.desktop -appimage -unsupported-allow-new-glibc -verbose=2"
+        linuxdeployqt usr/share/applications/artemis.desktop -appimage -unsupported-allow-new-glibc -verbose=2
+        LINUXDEPLOYQT_EXIT_CODE=$?
+        
+        echo "=== linuxdeployqt completed with exit code: $LINUXDEPLOYQT_EXIT_CODE ==="
+        echo "Contents after linuxdeployqt:"
+        ls -la
+        
+        # Look for any AppImage files created
+        echo "=== Searching for AppImage files ==="
+        find . -name "*.AppImage" -type f -exec ls -la {} \;
+        
+        # Also check for any temporary files or logs
+        echo "=== Looking for temporary files or error logs ==="
+        find . -name "*appimage*" -o -name "*AppImage*" -o -name "*.log" | head -10
         
         # Find and rename the AppImage
-        APPIMAGE_FILE=$(find . -name "*.AppImage" | head -n1)
+        APPIMAGE_FILE=$(find . -name "*.AppImage" -type f | head -n1)
         if [ -f "$APPIMAGE_FILE" ]; then
+          echo "Found AppImage: $APPIMAGE_FILE"
+          file "$APPIMAGE_FILE"
+          chmod +x "$APPIMAGE_FILE"
           mv "$APPIMAGE_FILE" "../installer-release/Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage"
           echo "AppImage created: Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage"
         else
-          echo "ERROR: AppImage not created"
-          exit 1
+          echo "ERROR: No AppImage file found after linuxdeployqt!"
+          echo "=== Final directory contents ==="
+          ls -laR
+          echo "=== Checking for appimagetool or mksquashfs errors ==="
+          which appimagetool || echo "appimagetool not found"
+          which mksquashfs || echo "mksquashfs not found" 
+          
+          # Try to run with manual appimagetool if available
+          if command -v appimagetool &> /dev/null; then
+            echo "=== Trying manual AppImage creation with appimagetool ==="
+            appimagetool . "../installer-release/Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage"
+            if [ -f "../installer-release/Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage" ]; then
+              echo "Manual AppImage creation succeeded!"
+            else
+              echo "Manual AppImage creation also failed"
+              exit 1
+            fi
+          else
+            exit 1
+          fi
         fi
     
     - name: Verify AppImage size and contents
