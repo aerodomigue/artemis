@@ -1725,7 +1725,7 @@ jobs:
                 sources:
                   - type: git
                     url: https://github.com/KhronosGroup/SPIRV-Headers.git
-                    branch: main
+                    commit: 2a9b6f951c7d6b04b6c21fe1bf3f475b68b84801
               - name: spirv-tools
                 buildsystem: cmake-ninja
                 builddir: true
@@ -1733,11 +1733,17 @@ jobs:
                   - -DCMAKE_BUILD_TYPE=Release
                   - -DSPIRV_SKIP_TESTS=ON
                   - -DSPIRV_WERROR=OFF
-                  - -DSPIRV-Headers_SOURCE_DIR=/run/build/spirv-headers
+                  - -DSPIRV_SKIP_EXECUTABLES=ON
+                build-commands:
+                  # Copy SPIRV-Headers to the location SPIRV-Tools expects
+                  - mkdir -p external/spirv-headers
+                  - cp -r /run/build/spirv-headers/* external/spirv-headers/
+                  # Now run the normal build
+                  - ninja
                 sources:
                   - type: git
                     url: https://github.com/KhronosGroup/SPIRV-Tools.git
-                    branch: main
+                    commit: dd4b663e13c07fea4fbb3f70c1c91c86731099f7
               - name: glslang
                 buildsystem: cmake-ninja
                 builddir: true
@@ -1750,7 +1756,7 @@ jobs:
                 sources:
                   - type: git
                     url: https://github.com/KhronosGroup/glslang.git
-                    branch: main
+                    commit: fa9c3deb49e035a8abcabe366f26aac010f6cbfb
               - name: shaderc
                 buildsystem: cmake-ninja
                 builddir: true
@@ -1765,7 +1771,7 @@ jobs:
                 sources:
                   - type: git
                     url: https://github.com/google/shaderc.git
-                    tag: v2024.1
+                    commit: 40bced4e1e205ecf44630d2dfa357655b6dabd04
           
           - name: artemis-desktop-dev
             buildsystem: simple
