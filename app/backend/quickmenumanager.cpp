@@ -62,7 +62,16 @@ QuickMenuManager::~QuickMenuManager()
 
 bool QuickMenuManager::hasServerCommands() const
 {
-    return m_serverCommandManager && m_serverCommandManager->hasPermission();
+    if (!m_serverCommandManager) {
+        return false;
+    }
+    
+    // Use thread-safe property access when called from QML
+    bool hasPermission = false;
+    QMetaObject::invokeMethod(m_serverCommandManager, "hasPermission", 
+                              Qt::DirectConnection,  // Use DirectConnection if we're on the same thread
+                              Q_RETURN_ARG(bool, hasPermission));
+    return hasPermission;
 }
 
 bool QuickMenuManager::isFullscreen() const
@@ -217,23 +226,37 @@ void QuickMenuManager::executeServerCommand(const QString &command)
         return;
     }
     
-    // Execute the actual server command through ServerCommandManager
-    if (m_serverCommandManager && m_serverCommandManager->hasPermission()) {
-        qDebug() << "QuickMenuManager: Executing server command:" << commandId;
-        m_serverCommandManager->executeCommand(commandId);
-    } else {
-        qDebug() << "QuickMenuManager: Server commands not available or no permission";
-        
-        // Show error message briefly
-        if (Session::get()) {
-            auto& overlayManager = Session::get()->getOverlayManager();
-            overlayManager.setOverlayState(Overlay::OverlayServerCommands, true);
-            overlayManager.updateOverlayText(Overlay::OverlayServerCommands, "Server commands not available");
+    // Use QMetaObject::invokeMethod to safely execute the server command from any thread
+    // This ensures thread safety when accessing ServerCommandManager from QML
+    if (m_serverCommandManager) {
+        // First check if the server command manager has permission (thread-safe property access)
+        bool hasPermission = false;
+        QMetaObject::invokeMethod(m_serverCommandManager, "hasPermission", 
+                                  Qt::BlockingQueuedConnection,
+                                  Q_RETURN_ARG(bool, hasPermission));
+                                  
+        if (hasPermission) {
+            qDebug() << "QuickMenuManager: Executing server command:" << commandId;
+            // Execute the command using thread-safe invocation
+            QMetaObject::invokeMethod(m_serverCommandManager, "executeCommand", 
+                                      Qt::QueuedConnection,
+                                      Q_ARG(QString, commandId));
+        } else {
+            qDebug() << "QuickMenuManager: Server commands not available or no permission";
             
-            QTimer::singleShot(2000, [&overlayManager]() {
-                overlayManager.setOverlayState(Overlay::OverlayServerCommands, false);
-            });
+            // Show error message briefly
+            if (Session::get()) {
+                auto& overlayManager = Session::get()->getOverlayManager();
+                overlayManager.setOverlayState(Overlay::OverlayServerCommands, true);
+                overlayManager.updateOverlayText(Overlay::OverlayServerCommands, "Server commands not available");
+                
+                QTimer::singleShot(2000, [&overlayManager]() {
+                    overlayManager.setOverlayState(Overlay::OverlayServerCommands, false);
+                });
+            }
         }
+    } else {
+        qDebug() << "QuickMenuManager: No ServerCommandManager available";
     }
 }
 

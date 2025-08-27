@@ -843,6 +843,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y \
+          build-essential \
           libegl1-mesa-dev libgl1-mesa-dev libopus-dev libsdl2-dev \
           libsdl2-ttf-dev libsdl2-ttf-2.0-0 libssl-dev libavcodec-dev libavformat-dev \
           libswscale-dev libva-dev libvdpau-dev libxkbcommon-dev \
@@ -852,7 +853,7 @@ jobs:
           libpulse-dev libudev-dev libx11-dev libxcursor-dev \
           libxext-dev libxi-dev libxinerama-dev libxrandr-dev \
           libxss-dev libxt-dev libxv-dev libxxf86vm-dev \
-          libxcb-dri3-dev libx11-xcb-dev
+          libxcb-dri3-dev libx11-xcb-dev libplacebo-dev
     
     - name: Clean any existing build
       run: |
@@ -1096,7 +1097,7 @@ jobs:
         sudo mv /tmp/appimagetool.AppImage /usr/local/bin/appimagetool
         
         # Install build dependencies (without Vulkan SDK to avoid conflicts)
-        sudo apt install -y python3-pip nasm libgbm-dev libdrm-dev libfreetype6-dev libasound2-dev libdbus-1-dev libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libglu1-mesa-dev libibus-1.0-dev libpulse-dev libudev-dev libx11-dev libxcursor-dev libxext-dev libxi-dev libxinerama-dev libxkbcommon-dev libxrandr-dev libxss-dev libxt-dev libxv-dev libxxf86vm-dev libxcb-dri3-dev libx11-xcb-dev wayland-protocols libopus-dev libvdpau-dev libwayland-dev libwayland-client0 libwayland-cursor0 libwayland-server0 libwayland-egl1-mesa
+        sudo apt install -y python3-pip nasm libgbm-dev libdrm-dev libfreetype6-dev libasound2-dev libdbus-1-dev libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libglu1-mesa-dev libibus-1.0-dev libpulse-dev libudev-dev libx11-dev libxcursor-dev libxext-dev libxi-dev libxinerama-dev libxkbcommon-dev libxrandr-dev libxss-dev libxt-dev libxv-dev libxxf86vm-dev libxcb-dri3-dev libx11-xcb-dev wayland-protocols libopus-dev libvdpau-dev libwayland-dev libwayland-client0 libwayland-cursor0 libwayland-server0 libwayland-egl1-mesa libplacebo-dev || echo "libplacebo-dev not available, will build from source"
         
         # Try to install Vulkan SDK, but don't fail the build if it has dependency issues
         sudo apt install -y vulkan-sdk || echo "Vulkan SDK installation had conflicts, proceeding without it"
@@ -1471,7 +1472,7 @@ jobs:
         sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
         sudo flatpak install -y flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08 org.kde.Platform//6.6 org.kde.Sdk//6.6
 
-    - name: Create Flatpak manifest
+    - name: Create Flatpak manifest with libplacebo for Steam Deck compatibility
       run: |
         cat > com.artemisdesktop.ArtemisDesktopDev.yml << 'EOF'
         app-id: com.artemisdesktop.ArtemisDesktopDev
@@ -1486,8 +1487,9 @@ jobs:
           - --socket=pulseaudio
           - --share=network
           - --filesystem=home
-          # GPU and hardware acceleration access
+          # GPU and hardware acceleration access (critical for Steam Deck)
           - --device=dri
+          - --device=all  # Allow access to GPU devices
           - --filesystem=/sys/dev/char:ro
           - --filesystem=/sys/devices/pci*:ro
           # GPU driver library access
@@ -1499,7 +1501,7 @@ jobs:
           - --filesystem=/usr/lib/nvidia:ro
           - --filesystem=/usr/lib/x86_64-linux-gnu/nvidia:ro
           - --filesystem=/usr/lib64/nvidia:ro
-          # Mesa/Intel driver access  
+          # Mesa/Intel driver access (important for Steam Deck)
           - --filesystem=/usr/lib/mesa:ro
           - --filesystem=/usr/lib/x86_64-linux-gnu/mesa:ro
           # VAAPI/VDPAU libraries
@@ -1526,6 +1528,32 @@ jobs:
                 url: https://github.com/libsdl-org/SDL_ttf/releases/download/release-2.20.2/SDL2_ttf-2.20.2.tar.gz
                 sha256: 9dc71ed93487521b107a2c4a9ca6bf43fb62f6bddd5c26b055e6b91418a22053
           
+          # Build libplacebo from source for Vulkan/HDR support (critical for Steam Deck)
+          - name: libplacebo
+            buildsystem: meson
+            config-opts:
+              - -Dvulkan=enabled
+              - -Dopengl=enabled
+              - -Ddemos=false
+              - -Dtests=false
+            sources:
+              - type: archive
+                url: https://code.videolan.org/videolan/libplacebo/-/archive/v7.349.0/libplacebo-v7.349.0.tar.gz
+                sha256: 4bd906fed8b0bab8de6b7cd8d66ab8634427dc7f87a81f6a4c4d9b68b31d4b75
+            modules:
+              # libplacebo dependencies
+              - name: shaderc
+                buildsystem: cmake-ninja
+                builddir: true
+                config-opts:
+                  - -DSHADERC_SKIP_COPYRIGHT_CHECK=ON
+                  - -DSHADERC_SKIP_EXAMPLES=ON
+                  - -DSHADERC_SKIP_TESTS=ON
+                sources:
+                  - type: archive
+                    url: https://github.com/google/shaderc/archive/refs/tags/v2024.1.tar.gz
+                    sha256: eb3b5f0c16313d34f208d0fe7df10d454fa53e8c8a9ddfcbc0bd13e42a92e1f1
+          
           - name: artemis-desktop-dev
             buildsystem: simple
             build-commands:
@@ -1534,7 +1562,8 @@ jobs:
               - rm -rf AntiHooking/ || true
               - rm -rf config.tests/SL/ || true
               - rm -f app/test_*.cpp || true
-              - qmake6 artemis.pro CONFIG+=release
+              # Add -fPIC to avoid static linking issues as per user feedback
+              - qmake6 artemis.pro CONFIG+=release "QMAKE_CXXFLAGS+=-fPIC"
               - make -j$(nproc)
               - install -Dm755 app/artemis /app/bin/artemis-dev
             sources:
@@ -1546,11 +1575,20 @@ jobs:
                 [Desktop Entry]
                 Type=Application
                 Name=Artemis Desktop (Dev)
-                Comment=Artemis Desktop Development Build
+                Comment=Artemis Desktop Development Build - Steam Deck Compatible
                 Exec=artemis-dev
                 Icon=com.artemisdesktop.ArtemisDesktopDev
                 Categories=Game;Network;
+                Keywords=gaming;streaming;nvidia;gamestream;sunshine;steam;deck;
                 EOD
+              # Copy icon files if they exist
+              - |
+                if [ -f app/artemis.png ]; then
+                  install -Dm644 app/artemis.png /app/share/icons/hicolor/256x256/apps/com.artemisdesktop.ArtemisDesktopDev.png
+                fi
+                if [ -f app/res/artemis.svg ]; then
+                  install -Dm644 app/res/artemis.svg /app/share/icons/hicolor/scalable/apps/com.artemisdesktop.ArtemisDesktopDev.svg
+                fi
         EOF
     
     - name: Build Flatpak
@@ -1590,6 +1628,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y \
+          build-essential \
           qt6-base-dev qt6-base-dev-tools qt6-declarative-dev qt6-declarative-dev-tools libqt6svg6-dev \
           libegl1-mesa-dev libgl1-mesa-dev libopus-dev libsdl2-dev libsdl2-ttf-dev \
           libssl-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev \
@@ -1597,7 +1636,7 @@ jobs:
           libfreetype6-dev libasound2-dev libdbus-1-dev libgles2-mesa-dev libglu1-mesa-dev \
           libibus-1.0-dev libpulse-dev libudev-dev libx11-dev libxcursor-dev libxext-dev \
           libxi-dev libxinerama-dev libxrandr-dev libxss-dev libxt-dev libxv-dev libxxf86vm-dev \
-          libxcb-dri3-dev libx11-xcb-dev
+          libxcb-dri3-dev libx11-xcb-dev libplacebo-dev
 
     - name: Clean any existing build
       run: |
