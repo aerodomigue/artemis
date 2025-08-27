@@ -1728,10 +1728,10 @@ jobs:
                 sources:
                   - type: git
                     url: https://github.com/KhronosGroup/SPIRV-Tools.git
-                    commit: dd4b663e13c07fea4fbb3f70c1c91c86731099f7
+                    commit: e943df71649969e6b72a6b0a88a09f872332e4b3
                   - type: git
                     url: https://github.com/KhronosGroup/SPIRV-Headers.git
-                    commit: 2a9b6f951c7d6b04b6c21fe1bf3f475b68b84801
+                    commit: c17cc6808796851a70c73a4b92b7c46c310c3702
                     dest: external/spirv-headers
               - name: glslang
                 buildsystem: cmake-ninja
