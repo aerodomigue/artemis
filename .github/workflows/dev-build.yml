@@ -868,7 +868,7 @@ jobs:
       run: |
         export PATH="$Qt6_DIR/bin:$PATH"
         export QMAKE="$Qt6_DIR/bin/qmake6"
-        qmake6 artemis.pro CONFIG+=release
+        qmake6 artemis.pro CONFIG+=release "QMAKE_CXXFLAGS+=-fPIC"
         make -j$(nproc)
     
     
@@ -1222,7 +1222,7 @@ jobs:
         git -c submodule.libs.update=none submodule update --init --recursive
         
         # Build the project using Qt 6
-        qmake6 artemis.pro CONFIG+=release
+        qmake6 artemis.pro CONFIG+=release "QMAKE_CXXFLAGS+=-fPIC"
         make -j$(nproc)
         
         # Create AppImage directory structure
@@ -1563,7 +1563,6 @@ jobs:
               - rm -rf AntiHooking/ || true
               - rm -rf config.tests/SL/ || true
               - rm -f app/test_*.cpp || true
-              # Add -fPIC to avoid static linking issues as per user feedback
               - qmake6 artemis.pro CONFIG+=release "QMAKE_CXXFLAGS+=-fPIC"
               - make -j$(nproc)
               - install -Dm755 app/artemis /app/bin/artemis-dev
@@ -1647,7 +1646,7 @@ jobs:
     - name: Build for Raspberry Pi ARM64
       run: |
         # Simple native ARM64 build - no cross-compilation needed!
-        qmake6 artemis.pro CONFIG+=release
+        qmake6 artemis.pro CONFIG+=release "QMAKE_CXXFLAGS+=-fPIC"
         make -j$(nproc)
 
     - name: Verify ARM64 binary
