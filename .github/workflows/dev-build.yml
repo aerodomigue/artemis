@@ -1733,7 +1733,7 @@ jobs:
                   - -DCMAKE_BUILD_TYPE=Release
                   - -DSPIRV_SKIP_TESTS=ON
                   - -DSPIRV_WERROR=OFF
-                  - -DSPIRV_HEADERS_SOURCE_DIR=/run/build/spirv-headers
+                  - -DSPIRV-Headers_SOURCE_DIR=/run/build/spirv-headers
                 sources:
                   - type: git
                     url: https://github.com/KhronosGroup/SPIRV-Tools.git
