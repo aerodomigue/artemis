@@ -1727,19 +1727,16 @@ jobs:
                     url: https://github.com/KhronosGroup/SPIRV-Headers.git
                     commit: 2a9b6f951c7d6b04b6c21fe1bf3f475b68b84801
               - name: spirv-tools
-                buildsystem: cmake-ninja
-                builddir: true
-                config-opts:
-                  - -DCMAKE_BUILD_TYPE=Release
-                  - -DSPIRV_SKIP_TESTS=ON
-                  - -DSPIRV_WERROR=OFF
-                  - -DSPIRV_SKIP_EXECUTABLES=ON
+                buildsystem: simple
                 build-commands:
                   # Copy SPIRV-Headers to the location SPIRV-Tools expects
                   - mkdir -p external/spirv-headers
                   - cp -r /run/build/spirv-headers/* external/spirv-headers/
-                  # Now run the normal build
-                  - ninja
+                  # Configure and build with CMake
+                  - mkdir -p build
+                  - cd build && cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DSPIRV_SKIP_TESTS=ON -DSPIRV_WERROR=OFF -DSPIRV_SKIP_EXECUTABLES=ON -DCMAKE_INSTALL_PREFIX=/app
+                  - cd build && ninja
+                  - cd build && ninja install
                 sources:
                   - type: git
                     url: https://github.com/KhronosGroup/SPIRV-Tools.git
