@@ -3,9 +3,8 @@
 #include "streaming/session.h"
 #include "streaming/streamutils.h"
 
-// Implementation in plvk_c.c
-#define PL_LIBAV_IMPLEMENTATION 0
-#include <libplacebo/utils/libav.h>
+// Use a C shim to call libplacebo's libav helpers from C++ safely
+#include "pl_libav_shim.h"
 
 #include <SDL_vulkan.h>
 
@@ -16,7 +15,7 @@
 
 #ifndef VK_KHR_video_decode_av1
 #define VK_KHR_VIDEO_DECODE_AV1_EXTENSION_NAME "VK_KHR_video_decode_av1"
-#define VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR ((VkVideoCodecOperationFlagBitsKHR)0x00000004)
+#define VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR 0x00000004u
 #endif
 
 // Compatibility definitions for missing Vulkan constants
@@ -36,13 +35,13 @@
 #define VK_STRUCTURE_TYPE_QUEUE_FAMILY_VIDEO_PROPERTIES_KHR ((VkStructureType)1000023012)
 #endif
 #ifndef VK_QUEUE_VIDEO_DECODE_BIT_KHR
-#define VK_QUEUE_VIDEO_DECODE_BIT_KHR ((VkQueueFlagBits)0x00000020)
+#define VK_QUEUE_VIDEO_DECODE_BIT_KHR 0x00000020u
 #endif
 #ifndef VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR
-#define VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR ((VkVideoCodecOperationFlagBitsKHR)0x00000001)
+#define VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR 0x00000001u
 #endif
 #ifndef VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR
-#define VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR ((VkVideoCodecOperationFlagBitsKHR)0x00000002)
+#define VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR 0x00000002u
 #endif
 
 // Compatibility definitions for missing libplacebo constants
@@ -51,12 +50,6 @@
 #endif
 #ifndef PL_COLOR_HDR_BLACK
 #define PL_COLOR_HDR_BLACK 0.0f
-#endif
-
-// Compatibility definitions for VkVideoCodecOperation types
-#ifndef VkVideoCodecOperationFlagsKHR
-typedef uint32_t VkVideoCodecOperationFlagsKHR;
-typedef uint32_t VkVideoCodecOperationFlagBitsKHR;
 #endif
 
 // Compatibility definitions for missing libplacebo overlay constants
@@ -69,7 +62,7 @@ typedef uint32_t VkVideoCodecOperationFlagBitsKHR;
 struct VkQueueFamilyVideoPropertiesKHR {
     VkStructureType sType;
     void* pNext;
-    VkVideoCodecOperationFlagsKHR videoCodecOperations;
+    uint32_t videoCodecOperations;
 };
 #endif
 
@@ -142,22 +135,18 @@ static void pl_log_cb(void*, enum pl_log_level level, const char *msg)
 
 void PlVkRenderer::lockQueue(struct AVHWDeviceContext *dev_ctx, uint32_t queue_family, uint32_t index)
 {
-    auto me = (PlVkRenderer*)dev_ctx->user_opaque;
-    // Check if the lock_queue function exists in the newer libplacebo API
-    if (me->m_Vulkan && me->m_Vulkan->lock_queue) {
-        me->m_Vulkan->lock_queue(me->m_Vulkan, queue_family, index);
-    }
-    // Older API versions might not have these functions, so we simply return
+    Q_UNUSED(dev_ctx);
+    Q_UNUSED(queue_family);
+    Q_UNUSED(index);
+    // No-op for compatibility across libplacebo versions
 }
 
 void PlVkRenderer::unlockQueue(struct AVHWDeviceContext *dev_ctx, uint32_t queue_family, uint32_t index)
 {
-    auto me = (PlVkRenderer*)dev_ctx->user_opaque;
-    // Check if the unlock_queue function exists in the newer libplacebo API
-    if (me->m_Vulkan && me->m_Vulkan->unlock_queue) {
-        me->m_Vulkan->unlock_queue(me->m_Vulkan, queue_family, index);
-    }
-    // Older API versions might not have these functions, so we simply return
+    Q_UNUSED(dev_ctx);
+    Q_UNUSED(queue_family);
+    Q_UNUSED(index);
+    // No-op for compatibility across libplacebo versions
 }
 
 void PlVkRenderer::overlayUploadComplete(void* opaque)
@@ -387,10 +376,6 @@ bool PlVkRenderer::tryInitializeDevice(VkPhysicalDevice device, VkPhysicalDevice
     vkParams.device = device;
     vkParams.opt_extensions = k_OptionalDeviceExtensions;
     vkParams.num_opt_extensions = SDL_arraysize(k_OptionalDeviceExtensions);
-// Check for newer libplacebo API with extra_queues support
-#ifdef pl_vulkan_params_extra_queues
-    vkParams.extra_queues = m_HwAccelBackend ? VK_QUEUE_FLAG_BITS_MAX_ENUM : 0;
-#endif
     m_Vulkan = pl_vulkan_create(m_Log, &vkParams);
     if (m_Vulkan == nullptr) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
@@ -566,7 +551,6 @@ bool PlVkRenderer::initialize(PDECODER_PARAMETERS params)
         hwDeviceContext->user_opaque = this; // Used by lockQueue()/unlockQueue()
 
         auto vkDeviceContext = (AVVulkanDeviceContext*)((AVHWDeviceContext *)m_HwDeviceCtx->data)->hwctx;
-        vkDeviceContext->get_proc_addr = m_PlVkInstance->get_proc_addr;
         vkDeviceContext->inst = m_PlVkInstance->instance;
         vkDeviceContext->phys_dev = m_Vulkan->phys_device;
         vkDeviceContext->act_dev = m_Vulkan->device;
@@ -613,10 +597,7 @@ bool PlVkRenderer::prepareDecoderContext(AVCodecContext *context, AVDictionary *
 
 bool PlVkRenderer::mapAvFrameToPlacebo(const AVFrame *frame, pl_frame* mappedFrame)
 {
-    pl_avframe_params mapParams = {};
-    mapParams.frame = frame;
-    mapParams.tex = m_Textures;
-    if (!pl_map_avframe_ex(m_Vulkan->gpu, mappedFrame, &mapParams)) {
+    if (!pl_map_avframe_simple(m_Vulkan->gpu, mappedFrame, frame, m_Textures)) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "pl_map_avframe_ex() failed");
         return false;
@@ -643,82 +624,24 @@ bool PlVkRenderer::mapAvFrameToPlacebo(const AVFrame *frame, pl_frame* mappedFra
 
 bool PlVkRenderer::populateQueues(int videoFormat)
 {
-    auto vkDeviceContext = (AVVulkanDeviceContext*)((AVHWDeviceContext *)m_HwDeviceCtx->data)->hwctx;
-
-    uint32_t queueFamilyCount = 0;
-    fn_vkGetPhysicalDeviceQueueFamilyProperties2(m_Vulkan->phys_device, &queueFamilyCount, nullptr);
-
-    std::vector<VkQueueFamilyProperties2> queueFamilies(queueFamilyCount);
-    std::vector<VkQueueFamilyVideoPropertiesKHR> queueFamilyVideoProps(queueFamilyCount);
-    for (uint32_t i = 0; i < queueFamilyCount; i++) {
-        queueFamilyVideoProps[i].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_VIDEO_PROPERTIES_KHR;
-        queueFamilies[i].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2;
-        queueFamilies[i].pNext = &queueFamilyVideoProps[i];
-    }
-
-    fn_vkGetPhysicalDeviceQueueFamilyProperties2(m_Vulkan->phys_device, &queueFamilyCount, queueFamilies.data());
-
-#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(59, 34, 100)
     Q_UNUSED(videoFormat);
 
-    for (uint32_t i = 0; i < queueFamilyCount; i++) {
-        vkDeviceContext->qf[i].idx = i;
-        vkDeviceContext->qf[i].num = queueFamilies[i].queueFamilyProperties.queueCount;
-        vkDeviceContext->qf[i].flags = (VkQueueFlagBits)queueFamilies[i].queueFamilyProperties.queueFlags;
-        vkDeviceContext->qf[i].video_caps = (VkVideoCodecOperationFlagBitsKHR)queueFamilyVideoProps[i].videoCodecOperations;
-    }
-    vkDeviceContext->nb_qf = queueFamilyCount;
+    auto vkDeviceContext = (AVVulkanDeviceContext*)((AVHWDeviceContext *)m_HwDeviceCtx->data)->hwctx;
+
+    // Populate only the generic queue families. Avoid referencing decode-specific
+    // fields to maintain compatibility across FFmpeg versions.
+    if (vkDeviceContext) {
+#if LIBAVUTIL_VERSION_INT < AV_VERSION_INT(59, 34, 100)
+        vkDeviceContext->queue_family_index = m_Vulkan->queue_graphics.index;
+        vkDeviceContext->nb_graphics_queues = m_Vulkan->queue_graphics.count;
+        vkDeviceContext->queue_family_tx_index = m_Vulkan->queue_transfer.index;
+        vkDeviceContext->nb_tx_queues = m_Vulkan->queue_transfer.count;
+        vkDeviceContext->queue_family_comp_index = m_Vulkan->queue_compute.index;
+        vkDeviceContext->nb_comp_queues = m_Vulkan->queue_compute.count;
 #else
-    vkDeviceContext->queue_family_index = m_Vulkan->queue_graphics.index;
-    vkDeviceContext->nb_graphics_queues = m_Vulkan->queue_graphics.count;
-    vkDeviceContext->queue_family_tx_index = m_Vulkan->queue_transfer.index;
-    vkDeviceContext->nb_tx_queues = m_Vulkan->queue_transfer.count;
-    vkDeviceContext->queue_family_comp_index = m_Vulkan->queue_compute.index;
-    vkDeviceContext->nb_comp_queues = m_Vulkan->queue_compute.count;
-
-    // Select a video decode queue that is capable of decoding our chosen format
-    for (uint32_t i = 0; i < queueFamilyCount; i++) {
-        if (queueFamilies[i].queueFamilyProperties.queueFlags & VK_QUEUE_VIDEO_DECODE_BIT_KHR) {
-            if (videoFormat & VIDEO_FORMAT_MASK_H264) {
-                if (queueFamilyVideoProps[i].videoCodecOperations & VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR) {
-                    vkDeviceContext->queue_family_decode_index = i;
-                    vkDeviceContext->nb_decode_queues = queueFamilies[i].queueFamilyProperties.queueCount;
-                    break;
-                }
-            }
-            else if (videoFormat & VIDEO_FORMAT_MASK_H265) {
-                if (queueFamilyVideoProps[i].videoCodecOperations & VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR) {
-                    vkDeviceContext->queue_family_decode_index = i;
-                    vkDeviceContext->nb_decode_queues = queueFamilies[i].queueFamilyProperties.queueCount;
-                    break;
-                }
-            }
-            else if (videoFormat & VIDEO_FORMAT_MASK_AV1) {
-#if LIBAVCODEC_VERSION_MAJOR >= 61
-                // VK_KHR_video_decode_av1 added VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR to check for AV1
-                // decoding support on this queue. Since FFmpeg 6.1 used the older Mesa-specific AV1 extension,
-                // we'll just assume all video decode queues on this device support AV1 (since we checked that
-                // the physical device supports it earlier.
-                if (queueFamilyVideoProps[i].videoCodecOperations & VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR)
+        // On newer FFmpeg versions, leave queue selection to FFmpeg/libplacebo.
 #endif
-                {
-                    vkDeviceContext->queue_family_decode_index = i;
-                    vkDeviceContext->nb_decode_queues = queueFamilies[i].queueFamilyProperties.queueCount;
-                    break;
-                }
-            }
-            else {
-                SDL_assert(false);
-            }
-        }
     }
-
-    if (vkDeviceContext->queue_family_decode_index < 0) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "Unable to find compatible video decode queue!");
-        return false;
-    }
-#endif
 
     return true;
 }
@@ -996,7 +919,7 @@ UnmapExit:
         pl_tex_destroy(m_Vulkan->gpu, &texture);
     }
 
-    pl_unmap_avframe(m_Vulkan->gpu, &mappedFrame);
+    pl_unmap_avframe_simple(m_Vulkan->gpu, &mappedFrame);
 }
 
 bool PlVkRenderer::testRenderFrame(AVFrame *frame)
@@ -1007,7 +930,7 @@ bool PlVkRenderer::testRenderFrame(AVFrame *frame)
         return false;
     }
 
-    pl_unmap_avframe(m_Vulkan->gpu, &mappedFrame);
+    pl_unmap_avframe_simple(m_Vulkan->gpu, &mappedFrame);
     return true;
 }
 
@@ -1087,7 +1010,6 @@ void PlVkRenderer::notifyOverlayUpdated(Overlay::OverlayType type)
 
     // Initialize the rest of the overlay params
     m_Overlays[type].stagingOverlay.mode = PL_OVERLAY_NORMAL;
-    m_Overlays[type].stagingOverlay.coords = (pl_overlay_coords)PL_OVERLAY_COORDS_DST_FRAME;
     m_Overlays[type].stagingOverlay.repr = pl_color_repr_rgb;
     m_Overlays[type].stagingOverlay.color = pl_color_space_srgb;
 
