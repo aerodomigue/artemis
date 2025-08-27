@@ -16,8 +16,12 @@
 #endif
 
 // Provide a dummy implementation of av_stream_get_side_data() to avoid having to link with libavformat
-// Updated signature to match newer FFmpeg versions
+// Use size_t for compatibility with newer FFmpeg versions on some platforms
+#if defined(LIBAVFORMAT_VERSION_INT) && LIBAVFORMAT_VERSION_INT >= AV_VERSION_INT(61, 0, 0)
+uint8_t *av_stream_get_side_data(const AVStream *stream, enum AVPacketSideDataType type, size_t *size)
+#else
 uint8_t *av_stream_get_side_data(const AVStream *stream, enum AVPacketSideDataType type, int *size)
+#endif
 {
     (void)stream;
     (void)type;

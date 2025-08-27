@@ -45,13 +45,21 @@
 #define VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR ((VkVideoCodecOperationFlagBitsKHR)0x00000002)
 #endif
 
-// Compatibility definitions for libplacebo constants
+// Compatibility definitions for missing libplacebo constants
 #ifndef PL_VK_MIN_VERSION
 #define PL_VK_MIN_VERSION VK_API_VERSION_1_1
 #endif
 #ifndef PL_COLOR_HDR_BLACK
 #define PL_COLOR_HDR_BLACK 0.0f
 #endif
+
+// Compatibility definitions for VkVideoCodecOperation types
+#ifndef VkVideoCodecOperationFlagsKHR
+typedef uint32_t VkVideoCodecOperationFlagsKHR;
+typedef uint32_t VkVideoCodecOperationFlagBitsKHR;
+#endif
+
+// Compatibility definitions for missing libplacebo overlay constants
 #ifndef PL_OVERLAY_COORDS_DST_FRAME
 #define PL_OVERLAY_COORDS_DST_FRAME 0
 #endif
@@ -379,7 +387,10 @@ bool PlVkRenderer::tryInitializeDevice(VkPhysicalDevice device, VkPhysicalDevice
     vkParams.device = device;
     vkParams.opt_extensions = k_OptionalDeviceExtensions;
     vkParams.num_opt_extensions = SDL_arraysize(k_OptionalDeviceExtensions);
+// Check for newer libplacebo API with extra_queues support
+#ifdef pl_vulkan_params_extra_queues
     vkParams.extra_queues = m_HwAccelBackend ? VK_QUEUE_FLAG_BITS_MAX_ENUM : 0;
+#endif
     m_Vulkan = pl_vulkan_create(m_Log, &vkParams);
     if (m_Vulkan == nullptr) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
@@ -1076,7 +1087,7 @@ void PlVkRenderer::notifyOverlayUpdated(Overlay::OverlayType type)
 
     // Initialize the rest of the overlay params
     m_Overlays[type].stagingOverlay.mode = PL_OVERLAY_NORMAL;
-    m_Overlays[type].stagingOverlay.coords = PL_OVERLAY_COORDS_DST_FRAME;
+    m_Overlays[type].stagingOverlay.coords = (pl_overlay_coords)PL_OVERLAY_COORDS_DST_FRAME;
     m_Overlays[type].stagingOverlay.repr = pl_color_repr_rgb;
     m_Overlays[type].stagingOverlay.color = pl_color_space_srgb;
 
