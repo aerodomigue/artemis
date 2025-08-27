@@ -1,18 +1,16 @@
 #include <string.h>
+#include <libplacebo/renderer.h>
 #include <libplacebo/utils/libav.h>
 #include "pl_libav_shim.h"
 
-bool pl_map_avframe_simple(void *gpu, void *out_frame, const AVFrame *frame, const void *tex)
+bool pl_map_avframe_simple(const void *gpu, void *out_frame, const AVFrame *frame, const void *tex)
 {
-    struct pl_avframe_params params;
-    memset(&params, 0, sizeof(params));
-    params.frame = frame;
-    params.tex = (const pl_tex *)tex;
-    return pl_map_avframe_ex((pl_gpu)gpu, (pl_frame *)out_frame, &params);
+    // Use the simple wrapper to avoid version-specific struct details
+    return pl_map_avframe((pl_gpu)gpu, (struct pl_frame *)out_frame, (const pl_tex **)tex, frame);
 }
 
-void pl_unmap_avframe_simple(void *gpu, void *frame)
+void pl_unmap_avframe_simple(const void *gpu, void *frame)
 {
-    pl_unmap_avframe((pl_gpu)gpu, (pl_frame *)frame);
+    pl_unmap_avframe((pl_gpu)gpu, (struct pl_frame *)frame);
 }
 

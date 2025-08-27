@@ -597,7 +597,8 @@ bool PlVkRenderer::prepareDecoderContext(AVCodecContext *context, AVDictionary *
 
 bool PlVkRenderer::mapAvFrameToPlacebo(const AVFrame *frame, pl_frame* mappedFrame)
 {
-    if (!pl_map_avframe_simple(m_Vulkan->gpu, &mappedFrame, frame, m_Textures)) {
+    // mappedFrame is an out-parameter (pl_frame*). Pass it directly to the C shim.
+    if (!pl_map_avframe_simple((const void *)m_Vulkan->gpu, mappedFrame, frame, (const void *)m_Textures)) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "pl_map_avframe_ex() failed");
         return false;
@@ -919,7 +920,7 @@ UnmapExit:
         pl_tex_destroy(m_Vulkan->gpu, &texture);
     }
 
-    pl_unmap_avframe_simple(m_Vulkan->gpu, &mappedFrame);
+    pl_unmap_avframe_simple((const void *)m_Vulkan->gpu, &mappedFrame);
 }
 
 bool PlVkRenderer::testRenderFrame(AVFrame *frame)
@@ -930,7 +931,7 @@ bool PlVkRenderer::testRenderFrame(AVFrame *frame)
         return false;
     }
 
-    pl_unmap_avframe_simple(m_Vulkan->gpu, &mappedFrame);
+    pl_unmap_avframe_simple((const void *)m_Vulkan->gpu, &mappedFrame);
     return true;
 }
 

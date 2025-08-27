@@ -39,9 +39,9 @@
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Artemis uses the local network to connect to your gaming PC for streaming.</string>
 	<key>CFBundleVersion</key>
-	<string>6.1.0</string>
+	<string>0.5.6</string>
 	<key>CFBundleShortVersionString</key>
-	<string>6.1.0</string>
+	<string>0.5.6</string>
 	<key>CFBundleDisplayName</key>
 	<string>Artemis</string>
 </dict>
