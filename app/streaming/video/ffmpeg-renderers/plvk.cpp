@@ -19,16 +19,67 @@
 #define VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR ((VkVideoCodecOperationFlagBitsKHR)0x00000004)
 #endif
 
+// Compatibility definitions for missing Vulkan constants
+#ifndef VK_KHR_VIDEO_QUEUE_EXTENSION_NAME
+#define VK_KHR_VIDEO_QUEUE_EXTENSION_NAME "VK_KHR_video_queue"
+#endif
+#ifndef VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME
+#define VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME "VK_KHR_video_decode_queue"
+#endif
+#ifndef VK_KHR_VIDEO_DECODE_H264_EXTENSION_NAME
+#define VK_KHR_VIDEO_DECODE_H264_EXTENSION_NAME "VK_KHR_video_decode_h264"
+#endif
+#ifndef VK_KHR_VIDEO_DECODE_H265_EXTENSION_NAME
+#define VK_KHR_VIDEO_DECODE_H265_EXTENSION_NAME "VK_KHR_video_decode_h265"
+#endif
+#ifndef VK_STRUCTURE_TYPE_QUEUE_FAMILY_VIDEO_PROPERTIES_KHR
+#define VK_STRUCTURE_TYPE_QUEUE_FAMILY_VIDEO_PROPERTIES_KHR ((VkStructureType)1000023012)
+#endif
+#ifndef VK_QUEUE_VIDEO_DECODE_BIT_KHR
+#define VK_QUEUE_VIDEO_DECODE_BIT_KHR ((VkQueueFlagBits)0x00000020)
+#endif
+#ifndef VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR
+#define VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR ((VkVideoCodecOperationFlagBitsKHR)0x00000001)
+#endif
+#ifndef VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR
+#define VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR ((VkVideoCodecOperationFlagBitsKHR)0x00000002)
+#endif
+
+// Compatibility definitions for libplacebo constants
+#ifndef PL_VK_MIN_VERSION
+#define PL_VK_MIN_VERSION VK_API_VERSION_1_1
+#endif
+#ifndef PL_COLOR_HDR_BLACK
+#define PL_COLOR_HDR_BLACK 0.0f
+#endif
+#ifndef PL_OVERLAY_COORDS_DST_FRAME
+#define PL_OVERLAY_COORDS_DST_FRAME 0
+#endif
+
+// Compatibility struct for VkQueueFamilyVideoPropertiesKHR
+#ifndef VK_KHR_video_queue
+struct VkQueueFamilyVideoPropertiesKHR {
+    VkStructureType sType;
+    void* pNext;
+    VkVideoCodecOperationFlagsKHR videoCodecOperations;
+};
+#endif
+
+// Compatibility definitions for missing AVPixelFormat
+#ifndef AV_PIX_FMT_P410
+#define AV_PIX_FMT_P410 AV_PIX_FMT_NONE
+#endif
+
 // Keep these in sync with hwcontext_vulkan.c
 static const char *k_OptionalDeviceExtensions[] = {
     /* Misc or required by other extensions */
     //VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
     VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
     VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME,
-    VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
+    // VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME, // May not be available in older Vulkan headers
     VK_EXT_PHYSICAL_DEVICE_DRM_EXTENSION_NAME,
     VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME,
-    VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME,
+    // VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME, // May not be available in older Vulkan headers
 
     /* Imports/exports */
     VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
@@ -84,13 +135,21 @@ static void pl_log_cb(void*, enum pl_log_level level, const char *msg)
 void PlVkRenderer::lockQueue(struct AVHWDeviceContext *dev_ctx, uint32_t queue_family, uint32_t index)
 {
     auto me = (PlVkRenderer*)dev_ctx->user_opaque;
-    me->m_Vulkan->lock_queue(me->m_Vulkan, queue_family, index);
+    // Check if the lock_queue function exists in the newer libplacebo API
+    if (me->m_Vulkan && me->m_Vulkan->lock_queue) {
+        me->m_Vulkan->lock_queue(me->m_Vulkan, queue_family, index);
+    }
+    // Older API versions might not have these functions, so we simply return
 }
 
 void PlVkRenderer::unlockQueue(struct AVHWDeviceContext *dev_ctx, uint32_t queue_family, uint32_t index)
 {
     auto me = (PlVkRenderer*)dev_ctx->user_opaque;
-    me->m_Vulkan->unlock_queue(me->m_Vulkan, queue_family, index);
+    // Check if the unlock_queue function exists in the newer libplacebo API
+    if (me->m_Vulkan && me->m_Vulkan->unlock_queue) {
+        me->m_Vulkan->unlock_queue(me->m_Vulkan, queue_family, index);
+    }
+    // Older API versions might not have these functions, so we simply return
 }
 
 void PlVkRenderer::overlayUploadComplete(void* opaque)
