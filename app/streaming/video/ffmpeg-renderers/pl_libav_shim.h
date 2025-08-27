@@ -6,13 +6,12 @@ extern "C" {
 #endif
 
 #include <stdbool.h>
-#include <libplacebo/renderer.h>
 #include <libavutil/frame.h>
 
-// Simple C-callable wrappers to avoid including libplacebo's C99-heavy
-// libav headers in C++ translation units.
-bool pl_map_avframe_simple(pl_gpu gpu, pl_frame *out_frame, const AVFrame *frame, const pl_tex *tex);
-void pl_unmap_avframe_simple(pl_gpu gpu, pl_frame *frame);
+// Avoid pulling libplacebo headers into C++ TU; use opaque pointers here.
+// They are cast to the correct libplacebo types in the C implementation.
+bool pl_map_avframe_simple(void *gpu, void *out_frame, const AVFrame *frame, const void *tex);
+void pl_unmap_avframe_simple(void *gpu, void *frame);
 
 #ifdef __cplusplus
 }

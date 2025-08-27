@@ -597,7 +597,7 @@ bool PlVkRenderer::prepareDecoderContext(AVCodecContext *context, AVDictionary *
 
 bool PlVkRenderer::mapAvFrameToPlacebo(const AVFrame *frame, pl_frame* mappedFrame)
 {
-    if (!pl_map_avframe_simple(m_Vulkan->gpu, mappedFrame, frame, m_Textures)) {
+    if (!pl_map_avframe_simple(m_Vulkan->gpu, &mappedFrame, frame, m_Textures)) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "pl_map_avframe_ex() failed");
         return false;

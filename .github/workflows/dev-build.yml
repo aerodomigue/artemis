@@ -1470,7 +1470,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y flatpak flatpak-builder
         sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-        sudo flatpak install -y flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08 org.freedesktop.Sdk.Extension.vulkan//23.08 org.kde.Platform//6.6 org.kde.Sdk//6.6
+        sudo flatpak install -y flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08 org.kde.Platform//6.6 org.kde.Sdk//6.6
 
     - name: Create Flatpak manifest with libplacebo for Steam Deck compatibility
       run: |
@@ -1479,14 +1479,6 @@ jobs:
         runtime: org.kde.Platform
         runtime-version: '6.6'
         sdk: org.kde.Sdk
-        sdk-extensions:
-          - org.freedesktop.Sdk.Extension.vulkan
-        build-options:
-          env:
-            PATH: /usr/lib/sdk/vulkan/bin:/app/bin:/usr/bin:/bin
-            LD_LIBRARY_PATH: /usr/lib/sdk/vulkan/lib:/app/lib:/usr/lib
-            PKG_CONFIG_PATH: /usr/lib/sdk/vulkan/lib/pkgconfig:/app/lib/pkgconfig:/usr/lib/pkgconfig
-            CMAKE_PREFIX_PATH: /usr/lib/sdk/vulkan
         command: artemis-dev
         finish-args:
           - --share=ipc
@@ -1549,8 +1541,58 @@ jobs:
               - type: archive
                 url: https://code.videolan.org/videolan/libplacebo/-/archive/v7.349.0/libplacebo-v7.349.0.tar.gz
                 sha256: 79120e685a1836344b51b13b6a5661622486a84e4d4a35f6c8d01679a20fbc86
-            # Rely on Vulkan SDK extension to provide shaderc, SPIRV-Tools, and glslang via pkg-config
-            # No nested modules needed here.
+            modules:
+              # Vulkan toolchain for shader compilation
+              - name: spirv-headers
+                buildsystem: cmake-ninja
+                builddir: true
+                config-opts:
+                  - -DCMAKE_BUILD_TYPE=Release
+                  - -DBUILD_SHARED_LIBS=ON
+                sources:
+                  - type: git
+                    url: https://github.com/KhronosGroup/SPIRV-Headers.git
+                    tag: sdk-1.3.280.0
+              - name: spirv-tools
+                buildsystem: cmake-ninja
+                builddir: true
+                config-opts:
+                  - -DCMAKE_BUILD_TYPE=Release
+                  - -DSPIRV_SKIP_TESTS=ON
+                  - -DSPIRV_WERROR=OFF
+                  - -DSPIRV_HEADERS_SOURCE_DIR=/run/build/spirv-headers
+                sources:
+                  - type: git
+                    url: https://github.com/KhronosGroup/SPIRV-Tools.git
+                    tag: sdk-1.3.280.0
+              - name: glslang
+                buildsystem: cmake-ninja
+                builddir: true
+                config-opts:
+                  - -DCMAKE_BUILD_TYPE=Release
+                  - -DBUILD_SHARED_LIBS=ON
+                  - -DGLSLANG_TESTS=OFF
+                  - -DENABLE_GLSLANG_BINARIES=OFF
+                  - -DENABLE_SPVREMAPPER=OFF
+                sources:
+                  - type: git
+                    url: https://github.com/KhronosGroup/glslang.git
+                    tag: sdk-1.3.280.0
+              - name: shaderc
+                buildsystem: cmake-ninja
+                builddir: true
+                config-opts:
+                  - -DCMAKE_BUILD_TYPE=Release
+                  - -DSHADERC_SKIP_COPYRIGHT_CHECK=ON
+                  - -DSHADERC_SKIP_EXAMPLES=ON
+                  - -DSHADERC_SKIP_TESTS=ON
+                  - -DSPIRV-Tools_DIR=/app/lib/cmake/SPIRV-Tools
+                  - -DSPIRV-Tools-opt_DIR=/app/lib/cmake/SPIRV-Tools
+                  - -Dglslang_DIR=/app/lib/cmake/glslang
+                sources:
+                  - type: git
+                    url: https://github.com/google/shaderc.git
+                    tag: v2024.1
           
           - name: artemis-desktop-dev
             buildsystem: simple
