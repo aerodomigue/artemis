@@ -1557,6 +1557,7 @@ jobs:
           - name: artemis-desktop-dev
             buildsystem: simple
             build-commands:
+              - install -d /app/lib/GL # Workaround for NVIDIA driver issue
               - rm -f .qmake.stash .qmake.cache
               - find . -name "Makefile*" -delete || true
               - rm -rf AntiHooking/ || true
