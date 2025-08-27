@@ -1552,7 +1552,7 @@ jobs:
                 sources:
                   - type: archive
                     url: https://github.com/google/shaderc/archive/refs/tags/v2024.1.tar.gz
-                    sha256: eb3b5f0c16313d34f208d0fe7df10d454fa53e8c8a9ddfcbc0bd13e42a92e1f1
+                    sha256: eb3b5f0c16313d34f208d90c2fa1e588a23283eed63b101edd5422be6165d528
           
           - name: artemis-desktop-dev
             buildsystem: simple
