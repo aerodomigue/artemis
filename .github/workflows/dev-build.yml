@@ -1750,7 +1750,7 @@ jobs:
                 sources:
                   - type: git
                     url: https://github.com/KhronosGroup/glslang.git
-                    tag: sdk-1.3.280.0
+                    branch: main
               - name: shaderc
                 buildsystem: cmake-ninja
                 builddir: true
