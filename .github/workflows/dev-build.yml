@@ -1716,16 +1716,6 @@ jobs:
                 sha256: 79120e685a1836344b51b13b6a5661622486a84e4d4a35f6c8d01679a20fbc86
             modules:
               # Vulkan toolchain for shader compilation
-              - name: spirv-headers
-                buildsystem: cmake-ninja
-                builddir: true
-                config-opts:
-                  - -DCMAKE_BUILD_TYPE=Release
-                  - -DBUILD_SHARED_LIBS=ON
-                sources:
-                  - type: git
-                    url: https://github.com/KhronosGroup/SPIRV-Headers.git
-                    commit: 2a9b6f951c7d6b04b6c21fe1bf3f475b68b84801
               - name: spirv-tools
                 buildsystem: cmake-ninja
                 builddir: true
@@ -1734,12 +1724,15 @@ jobs:
                   - -DSPIRV_SKIP_TESTS=ON
                   - -DSPIRV_WERROR=OFF
                   - -DSPIRV_SKIP_EXECUTABLES=ON
-                  - -DSPIRV_TOOLS_FETCH_SPIRV_HEADERS=ON
                   - -DCMAKE_INSTALL_PREFIX=/app
                 sources:
                   - type: git
                     url: https://github.com/KhronosGroup/SPIRV-Tools.git
                     commit: dd4b663e13c07fea4fbb3f70c1c91c86731099f7
+                  - type: git
+                    url: https://github.com/KhronosGroup/SPIRV-Headers.git
+                    commit: 2a9b6f951c7d6b04b6c21fe1bf3f475b68b84801
+                    dest: external/spirv-headers
               - name: glslang
                 buildsystem: cmake-ninja
                 builddir: true
