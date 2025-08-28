@@ -1747,7 +1747,7 @@ jobs:
                 sources:
                   - type: git
                     url: https://github.com/KhronosGroup/glslang.git
-                    commit: fa9c3deb49e035a8abcabe366f26aac010f6cbfb
+                    branch: main
               - name: shaderc
                 buildsystem: cmake-ninja
                 builddir: true
@@ -1756,13 +1756,12 @@ jobs:
                   - -DSHADERC_SKIP_COPYRIGHT_CHECK=ON
                   - -DSHADERC_SKIP_EXAMPLES=ON
                   - -DSHADERC_SKIP_TESTS=ON
-                  - -DALLOW_EXTERNAL_SPIRV_TOOLS=ON
                   - -DSPIRV-Tools_DIR=/app/lib/cmake/SPIRV-Tools
-                  - -DSPIRV-Tools-opt_DIR=/app/lib/cmake/SPIRV-Tools
                   - -Dglslang_DIR=/app/lib/cmake/glslang
                 sources:
                   - type: git
                     url: https://github.com/google/shaderc.git
+                    branch: main
                     commit: 40bced4e1e205ecf44630d2dfa357655b6dabd04
           
           - name: artemis-desktop-dev
