@@ -1694,49 +1694,6 @@ Flickable {
                     wrapMode: Text.Wrap
                 }
 
-                // Preferred renderer backend
-                Label {
-                    width: parent.width
-                    text: qsTr("Preferred renderer")
-                    font.pointSize: 12
-                    wrapMode: Text.Wrap
-                    topPadding: 12
-                }
-
-                AutoResizingComboBox {
-                    function createModel() {
-                        var model = Qt.createQmlObject('import QtQuick 2.0; ListModel {}', parent, '')
-
-                        model.append({ text: qsTr("Auto (Vulkan, fallback to OpenGL)"), val: StreamingPreferences.RB_AUTO })
-                        model.append({ text: qsTr("Vulkan"), val: StreamingPreferences.RB_VULKAN })
-                        model.append({ text: qsTr("OpenGL"), val: StreamingPreferences.RB_OPENGL })
-                        return model
-                    }
-
-                    function reinitialize() {
-                        model = createModel()
-                        currentIndex = 0
-                        var saved = StreamingPreferences.rendererBackend
-                        for (var i = 0; i < model.count; i++) {
-                            if (model.get(i).val === saved) {
-                                currentIndex = i
-                                break
-                            }
-                        }
-                        activated(currentIndex)
-                    }
-
-                    Component.onCompleted: {
-                        reinitialize()
-                        languageChanged.connect(reinitialize)
-                    }
-
-                    id: rendererBackendComboBox
-                    textRole: "text"
-                    onActivated: {
-                        StreamingPreferences.rendererBackend = model.get(currentIndex).val
-                    }
-                }
 
                 AutoResizingComboBox {
                     // ignore setting the index at first, and actually set it when the component is loaded
@@ -1832,6 +1789,50 @@ Flickable {
                         if (enabled) {
                             StreamingPreferences.videoCodecConfig = codecListModel.get(currentIndex).val
                         }
+                    }
+                }
+
+                // Preferred renderer backend
+                Label {
+                    width: parent.width
+                    text: qsTr("Preferred renderer")
+                    font.pointSize: 12
+                    wrapMode: Text.Wrap
+                    topPadding: 12
+                }
+
+                AutoResizingComboBox {
+                    function createModel() {
+                        var model = Qt.createQmlObject('import QtQuick 2.0; ListModel {}', parent, '')
+
+                        model.append({ text: qsTr("Auto (Vulkan, fallback to OpenGL)"), val: StreamingPreferences.RB_AUTO })
+                        model.append({ text: qsTr("Vulkan"), val: StreamingPreferences.RB_VULKAN })
+                        model.append({ text: qsTr("OpenGL"), val: StreamingPreferences.RB_OPENGL })
+                        return model
+                    }
+
+                    function reinitialize() {
+                        model = createModel()
+                        currentIndex = 0
+                        var saved = StreamingPreferences.rendererBackend
+                        for (var i = 0; i < model.count; i++) {
+                            if (model.get(i).val === saved) {
+                                currentIndex = i
+                                break
+                            }
+                        }
+                        activated(currentIndex)
+                    }
+
+                    Component.onCompleted: {
+                        reinitialize()
+                        languageChanged.connect(reinitialize)
+                    }
+
+                    id: rendererBackendComboBox
+                    textRole: "text"
+                    onActivated: {
+                        StreamingPreferences.rendererBackend = model.get(currentIndex).val
                     }
                 }
 
