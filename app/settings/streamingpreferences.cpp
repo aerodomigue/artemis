@@ -51,6 +51,7 @@
 #define SER_CAPTURESYSKEYS "capturesyskeys"
 #define SER_KEEPAWAKE "keepawake"
 #define SER_LANGUAGE "language"
+#define SER_RENDERERBACKEND "rendererbackend"
 
 // Artemis client-side streaming enhancements
 #define SER_VIRTUALDISPLAY "virtualdisplay"
@@ -172,6 +173,8 @@ void StreamingPreferences::reload()
                                                                                                                  : UIDisplayMode::UI_MAXIMIZED)).toInt());
     language = static_cast<Language>(settings.value(SER_LANGUAGE,
                                                     static_cast<int>(Language::LANG_AUTO)).toInt());
+    rendererBackend = static_cast<RendererBackend>(settings.value(SER_RENDERERBACKEND,
+                                                    static_cast<int>(RendererBackend::RB_AUTO)).toInt());
 
     // Artemis client-side streaming enhancements
     useVirtualDisplay = settings.value(SER_VIRTUALDISPLAY, false).toBool();
@@ -361,6 +364,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_WINDOWMODE, static_cast<int>(windowMode));
     settings.setValue(SER_UIDISPLAYMODE, static_cast<int>(uiDisplayMode));
     settings.setValue(SER_LANGUAGE, static_cast<int>(language));
+    settings.setValue(SER_RENDERERBACKEND, static_cast<int>(rendererBackend));
     settings.setValue(SER_DEFAULTVER, CURRENT_DEFAULT_VER);
     settings.setValue(SER_SWAPMOUSEBUTTONS, swapMouseButtons);
     settings.setValue(SER_MUTEONFOCUSLOSS, muteOnFocusLoss);

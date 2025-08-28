@@ -10,16 +10,10 @@
 
 #define PL_LIBAV_IMPLEMENTATION 1
 #include <libplacebo/utils/libav.h>
+// Ensure we get FFmpeg version macros for accurate prototype matching
+#include <libavformat/avformat.h>
 
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
 
-// Provide a dummy implementation of av_stream_get_side_data() to avoid having to link with libavformat
-uint8_t *av_stream_get_side_data(const AVStream *stream, enum AVPacketSideDataType type, size_t *size)
-{
-    (void)stream;
-    (void)type;
-    (void)size;
-    return NULL;
-}

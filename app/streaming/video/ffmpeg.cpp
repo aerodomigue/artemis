@@ -2,6 +2,7 @@
 #include "ffmpeg.h"
 #include "streaming/session.h"
 #include "backend/systemproperties.h"
+#include "settings/streamingpreferences.h"
 
 #include <h264_stream.h>
 
@@ -351,7 +352,39 @@ bool FFmpegVideoDecoder::initializeRendererInternal(IFFmpegRenderer* renderer, P
 
 bool FFmpegVideoDecoder::createFrontendRenderer(PDECODER_PARAMETERS params, bool useAlternateFrontend)
 {
+    // Read preferred renderer backend (Auto/Vulkan/OpenGL)
+    StreamingPreferences::RendererBackend preferredBackend = StreamingPreferences::RB_AUTO;
+    if (auto prefs = StreamingPreferences::get()) {
+        preferredBackend = prefs->rendererBackend;
+    }
+
     if (useAlternateFrontend) {
+        // Respect user's preferred frontend renderer first, then fall back to existing logic
+#if defined(HAVE_LIBPLACEBO_VULKAN)
+        if (preferredBackend == StreamingPreferences::RB_VULKAN &&
+            m_BackendRenderer->getRendererType() != IFFmpegRenderer::RendererType::Vulkan) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "Renderer preference: Trying Vulkan (PlVkRenderer) as frontend first");
+            m_FrontendRenderer = new PlVkRenderer(false, m_BackendRenderer);
+            if (initializeRendererInternal(m_FrontendRenderer, params)) {
+                return true;
+            }
+            delete m_FrontendRenderer;
+            m_FrontendRenderer = nullptr;
+        }
+#endif
+#if defined(HAVE_EGL)
+        if (preferredBackend == StreamingPreferences::RB_OPENGL && m_BackendRenderer->canExportEGL()) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "Renderer preference: Trying OpenGL (EGLRenderer) as frontend first");
+            m_FrontendRenderer = new EGLRenderer(m_BackendRenderer);
+            if (initializeRendererInternal(m_FrontendRenderer, params)) {
+                return true;
+            }
+            delete m_FrontendRenderer;
+            m_FrontendRenderer = nullptr;
+        }
+#endif
         if (params->videoFormat & VIDEO_FORMAT_MASK_10BIT) {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                         "HDR Debug: Creating alternate frontend renderer for 10-bit content");
@@ -441,6 +474,32 @@ bool FFmpegVideoDecoder::createFrontendRenderer(PDECODER_PARAMETERS params, bool
     else {
         // The backend renderer cannot directly render to the display, so
         // we will create an SDL or DRM renderer to draw the frames.
+
+        // Respect user's preferred frontend first where possible
+#if defined(HAVE_LIBPLACEBO_VULKAN)
+        if (preferredBackend == StreamingPreferences::RB_VULKAN) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "Renderer preference: Trying Vulkan (PlVkRenderer) frontend");
+            m_FrontendRenderer = new PlVkRenderer(false, m_BackendRenderer);
+            if (initializeRendererInternal(m_FrontendRenderer, params)) {
+                return true;
+            }
+            delete m_FrontendRenderer;
+            m_FrontendRenderer = nullptr;
+        }
+#endif
+#if defined(HAVE_EGL)
+        if (preferredBackend == StreamingPreferences::RB_OPENGL && m_BackendRenderer->canExportEGL()) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "Renderer preference: Trying OpenGL (EGLRenderer) frontend");
+            m_FrontendRenderer = new EGLRenderer(m_BackendRenderer);
+            if (initializeRendererInternal(m_FrontendRenderer, params)) {
+                return true;
+            }
+            delete m_FrontendRenderer;
+            m_FrontendRenderer = nullptr;
+        }
+#endif
 
 #if (defined(VULKAN_IS_SLOW) || defined(GL_IS_SLOW)) && defined(HAVE_DRM)
         // Try DrmRenderer first if we have a slow GPU

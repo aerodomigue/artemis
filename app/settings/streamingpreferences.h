@@ -60,6 +60,15 @@ public:
     };
     Q_ENUM(UIDisplayMode)
 
+    // Renderer backend preference
+    enum RendererBackend
+    {
+        RB_AUTO,
+        RB_VULKAN,
+        RB_OPENGL,
+    };
+    Q_ENUM(RendererBackend)
+
     // New entries must go at the end of the enum
     // to avoid renumbering existing entries (which
     // would affect existing user preferences).
@@ -145,6 +154,7 @@ public:
     Q_PROPERTY(bool keepAwake MEMBER keepAwake NOTIFY keepAwakeChanged)
     Q_PROPERTY(CaptureSysKeysMode captureSysKeysMode MEMBER captureSysKeysMode NOTIFY captureSysKeysModeChanged)
     Q_PROPERTY(Language language MEMBER language NOTIFY languageChanged)
+    Q_PROPERTY(RendererBackend rendererBackend MEMBER rendererBackend NOTIFY rendererBackendChanged)
     
     // Artemis client-side streaming enhancements
     Q_PROPERTY(bool useVirtualDisplay MEMBER useVirtualDisplay NOTIFY useVirtualDisplayChanged)
@@ -194,6 +204,7 @@ public:
     UIDisplayMode uiDisplayMode;
     Language language;
     CaptureSysKeysMode captureSysKeysMode;
+    RendererBackend rendererBackend;
     
     // Artemis client-side streaming enhancements
     bool useVirtualDisplay;
@@ -238,6 +249,7 @@ signals:
     void captureSysKeysModeChanged();
     void keepAwakeChanged();
     void languageChanged();
+    void rendererBackendChanged();
     
     // Artemis client-side streaming enhancement signals
     void useVirtualDisplayChanged();

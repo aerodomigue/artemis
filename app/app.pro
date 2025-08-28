@@ -78,7 +78,7 @@ unix:if(!macx|disable-prebuilts) {
 
     !disable-ffmpeg {
         packagesExist(libavcodec) {
-            PKGCONFIG += libavcodec libavutil libswscale
+            PKGCONFIG += libavcodec libavutil libswscale libavformat
             CONFIG += ffmpeg
 
             !disable-libva {
@@ -362,9 +362,11 @@ libplacebo {
     DEFINES += HAVE_LIBPLACEBO_VULKAN
     SOURCES += \
         streaming/video/ffmpeg-renderers/plvk.cpp \
-        streaming/video/ffmpeg-renderers/plvk_c.c
+        streaming/video/ffmpeg-renderers/plvk_c.c \
+        streaming/video/ffmpeg-renderers/pl_libav_shim.c
     HEADERS += \
-        streaming/video/ffmpeg-renderers/plvk.h
+        streaming/video/ffmpeg-renderers/plvk.h \
+        streaming/video/ffmpeg-renderers/pl_libav_shim.h
 }
 config_EGL {
     message(EGL renderer selected)
