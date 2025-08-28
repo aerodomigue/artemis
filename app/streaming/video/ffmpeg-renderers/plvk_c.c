@@ -17,20 +17,3 @@
 #pragma warning(pop)
 #endif
 
-// Provide a dummy implementation of av_stream_get_side_data() to avoid having to link with libavformat
-// Match the header's declaration exactly based on libavformat major version
-#if defined(LIBAVFORMAT_VERSION_MAJOR) && (LIBAVFORMAT_VERSION_MAJOR >= 61)
-uint8_t *av_stream_get_side_data(const AVStream *stream, enum AVPacketSideDataType type, size_t *size)
-#else
-uint8_t *av_stream_get_side_data(const AVStream *stream, enum AVPacketSideDataType type, int *size)
-#endif
-{
-    (void)stream;
-    (void)type;
-#if defined(LIBAVFORMAT_VERSION_MAJOR) && (LIBAVFORMAT_VERSION_MAJOR >= 61)
-    if (size) *size = 0;
-#else
-    if (size) *size = 0;
-#endif
-    return NULL;
-}

@@ -598,7 +598,7 @@ bool PlVkRenderer::prepareDecoderContext(AVCodecContext *context, AVDictionary *
 bool PlVkRenderer::mapAvFrameToPlacebo(const AVFrame *frame, pl_frame* mappedFrame)
 {
     // mappedFrame is an out-parameter (pl_frame*). Pass it directly to the C shim.
-    if (!pl_map_avframe_simple((const void *)m_Vulkan->gpu, mappedFrame, frame, (const void *)m_Textures)) {
+    if (!pl_map_avframe_simple((const void *)m_Vulkan->gpu, mappedFrame, frame, (void *)m_Textures)) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "pl_map_avframe_ex() failed");
         return false;
