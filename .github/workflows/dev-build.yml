@@ -1715,39 +1715,7 @@ jobs:
                 url: https://code.videolan.org/videolan/libplacebo/-/archive/v7.349.0/libplacebo-v7.349.0.tar.gz
                 sha256: 79120e685a1836344b51b13b6a5661622486a84e4d4a35f6c8d01679a20fbc86
             modules:
-              # Vulkan toolchain for shader compilation
-              - name: spirv-tools
-                buildsystem: cmake-ninja
-                builddir: true
-                config-opts:
-                  - -DCMAKE_BUILD_TYPE=Release
-                  - -DSPIRV_SKIP_TESTS=ON
-                  - -DSPIRV_WERROR=OFF
-                  - -DSPIRV_SKIP_EXECUTABLES=ON
-                  - -DCMAKE_INSTALL_PREFIX=/app
-                sources:
-                  - type: git
-                    url: https://github.com/KhronosGroup/SPIRV-Tools.git
-                    branch: main
-                  - type: git
-                    url: https://github.com/KhronosGroup/SPIRV-Headers.git
-                    branch: main
-                    dest: external/spirv-headers
-              - name: glslang
-                buildsystem: cmake-ninja
-                builddir: true
-                config-opts:
-                  - -DCMAKE_BUILD_TYPE=Release
-                  - -DBUILD_SHARED_LIBS=ON
-                  - -DGLSLANG_TESTS=OFF
-                  - -DENABLE_GLSLANG_BINARIES=OFF
-                  - -DENABLE_SPVREMAPPER=OFF
-                  - -DALLOW_EXTERNAL_SPIRV_TOOLS=ON
-                  - -DSPIRV-Tools_DIR=/app/lib/cmake/SPIRV-Tools
-                sources:
-                  - type: git
-                    url: https://github.com/KhronosGroup/glslang.git
-                    branch: main
+              # Build shaderc and vendor its exact dependencies to ensure compatibility
               - name: shaderc
                 buildsystem: cmake-ninja
                 builddir: true
@@ -1756,15 +1724,25 @@ jobs:
                   - -DSHADERC_SKIP_COPYRIGHT_CHECK=ON
                   - -DSHADERC_SKIP_EXAMPLES=ON
                   - -DSHADERC_SKIP_TESTS=ON
-                  - -DSHADERC_SKIP_THIRD_PARTY=ON
-                  - -DSPIRV-Tools_DIR=/app/lib/cmake/SPIRV-Tools
-                  - -Dglslang_DIR=/app/lib/cmake/glslang
-                  - -DCMAKE_PREFIX_PATH=/app
-                  - -DCMAKE_MODULE_PATH=/app/lib/cmake
+                  - -DSHADERC_ENABLE_WERROR=OFF
                 sources:
                   - type: git
                     url: https://github.com/google/shaderc.git
                     branch: main
+                  # Vendor glslang at the location shaderc expects
+                  - type: git
+                    url: https://github.com/KhronosGroup/glslang.git
+                    branch: main
+                    dest: third_party/glslang
+                  # Vendor SPIRV-Tools and SPIRV-Headers in the expected layout
+                  - type: git
+                    url: https://github.com/KhronosGroup/SPIRV-Tools.git
+                    branch: main
+                    dest: third_party/spirv-tools
+                  - type: git
+                    url: https://github.com/KhronosGroup/SPIRV-Headers.git
+                    branch: main
+                    dest: third_party/spirv-tools/external/spirv-headers
           
           - name: artemis-desktop-dev
             buildsystem: simple
