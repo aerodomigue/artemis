@@ -10,14 +10,16 @@
 
 #define PL_LIBAV_IMPLEMENTATION 1
 #include <libplacebo/utils/libav.h>
+// Ensure we get FFmpeg version macros for accurate prototype matching
+#include <libavformat/avformat.h>
 
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
 
 // Provide a dummy implementation of av_stream_get_side_data() to avoid having to link with libavformat
-// Use size_t for compatibility with newer FFmpeg versions on some platforms
-#if defined(LIBAVFORMAT_VERSION_INT) && LIBAVFORMAT_VERSION_INT >= AV_VERSION_INT(61, 0, 0)
+// Match the header's declaration exactly based on libavformat major version
+#if defined(LIBAVFORMAT_VERSION_MAJOR) && (LIBAVFORMAT_VERSION_MAJOR >= 61)
 uint8_t *av_stream_get_side_data(const AVStream *stream, enum AVPacketSideDataType type, size_t *size)
 #else
 uint8_t *av_stream_get_side_data(const AVStream *stream, enum AVPacketSideDataType type, int *size)
@@ -25,6 +27,10 @@ uint8_t *av_stream_get_side_data(const AVStream *stream, enum AVPacketSideDataTy
 {
     (void)stream;
     (void)type;
+#if defined(LIBAVFORMAT_VERSION_MAJOR) && (LIBAVFORMAT_VERSION_MAJOR >= 61)
     if (size) *size = 0;
+#else
+    if (size) *size = 0;
+#endif
     return NULL;
 }
