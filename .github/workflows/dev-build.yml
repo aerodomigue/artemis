@@ -1756,8 +1756,7 @@ jobs:
                   - -DSHADERC_SKIP_COPYRIGHT_CHECK=ON
                   - -DSHADERC_SKIP_EXAMPLES=ON
                   - -DSHADERC_SKIP_TESTS=ON
-                  - -DALLOW_EXTERNAL_SPIRV_TOOLS=ON
-                  - -DALLOW_EXTERNAL_GLSLANG=ON
+                  - -DSHADERC_SKIP_THIRD_PARTY=ON
                   - -DSPIRV-Tools_DIR=/app/lib/cmake/SPIRV-Tools
                   - -Dglslang_DIR=/app/lib/cmake/glslang
                   - -DCMAKE_PREFIX_PATH=/app
