@@ -78,7 +78,7 @@ unix:if(!macx|disable-prebuilts) {
 
     !disable-ffmpeg {
         packagesExist(libavcodec) {
-            PKGCONFIG += libavcodec libavutil libswscale
+            PKGCONFIG += libavcodec libavutil libswscale libavformat
             CONFIG += ffmpeg
 
             !disable-libva {
