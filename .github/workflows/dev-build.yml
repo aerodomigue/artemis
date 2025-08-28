@@ -1742,6 +1742,8 @@ jobs:
                   - -DGLSLANG_TESTS=OFF
                   - -DENABLE_GLSLANG_BINARIES=OFF
                   - -DENABLE_SPVREMAPPER=OFF
+                  - -DALLOW_EXTERNAL_SPIRV_TOOLS=ON
+                  - -DSPIRV-Tools_DIR=/app/lib/cmake/SPIRV-Tools
                 sources:
                   - type: git
                     url: https://github.com/KhronosGroup/glslang.git
