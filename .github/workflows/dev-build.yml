@@ -1735,7 +1735,7 @@ jobs:
                 sources:
                   - type: git
                     url: https://github.com/KhronosGroup/SPIRV-Cross.git
-                    branch: master
+                    branch: main
               # Build shaderc and vendor its exact dependencies to ensure compatibility
               - name: shaderc
                 buildsystem: cmake-ninja
