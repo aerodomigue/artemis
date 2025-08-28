@@ -1762,7 +1762,7 @@ jobs:
                   - type: git
                     url: https://github.com/google/shaderc.git
                     branch: main
-                    commit: 40bced4e1e205ecf44630d2dfa357655b6dabd04
+                    commit: 402a16ea5a99a3acbda542d48e902c7e3aa50033
           
           - name: artemis-desktop-dev
             buildsystem: simple
