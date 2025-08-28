@@ -1717,7 +1717,7 @@ jobs:
               # Vendor glad2 into libplacebo's 3rdparty/ so Meson can find it without network access
               - type: git
                 url: https://github.com/Dav1dde/glad.git
-                branch: main
+                branch: glad2
                 dest: 3rdparty/glad
             modules:
               # Provide spirv-cross for the OpenGL backend (C shared library with pkg-config)
