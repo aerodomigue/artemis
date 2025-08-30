@@ -1424,7 +1424,7 @@ jobs:
         Comment=Game streaming client for NVIDIA GameStream and Sunshine
         Exec=artemis
         Icon=artemis
-        Categories=Game;Network;AudioVideo;
+        Categories=Game;Network;
         Keywords=gaming;streaming;nvidia;gamestream;sunshine;
         StartupNotify=true
         MimeType=x-scheme-handler/artemis;
@@ -1460,6 +1460,13 @@ jobs:
         
         # Ensure a desktop file is at the AppDir root for appimagetool
         cp -f usr/share/applications/artemis.desktop . || true
+        
+        # Ensure an application icon is available at AppDir root for appimagetool
+        if [ -f "usr/share/icons/hicolor/256x256/apps/artemis.png" ]; then
+          cp -f usr/share/icons/hicolor/256x256/apps/artemis.png ./artemis.png
+        elif [ -f "usr/share/icons/hicolor/scalable/apps/artemis.svg" ]; then
+          cp -f usr/share/icons/hicolor/scalable/apps/artemis.svg ./artemis.svg
+        fi
         
         echo "=== Creating AppImage with appimagetool ==="
         ARCH=x86_64 appimagetool . "../installer-release/Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage" 2>&1 | tee appimagetool.log
