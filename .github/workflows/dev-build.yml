@@ -1430,165 +1430,43 @@ jobs:
         MimeType=x-scheme-handler/artemis;
         EOF
         
-        # Use linuxdeployqt to create AppImage with comprehensive debugging
+        # Build an AppDir with linuxdeployqt, then package with our own AppRun (fixes path issues on Steam Deck)
         export PATH=$HOME/bin:$PATH
         cd build/build-release
         
         echo "=== Environment Check ==="
         echo "PWD: $(pwd)"
         echo "PATH: $PATH"
-        echo "GLIBC version: $(ldd --version | head -n1)"
-        echo "Available tools:"
         which linuxdeployqt && linuxdeployqt --version || echo "linuxdeployqt not found"
         which appimagetool && appimagetool --version || echo "appimagetool not found"
-        which mksquashfs && mksquashfs -version || echo "mksquashfs not found"
         
-        echo "=== Binary Analysis ==="
-        echo "Binary info:"
-        file usr/bin/artemis
-        echo "Binary dependencies (first 10):"
-        ldd usr/bin/artemis | head -10
-        echo "Binary size: $(ls -lh usr/bin/artemis | awk '{print $5}')"
+        echo "=== Preparing AppDir with linuxdeployqt ==="
+        linuxdeployqt usr/share/applications/artemis.desktop -unsupported-allow-new-glibc -verbose=2 2>&1 | tee linuxdeployqt.log
         
-        echo "=== Desktop File Analysis ==="
-        echo "Desktop file contents:"
-        cat usr/share/applications/artemis.desktop
-        echo "Icon files available:"
-        find usr/share/icons -name "*artemis*" -type f
-        
-        echo "=== Starting linuxdeployqt with maximum verbosity ==="
-        echo "Command: linuxdeployqt usr/share/applications/artemis.desktop -appimage -unsupported-allow-new-glibc -verbose=3"
-        
-        # Try linuxdeployqt with stderr capture
-        linuxdeployqt usr/share/applications/artemis.desktop -appimage -unsupported-allow-new-glibc -verbose=3 2>&1 | tee linuxdeployqt.log
-        LINUXDEPLOYQT_EXIT_CODE=${PIPESTATUS[0]}
-        
-        echo "=== linuxdeployqt Result Analysis ==="
-        echo "Exit code: $LINUXDEPLOYQT_EXIT_CODE"
-        echo "Log file contents:"
-        if [ -f linuxdeployqt.log ]; then
-          tail -20 linuxdeployqt.log
+        if [ ! -d "usr" ] || [ ! -f "usr/bin/artemis" ]; then
+          echo "ERROR: AppDir not prepared correctly"
+          exit 1
         fi
         
-        echo "Contents after linuxdeployqt:"
-        ls -la
-        
-        # Look for any AppImage files created
-        echo "=== Searching for AppImage files ==="
-        find . -name "*.AppImage" -type f -exec ls -la {} \; 2>/dev/null || echo "No AppImage files found"
-        
-        # Check if AppImage was created successfully
-        APPIMAGE_FILE=$(find . -name "*.AppImage" -type f | head -n1)
-        if [ -n "$APPIMAGE_FILE" ] && [ -f "$APPIMAGE_FILE" ]; then
-          echo "SUCCESS: Found AppImage: $APPIMAGE_FILE"
-          file "$APPIMAGE_FILE"
-          chmod +x "$APPIMAGE_FILE"
-          mv "$APPIMAGE_FILE" "../installer-release/Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage"
-          echo "AppImage created: Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage"
-        else
-          echo "=== FALLBACK: linuxdeployqt failed, trying alternative approaches ==="
-          
-          # Method 1: Try without -appimage flag first to create AppDir, then use appimagetool
-          echo "=== Fallback Method 1: Create AppDir then use appimagetool ==="
-          rm -f linuxdeployqt.log
-          linuxdeployqt usr/share/applications/artemis.desktop -unsupported-allow-new-glibc -verbose=2 2>&1 | tee appdir.log
-          
-          if [ -d "usr" ] && [ -f "usr/bin/artemis" ]; then
-            echo "AppDir created successfully, now trying appimagetool"
-            if command -v appimagetool &> /dev/null; then
-              echo "Creating AppImage with appimagetool"
-              appimagetool . "../installer-release/Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage" 2>&1 | tee appimagetool.log
-              if [ -f "../installer-release/Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage" ]; then
-                echo "SUCCESS: AppImage created with appimagetool!"
-                exit 0
-              else
-                echo "appimagetool failed, checking logs:"
-                tail -10 appimagetool.log
-              fi
-            fi
-          fi
-          
-          # Method 2: Try with older Ubuntu compatibility
-          echo "=== Fallback Method 2: Try without unsupported-allow-new-glibc ==="
-          rm -rf usr AppRun *.desktop 2>/dev/null || true
-          
-          # Rebuild basic AppDir structure
-          mkdir -p usr/bin usr/share/applications usr/share/icons/hicolor/256x256/apps usr/share/icons/hicolor/scalable/apps
-          cp ../../app/artemis usr/bin/
-          if [ -f "../../app/artemis.png" ]; then
-            cp ../../app/artemis.png usr/share/icons/hicolor/256x256/apps/artemis.png
-          fi
-          if [ -f "../../app/res/artemis.svg" ]; then
-            cp ../../app/res/artemis.svg usr/share/icons/hicolor/scalable/apps/artemis.svg
-          fi
-          
-          cat > usr/share/applications/artemis.desktop << 'EOF'
-        [Desktop Entry]
-        Type=Application
-        Name=Artemis Desktop
-        Comment=Game streaming client
-        Exec=artemis
-        Icon=artemis
-        Categories=Game;Network;
-        EOF
-          
-          echo "Trying linuxdeployqt without unsupported flag"
-          linuxdeployqt usr/share/applications/artemis.desktop -appimage -verbose=2 2>&1 | tee fallback.log
-          
-          FALLBACK_APPIMAGE=$(find . -name "*.AppImage" -type f | head -n1)
-          if [ -n "$FALLBACK_APPIMAGE" ] && [ -f "$FALLBACK_APPIMAGE" ]; then
-            echo "SUCCESS: Fallback method worked!"
-            mv "$FALLBACK_APPIMAGE" "../installer-release/Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage"
-            exit 0
-          fi
-          
-          # Method 3: Manual AppImage creation
-          echo "=== Fallback Method 3: Manual AppImage creation ==="
-          if command -v mksquashfs &> /dev/null && command -v appimagetool &> /dev/null; then
-            echo "Tools available for manual creation"
-            
-            # Create AppRun script
-            cat > AppRun << 'APPRUN_EOF'
+        echo "=== Inject custom AppRun ==="
+        cat > AppRun << 'APPRUN_EOF'
         #!/bin/bash
-        HERE="$(dirname "$(readlink -f "${0}")")" 
-        export PATH="${HERE}"/usr/bin/:"${HERE}"/usr/sbin/:"${HERE}"/usr/games/:"${HERE}"/bin/:"${HERE}"/sbin/:"${PATH}"
-        export LD_LIBRARY_PATH="${HERE}"/usr/lib/:"${HERE}"/usr/lib/i386-linux-gnu/:"${HERE}"/usr/lib/x86_64-linux-gnu/:"${HERE}"/usr/lib32/:"${HERE}"/usr/lib64/:"${HERE}"/lib/:"${HERE}"/lib/i386-linux-gnu/:"${HERE}"/lib/x86_64-linux-gnu/:"${HERE}"/lib32/:"${HERE}"/lib64/:"${LD_LIBRARY_PATH}"
-        export PYTHONPATH="${HERE}"/usr/share/pyshared/:"${PYTHONPATH}"
-        export XDG_DATA_DIRS="${HERE}"/usr/share/:"${XDG_DATA_DIRS}"
-        export PERLLIB="${HERE}"/usr/share/perl5/:"${HERE}"/usr/lib/perl5/:"${PERLLIB}"
-        export GSETTINGS_SCHEMA_DIR="${HERE}"/usr/share/glib-2.0/schemas/:"${GSETTINGS_SCHEMA_DIR}"
-        export QT_PLUGIN_PATH="${HERE}"/usr/lib/qt4/plugins/:"${HERE}"/usr/lib/i386-linux-gnu/qt4/plugins/:"${HERE}"/usr/lib/x86_64-linux-gnu/qt4/plugins/:"${HERE}"/usr/lib32/qt4/plugins/:"${HERE}"/usr/lib64/qt4/plugins/:"${HERE}"/usr/lib/qt5/plugins/:"${HERE}"/usr/lib/i386-linux-gnu/qt5/plugins/:"${HERE}"/usr/lib/x86_64-linux-gnu/qt5/plugins/:"${HERE}"/usr/lib32/qt5/plugins/:"${HERE}"/usr/lib64/qt5/plugins/:"${QT_PLUGIN_PATH}"
-        EXEC="$(grep -e '^Exec=.*' "${HERE}"/*.desktop | head -n 1 | cut -d "=" -f 2 | cut -d " " -f 1)"
-        exec "${HERE}"/usr/bin/"${EXEC}" "$@"
+        HERE="$(dirname "$(readlink -f "${0}")")"
+        export LD_LIBRARY_PATH="${HERE}/usr/lib:${HERE}/lib:${LD_LIBRARY_PATH}"
+        export QT_PLUGIN_PATH="${HERE}/usr/lib/qt6/plugins:${QT_PLUGIN_PATH}"
+        exec "${HERE}/usr/bin/artemis" "$@"
         APPRUN_EOF
-            chmod +x AppRun
-            
-            # Copy desktop file to root
-            cp usr/share/applications/artemis.desktop artemis.desktop
-            
-            # Create the AppImage manually
-            echo "Creating manual AppImage with appimagetool"
-            appimagetool . "../installer-release/Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage" 2>&1 | tee manual.log
-            
-            if [ -f "../installer-release/Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage" ]; then
-              echo "SUCCESS: Manual AppImage creation worked!"
-              exit 0
-            else
-              echo "Manual creation failed, checking logs:"
-              tail -10 manual.log
-            fi
-          fi
-          
-          echo "=== ALL METHODS FAILED ==="
-          echo "Final directory structure:"
-          find . -type f | head -20
-          echo "All logs:"
-          for log in *.log; do
-            if [ -f "$log" ]; then
-              echo "=== $log ==="
-              tail -5 "$log"
-            fi
-          done
+        chmod +x AppRun
+        
+        # Ensure a desktop file is at the AppDir root for appimagetool
+        cp -f usr/share/applications/artemis.desktop . || true
+        
+        echo "=== Creating AppImage with appimagetool ==="
+        appimagetool . "../installer-release/Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage" 2>&1 | tee appimagetool.log
+        
+        if [ ! -f "../installer-release/Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage" ]; then
+          echo "ERROR: appimagetool failed"
+          tail -50 appimagetool.log || true
           exit 1
         fi
     
@@ -1660,28 +1538,22 @@ jobs:
           - --socket=pulseaudio
           - --share=network
           - --filesystem=home
-          # GPU and hardware acceleration access (critical for Steam Deck)
+          # GPU and hardware acceleration access (critical for Steam Deck and desktop)
           - --device=dri
-          - --device=all  # Allow access to GPU devices
-          - --filesystem=/sys/dev/char:ro
-          - --filesystem=/sys/devices/pci*:ro
-          # GPU driver library access
-          - --filesystem=/usr/lib/dri:ro
-          - --filesystem=/usr/lib/x86_64-linux-gnu/dri:ro
-          - --filesystem=/usr/lib64/dri:ro
-          - --filesystem=/usr/share/drirc.d:ro
-          # NVIDIA driver access
-          - --filesystem=/usr/lib/nvidia:ro
-          - --filesystem=/usr/lib/x86_64-linux-gnu/nvidia:ro
-          - --filesystem=/usr/lib64/nvidia:ro
-          # Mesa/Intel driver access (important for Steam Deck)
-          - --filesystem=/usr/lib/mesa:ro
-          - --filesystem=/usr/lib/x86_64-linux-gnu/mesa:ro
-          # VAAPI/VDPAU libraries
-          - --filesystem=/usr/lib/libva:ro
-          - --filesystem=/usr/lib/x86_64-linux-gnu/libva:ro
-          - --filesystem=/usr/lib/vdpau:ro
-          - --filesystem=/usr/lib/x86_64-linux-gnu/vdpau:ro
+        add-extensions:
+          # Mount host GL/Vulkan drivers from the Freedesktop runtime
+          org.freedesktop.Platform.GL.default:
+            version: '23.08'
+          org.freedesktop.Platform.GL.nvidia:
+            version: '23.08'
+            subdirectories: true
+            no-autodownload: true
+            autodelete: false
+          # Mount host VA-API drivers for hardware video decode
+          org.freedesktop.Platform.VAAPI.Intel:
+            version: '23.08'
+          org.freedesktop.Platform.VAAPI.AMD:
+            version: '23.08'
         modules:
           - name: opus
             sources:
