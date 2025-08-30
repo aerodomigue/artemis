@@ -1462,7 +1462,7 @@ jobs:
         cp -f usr/share/applications/artemis.desktop . || true
         
         echo "=== Creating AppImage with appimagetool ==="
-        appimagetool . "../installer-release/Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage" 2>&1 | tee appimagetool.log
+        ARCH=x86_64 appimagetool . "../installer-release/Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage" 2>&1 | tee appimagetool.log
         
         if [ ! -f "../installer-release/Artemis-${{ needs.setup-version.outputs.version }}-x86_64.AppImage" ]; then
           echo "ERROR: appimagetool failed"
