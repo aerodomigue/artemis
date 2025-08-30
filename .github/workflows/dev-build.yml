@@ -1213,7 +1213,8 @@ jobs:
     name: AppImage Development Build (Moonlight Compatible Dependencies)
     needs: setup-version
     runs-on: ubuntu-22.04  # Use Ubuntu 22.04 since 20.04 is deprecated
-    if: needs.setup-version.outputs.should_build == 'true'
+    if: false  # Temporarily disabled
+    # if: needs.setup-version.outputs.should_build == 'true'
     
     env:
       FFMPEG_CONFIGURE_ARGS: --enable-pic --disable-static --enable-shared --disable-all --enable-avcodec --enable-avformat --enable-swscale --enable-decoder=h264 --enable-decoder=hevc --enable-decoder=av1 --enable-hwaccel=h264_vaapi --enable-hwaccel=hevc_vaapi --enable-hwaccel=av1_vaapi --enable-hwaccel=h264_vdpau --enable-hwaccel=hevc_vdpau --enable-hwaccel=av1_vdpau --enable-hwaccel=h264_vulkan --enable-hwaccel=hevc_vulkan --enable-hwaccel=av1_vulkan --enable-libdav1d --enable-decoder=libdav1d
@@ -1547,20 +1548,43 @@ jobs:
           - --filesystem=home
           # GPU and hardware acceleration access (critical for Steam Deck and desktop)
           - --device=dri
+          # Enable access to host graphics drivers (Mesa, NVIDIA, etc.)
+          - --filesystem=host-os
+          - --filesystem=/usr/share/drirc.d:ro
+          # Allow access to VA-API and VDPAU hardware decode libraries
+          - --env=LIBVA_DRIVERS_PATH=/run/host/usr/lib/x86_64-linux-gnu/dri:/run/host/usr/lib/dri:/usr/lib/x86_64-linux-gnu/dri
+          - --env=VDPAU_DRIVER_PATH=/run/host/usr/lib/x86_64-linux-gnu/vdpau:/run/host/usr/lib/vdpau:/usr/lib/x86_64-linux-gnu/vdpau
         add-extensions:
           # Mount host GL/Vulkan drivers from the Freedesktop runtime
           org.freedesktop.Platform.GL.default:
             version: '23.08'
-          org.freedesktop.Platform.GL.nvidia:
-            version: '23.08'
+            directory: gl-default
             subdirectories: true
             no-autodownload: true
             autodelete: false
+            add-ld-path: lib
+          org.freedesktop.Platform.GL.nvidia:
+            version: '23.08'
+            directory: gl-nvidia
+            subdirectories: true
+            no-autodownload: true
+            autodelete: false
+            add-ld-path: lib
           # Mount host VA-API drivers for hardware video decode
           org.freedesktop.Platform.VAAPI.Intel:
             version: '23.08'
+            directory: vaapi-intel
+            subdirectories: true
+            no-autodownload: true
+            autodelete: false
+            add-ld-path: lib
           org.freedesktop.Platform.VAAPI.AMD:
             version: '23.08'
+            directory: vaapi-amd
+            subdirectories: true
+            no-autodownload: true
+            autodelete: false
+            add-ld-path: lib
         modules:
           - name: opus
             sources:
@@ -1656,6 +1680,11 @@ jobs:
             buildsystem: simple
             build-commands:
               - install -d /app/lib/GL # Workaround for NVIDIA driver issue
+              # Create extension mount directories for hardware acceleration
+              - install -d /app/lib/gl-default
+              - install -d /app/lib/gl-nvidia
+              - install -d /app/lib/vaapi-intel
+              - install -d /app/lib/vaapi-amd
               - rm -f .qmake.stash .qmake.cache
               - find . -name "Makefile*" -delete || true
               - rm -rf AntiHooking/ || true
@@ -1820,7 +1849,7 @@ jobs:
 
   create-dev-release:
     name: Create Development Release
-    needs: [setup-version, build-windows-x64-portable, build-windows-arm64-portable, build-windows-universal-installer, build-macos-dev, build-linux-dev, build-appimage-dev, build-flatpak-dev, build-raspberry-pi-dev]
+    needs: [setup-version, build-windows-x64-portable, build-windows-arm64-portable, build-windows-universal-installer, build-macos-dev, build-linux-dev, build-flatpak-dev, build-raspberry-pi-dev]
     runs-on: ubuntu-latest
     if: (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && needs.setup-version.outputs.should_build == 'true'  # Create releases for develop/main branches when builds ran
     
