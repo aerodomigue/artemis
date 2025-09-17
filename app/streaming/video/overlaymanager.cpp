@@ -9,8 +9,8 @@ OverlayManager::OverlayManager() :
 {
     memset(m_Overlays, 0, sizeof(m_Overlays));
 
-    m_Overlays[OverlayType::OverlayDebug].color = {0xD0, 0xD0, 0x00, 0xFF};
-    m_Overlays[OverlayType::OverlayDebug].fontSize = 20;
+    m_Overlays[OverlayType::OverlayDebug].color = {0xFF, 0xFF, 0xFF, 0xFF};
+    m_Overlays[OverlayType::OverlayDebug].fontSize = 18;
 
     m_Overlays[OverlayType::OverlayStatusUpdate].color = {0xCC, 0x00, 0x00, 0xFF};
     m_Overlays[OverlayType::OverlayStatusUpdate].fontSize = 36;
@@ -157,14 +157,128 @@ void OverlayManager::notifyOverlayUpdated(OverlayType type)
     }
 
     if (m_Overlays[type].enabled) {
-        // The _Wrapped variant is required for line breaks to work
-        SDL_Surface* surface = TTF_RenderText_Blended_Wrapped(m_Overlays[type].font,
-                                                              m_Overlays[type].text,
-                                                              m_Overlays[type].color,
-                                                              1024);
-        SDL_AtomicSetPtr((void**)&m_Overlays[type].surface, surface);
+        if (type == OverlayType::OverlayDebug) {
+            // For debug overlay, create multi-colored surface
+            SDL_Surface* surface = createColoredDebugSurface(m_Overlays[type].text);
+            SDL_AtomicSetPtr((void**)&m_Overlays[type].surface, surface);
+        } else {
+            // For other overlays, use simple rendering
+            SDL_Surface* surface = TTF_RenderText_Blended_Wrapped(m_Overlays[type].font,
+                                                                  m_Overlays[type].text,
+                                                                  m_Overlays[type].color,
+                                                                  4096); // Increase width to avoid line wrapping
+            SDL_AtomicSetPtr((void**)&m_Overlays[type].surface, surface);
+        }
     }
 
     // Notify the renderer
     m_Renderer->notifyOverlayUpdated(type);
+}
+
+SDL_Surface* OverlayManager::createColoredDebugSurface(const char* text)
+{
+    // Define latency thresholds for progressive coloring
+    const float EXCELLENT_THRESHOLD = 5.0f;   // < 5ms = Blanc (excellent)
+    const float GOOD_THRESHOLD = 10.0f;       // 5-10ms = Vert (bon)
+    const float AVERAGE_THRESHOLD = 20.0f;    // 10-20ms = Jaune (moyen)
+    const float POOR_THRESHOLD = 35.0f;       // 20-35ms = Orange (mauvais)
+    // > 35ms = Rouge (très mauvais)
+    
+    // Parse latency values
+    float renderTime = 0.0f, decodeTime = 0.0f, encodeTime = 0.0f, totalTime = 0.0f;
+    
+    // Extract values
+    const char* renderPos = strstr(text, "Render ");
+    if (renderPos) sscanf(renderPos, "Render %fms", &renderTime);
+    
+    const char* decodePos = strstr(text, "Decode ");
+    if (decodePos) sscanf(decodePos, "Decode %fms", &decodeTime);
+    
+    const char* encodePos = strstr(text, "Encode ");
+    if (encodePos) sscanf(encodePos, "Encode %fms", &encodeTime);
+    
+    const char* totalPos = strstr(text, "Total ");
+    if (totalPos) sscanf(totalPos, "Total %fms", &totalTime);
+    
+    // Find the worst latency to determine overall color
+    float maxLatency = 0.0f;
+    if (renderTime > maxLatency) maxLatency = renderTime;
+    if (decodeTime > maxLatency) maxLatency = decodeTime;
+    if (encodeTime > maxLatency) maxLatency = encodeTime;
+    if (totalTime > maxLatency) maxLatency = totalTime;
+    
+    // Determine color based on worst latency
+    SDL_Color textColor;
+    if (maxLatency < EXCELLENT_THRESHOLD) {
+        textColor = {0xFF, 0xFF, 0xFF, 0xFF}; // Blanc (excellent)
+    } else if (maxLatency < GOOD_THRESHOLD) {
+        textColor = {0x44, 0xFF, 0x44, 0xFF}; // Vert (bon)
+    } else if (maxLatency < AVERAGE_THRESHOLD) {
+        textColor = {0x00, 0xFF, 0xFF, 0xFF}; // Jaune (moyen) - inversé
+    } else if (maxLatency < POOR_THRESHOLD) {
+        textColor = {0x00, 0x88, 0xFF, 0xFF}; // Orange (mauvais) - inversé
+    } else {
+        textColor = {0x44, 0x44, 0xFF, 0xFF}; // Rouge (très mauvais) - inversé
+    }
+    
+    // Render text surface
+    SDL_Surface* textSurface = TTF_RenderText_Blended_Wrapped(m_Overlays[OverlayType::OverlayDebug].font,
+                                                              text,
+                                                              textColor,
+                                                              4096);
+    
+    if (!textSurface) {
+        return nullptr;
+    }
+    
+    // Create background surface with padding
+    int padding = 12;
+    SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(0,
+                                                          textSurface->w + (padding * 2),
+                                                          textSurface->h + (padding * 2),
+                                                          32,
+                                                          SDL_PIXELFORMAT_ABGR8888);
+    
+    if (!surface) {
+        SDL_FreeSurface(textSurface);
+        return nullptr;
+    }
+    
+    // Fill with semi-transparent black background (75% opacity)
+    SDL_FillRect(surface, &surface->clip_rect, SDL_MapRGBA(surface->format, 0x00, 0x00, 0x00, 192));
+    
+    // Blit text onto background
+    SDL_Rect dstRect = {padding, padding, textSurface->w, textSurface->h};
+    SDL_BlitSurface(textSurface, nullptr, surface, &dstRect);
+    
+    SDL_FreeSurface(textSurface);
+    return surface;
+}
+
+bool OverlayManager::hasHighLatency(const char* text)
+{
+    // Define latency thresholds in milliseconds
+    const float RENDER_THRESHOLD = 10.0f;   // 10ms for render
+    const float DECODE_THRESHOLD = 15.0f;   // 15ms for decode
+    const float ENCODE_THRESHOLD = 20.0f;   // 20ms for encode
+    const float TOTAL_THRESHOLD = 35.0f;    // 35ms total
+    
+    // Parse the text to extract latency values
+    float renderTime = 0.0f, decodeTime = 0.0f, encodeTime = 0.0f, totalTime = 0.0f;
+    
+    // Look for "Render X.XXms", "Decode X.XXms", "Encode X.XXms", "Total X.Xms"
+    if (sscanf(text, "%*[^R]Render %fms", &renderTime) == 1 && renderTime > RENDER_THRESHOLD) {
+        return true;
+    }
+    if (sscanf(text, "%*[^D]Decode %fms", &decodeTime) == 1 && decodeTime > DECODE_THRESHOLD) {
+        return true;
+    }
+    if (sscanf(text, "%*[^E]Encode %fms", &encodeTime) == 1 && encodeTime > ENCODE_THRESHOLD) {
+        return true;
+    }
+    if (sscanf(text, "%*[^T]Total %fms", &totalTime) == 1 && totalTime > TOTAL_THRESHOLD) {
+        return true;
+    }
+    
+    return false;
 }

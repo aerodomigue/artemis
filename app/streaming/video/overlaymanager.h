@@ -37,6 +37,12 @@ public:
     SDL_Color getOverlayColor(OverlayType type);
     int getOverlayFontSize(OverlayType type);
     SDL_Surface* getUpdatedOverlaySurface(OverlayType type);
+    
+    // Check if text contains high latency and should be colored red
+    bool hasHighLatency(const char* text);
+    
+    // Create a multi-colored surface for debug text with red highlights for high latency values
+    SDL_Surface* createColoredDebugSurface(const char* text);
 
     void setOverlayRenderer(IOverlayRenderer* renderer);
 

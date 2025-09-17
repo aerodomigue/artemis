@@ -3,6 +3,7 @@
 #include "streaming/session.h"
 #include "backend/systemproperties.h"
 #include "settings/streamingpreferences.h"
+#include "bandwidth.h"
 
 #include <h264_stream.h>
 
@@ -256,6 +257,9 @@ FFmpegVideoDecoder::FFmpegVideoDecoder(bool testOnly)
 
     SDL_AtomicSet(&m_DecoderThreadShouldQuit, 0);
 
+    // Start bandwidth monitoring
+    BandwidthCalculator::instance()->start();
+
     // Use linear filtering when renderer scaling is required
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
 }
@@ -263,6 +267,9 @@ FFmpegVideoDecoder::FFmpegVideoDecoder(bool testOnly)
 FFmpegVideoDecoder::~FFmpegVideoDecoder()
 {
     reset();
+
+    // Stop bandwidth monitoring
+    BandwidthCalculator::instance()->stop();
 
     // Set log level back to default.
     // NB: We don't do this in reset() because we want
@@ -825,6 +832,81 @@ void FFmpegVideoDecoder::addVideoStats(VIDEO_STATS& src, VIDEO_STATS& dst)
     dst.receivedFps = (float)dst.receivedFrames / ((float)(now - dst.measurementStartTimestamp) / 1000);
     dst.decodedFps = (float)dst.decodedFrames / ((float)(now - dst.measurementStartTimestamp) / 1000);
     dst.renderedFps = (float)dst.renderedFrames / ((float)(now - dst.measurementStartTimestamp) / 1000);
+}
+
+void FFmpegVideoDecoder::stringifyPerformanceStats(VIDEO_STATS& stats, char* output, int length)
+{
+    const char* codecString;
+
+    // Start with an empty string
+    output[0] = 0;
+
+    switch (m_VideoFormat)
+    {
+    case VIDEO_FORMAT_H264:
+        codecString = "H.264";
+        break;
+    case VIDEO_FORMAT_H264_HIGH8_444:
+        codecString = "H.264 4:4:4";
+        break;
+    case VIDEO_FORMAT_H265:
+        codecString = "HEVC";
+        break;
+    case VIDEO_FORMAT_H265_REXT8_444:
+        codecString = "HEVC 4:4:4";
+        break;
+    case VIDEO_FORMAT_H265_MAIN10:
+        codecString = LiGetCurrentHostDisplayHdrMode() ? "HEVC 10-bit HDR" : "HEVC 10-bit SDR";
+        break;
+    case VIDEO_FORMAT_H265_REXT10_444:
+        codecString = LiGetCurrentHostDisplayHdrMode() ? "HEVC 10-bit HDR 4:4:4" : "HEVC 10-bit SDR 4:4:4";
+        break;
+    case VIDEO_FORMAT_AV1_MAIN8:
+        codecString = "AV1";
+        break;
+    case VIDEO_FORMAT_AV1_HIGH8_444:
+        codecString = "AV1 4:4:4";
+        break;
+    case VIDEO_FORMAT_AV1_MAIN10:
+        codecString = LiGetCurrentHostDisplayHdrMode() ? "AV1 10-bit HDR" : "AV1 10-bit SDR";
+        break;
+    case VIDEO_FORMAT_AV1_HIGH10_444:
+        codecString = LiGetCurrentHostDisplayHdrMode() ? "AV1 10-bit HDR 4:4:4" : "AV1 10-bit SDR 4:4:4";
+        break;
+    default:
+        codecString = "UNKNOWN";
+        break;
+    }
+
+    if (stats.receivedFps > 0 && m_VideoDecoderCtx != nullptr) {
+        // Format: Resolution@RefreshRate CODEC FPS Rx.x Dx.x Rx.x Network X ± Xms Loss X.XX% Bandwidth XX.XX Mbps | Render X.XXms • Decode X.XXms • Encode X.Xms
+        float networkLoss = stats.totalFrames > 0 ? (float)stats.networkDroppedFrames / stats.totalFrames * 100 : 0.0f;
+        float avgDecodeTime = stats.decodedFrames > 0 ? (float)stats.totalDecodeTime / stats.decodedFrames : 0.0f;
+        float avgRenderTime = stats.renderedFrames > 0 ? (float)stats.totalRenderTime / stats.renderedFrames : 0.0f;
+        float avgHostProcessingTime = stats.framesWithHostProcessingLatency > 0 ? 
+            (float)stats.totalHostProcessingLatency / 10 / stats.framesWithHostProcessingLatency : 0.0f;
+        float currentBandwidthMbps = BandwidthCalculator::instance()->getCurrentBandwidthKbps() / 1000.0f;
+        float totalLatency = avgRenderTime + avgDecodeTime + avgHostProcessingTime;
+
+        snprintf(output, length,
+                "%dx%d@%d - %s \u007C FPS %.1f - Rx %.1f - De %.1f - Rd %.1f \u007C Network %u +/- %ums - Loss %.2f%% - Bandwidth %.1f Mbps \u007C Render %.2fms - Decode %.2fms - Encode %.1fms - Total %.1fms",
+                m_VideoDecoderCtx->width,
+                m_VideoDecoderCtx->height,
+                m_StreamFps,
+                codecString,
+                stats.renderedFps,
+                stats.receivedFps,
+                stats.decodedFps,
+                stats.renderedFps,
+                stats.lastRtt,
+                stats.lastRttVariance,
+                networkLoss,
+                currentBandwidthMbps,
+                avgRenderTime,
+                avgDecodeTime,
+                avgHostProcessingTime,
+                totalLatency);
+    }
 }
 
 void FFmpegVideoDecoder::stringifyVideoStats(VIDEO_STATS& stats, char* output, int length)
@@ -1920,7 +2002,7 @@ int FFmpegVideoDecoder::submitDecodeUnit(PDECODE_UNIT du)
             addVideoStats(m_LastWndVideoStats, lastTwoWndStats);
             addVideoStats(m_ActiveWndVideoStats, lastTwoWndStats);
 
-            stringifyVideoStats(lastTwoWndStats,
+            stringifyPerformanceStats(lastTwoWndStats,
                                 Session::get()->getOverlayManager().getOverlayText(Overlay::OverlayDebug),
                                 Session::get()->getOverlayManager().getOverlayMaxTextLength());
             Session::get()->getOverlayManager().setOverlayTextUpdated(Overlay::OverlayDebug);

@@ -497,7 +497,7 @@ public:
 
             switch (type) {
             case Overlay::OverlayDebug:
-                [m_OverlayTextFields[type] setAlignment:NSTextAlignmentLeft];
+                [m_OverlayTextFields[type] setAlignment:NSTextAlignmentCenter];
                 break;
             case Overlay::OverlayStatusUpdate:
                 [m_OverlayTextFields[type] setAlignment:NSTextAlignmentRight];
