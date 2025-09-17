@@ -120,10 +120,9 @@ public:
             delete m_ServerCommandManager;
             m_ServerCommandManager = nullptr;
         }
-        if (m_ClipboardManager) {
-            delete m_ClipboardManager;
-            m_ClipboardManager = nullptr;
-        }
+        // Note: m_ClipboardManager is a singleton instance from ClipboardManager::instance()
+        // Do NOT delete it - it's managed elsewhere
+        m_ClipboardManager = nullptr;
     };
 
     Q_INVOKABLE void exec(QWindow* qtWindow);

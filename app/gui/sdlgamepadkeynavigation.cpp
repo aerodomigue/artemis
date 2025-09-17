@@ -3,6 +3,7 @@
 #include <QKeyEvent>
 #include <QGuiApplication>
 #include <QWindow>
+#include <QCoreApplication>
 
 #include "settings/mappingmanager.h"
 
@@ -22,7 +23,22 @@ SdlGamepadKeyNavigation::SdlGamepadKeyNavigation(StreamingPreferences* prefs)
 
 SdlGamepadKeyNavigation::~SdlGamepadKeyNavigation()
 {
+    // Stop timer FIRST and ensure it's completely stopped
+    if (m_PollingTimer) {
+        m_PollingTimer->stop();
+        
+        // Force any pending timer events to be processed
+        QCoreApplication::processEvents();
+    }
+    
+    // THEN disable SDL (only after timer is guaranteed stopped)
     disable();
+    
+    // Clean up timer object safely
+    if (m_PollingTimer) {
+        m_PollingTimer->deleteLater();
+        m_PollingTimer = nullptr;
+    }
 }
 
 void SdlGamepadKeyNavigation::enable()
@@ -97,6 +113,11 @@ void SdlGamepadKeyNavigation::notifyWindowFocus(bool hasFocus)
 
 void SdlGamepadKeyNavigation::onPollingTimerFired()
 {
+    // Safety check: Don't process if we're being destroyed or disabled
+    if (!m_Enabled || !m_PollingTimer || !m_PollingTimer->isActive()) {
+        return;
+    }
+    
     SDL_Event event;
 
     // Discard any pending button events on the first poll to avoid picking up
@@ -109,7 +130,13 @@ void SdlGamepadKeyNavigation::onPollingTimerFired()
         m_FirstPoll = false;
     }
 
-    while (SDL_PollEvent(&event)) {
+    // Limit number of events processed per timer tick to prevent infinite loops
+    int eventCount = 0;
+    const int maxEvents = 100;
+
+    while (SDL_PollEvent(&event) && eventCount < maxEvents) {
+        eventCount++;
+        
         switch (event.type) {
         case SDL_QUIT:
             // SDL may send us a quit event since we initialize
@@ -120,6 +147,11 @@ void SdlGamepadKeyNavigation::onPollingTimerFired()
         case SDL_CONTROLLERBUTTONDOWN:
         case SDL_CONTROLLERBUTTONUP:
         {
+            // Validate event data before use
+            if (event.cbutton.which == 0 && event.cbutton.button >= SDL_CONTROLLER_BUTTON_MAX) {
+                continue; // Skip invalid events
+            }
+            
             QEvent::Type type =
                     event.type == SDL_CONTROLLERBUTTONDOWN ?
                         QEvent::Type::KeyPress : QEvent::Type::KeyRelease;
@@ -258,16 +290,35 @@ void SdlGamepadKeyNavigation::onPollingTimerFired()
 
 void SdlGamepadKeyNavigation::sendKey(QEvent::Type type, Qt::Key key, Qt::KeyboardModifiers modifiers)
 {
+    // Safety check: Don't send events if we're being destroyed
+    if (!m_Enabled) {
+        return;
+    }
+    
     QGuiApplication* app = static_cast<QGuiApplication*>(QGuiApplication::instance());
+    if (!app) {
+        return; // App is shutting down
+    }
+    
     QWindow* focusWindow = app->focusWindow();
     if (focusWindow != nullptr) {
-        QKeyEvent keyPressEvent(type, key, modifiers);
-        app->sendEvent(focusWindow, &keyPressEvent);
+        // Create event on stack to avoid memory issues
+        QKeyEvent keyEvent(type, key, modifiers);
+        
+        // Additional safety check before sending
+        if (focusWindow->isExposed()) {
+            app->sendEvent(focusWindow, &keyEvent);
+        }
     }
 }
 
 void SdlGamepadKeyNavigation::updateTimerState()
 {
+    // Safety check for null pointer
+    if (!m_PollingTimer) {
+        return;
+    }
+    
     if (m_PollingTimer->isActive() && (!m_HasFocus || !m_Enabled)) {
         m_PollingTimer->stop();
     }
